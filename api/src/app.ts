@@ -17,57 +17,54 @@ dotenv.config();
 
 const app = express();
 
-// Security middleware
-app.use(helmet());
+// ---- CORS (EN ÜSTE) ----
+const allowlist = new Set([
+  "http://elitefilomuhasebe.com",
+  "https://elitefilomuhasebe.com", 
+  "http://www.elitefilomuhasebe.com",
+  "https://www.elitefilomuhasebe.com",
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://localhost:5174"
+]);
 
-// CORS configuration
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'https://elitefilomuhasebe.com',
-  'http://elitefilomuhasebe.com',
-  'https://www.elitefilomuhasebe.com',
-  'http://www.elitefilomuhasebe.com'
-];
-
-if (process.env.ALLOWED_ORIGIN) {
-  if (process.env.ALLOWED_ORIGIN === '*') {
-    // Allow all origins
-  } else {
-    allowedOrigins.push(process.env.ALLOWED_ORIGIN);
-  }
+// Add environment origin if exists
+if (process.env.ALLOWED_ORIGIN && process.env.ALLOWED_ORIGIN !== '*') {
+  allowlist.add(process.env.ALLOWED_ORIGIN);
 }
 
-const corsOptions = {
-  origin: process.env.ALLOWED_ORIGIN === '*' ? true : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
-};
-
 // Add Vary header for proper caching
-app.use((req, res, next) => {
-  res.header('Vary', 'Origin');
-  next();
+app.use((req, res, next) => { 
+  res.header("Vary", "Origin"); 
+  next(); 
 });
 
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Enable preflight for all routes
+app.use(cors({
+  origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return cb(null, true);
+    
+    // Allow all origins if ALLOWED_ORIGIN is *
+    if (process.env.ALLOWED_ORIGIN === '*') return cb(null, true);
+    
+    // Check if origin is in allowlist
+    cb(null, allowlist.has(origin));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  optionsSuccessStatus: 200
+}));
 
-// Body parsing middleware
+// Preflight for all routes
+app.options("*", cors());
+
+// ---- Other middleware AFTER CORS ----
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Security middleware
+app.use(helmet());
 
 // Add noindex header to all responses
 app.use((req, res, next) => {
