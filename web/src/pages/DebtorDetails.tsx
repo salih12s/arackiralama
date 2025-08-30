@@ -262,7 +262,7 @@ export default function DebtorDetails() {
     });
 
     console.log('✅ Processed all rentals, customers found:', customerMap.size);
-    customerMap.forEach((customer, id) => {
+    customerMap.forEach((customer) => {
       console.log(`👤 ${customer.customerName}: ${customer.totalRentals} rentals, ${customer.currentDebt.toFixed(2)} TL debt`);
     });
 

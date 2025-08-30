@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3005/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://arackiralama-production.up.railway.app/api',
   timeout: 30000, // Increase timeout
 });
 

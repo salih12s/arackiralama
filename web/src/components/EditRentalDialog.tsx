@@ -116,7 +116,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
   const rentalData = rental || (rentalResponse?.data || rentalResponse) as Rental;
 
   // Fetch all vehicles (for changing vehicle if needed)
-  const { data: vehiclesResponse, isLoading: vehiclesLoading, error: vehiclesError } = useQuery({
+  const { data: vehiclesResponse } = useQuery({
     queryKey: ['vehicles-all'],
     queryFn: () => vehiclesApi.getAll(),
     enabled: true, // Always load vehicles

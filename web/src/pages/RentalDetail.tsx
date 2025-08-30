@@ -55,7 +55,7 @@ export default function RentalDetail() {
   // Return rental mutation
   const returnRentalMutation = useMutation({
     mutationFn: (rentalId: string) => 
-      fetch(`http://localhost:3005/api/rentals/${rentalId}/return`, { 
+      fetch(`https://arackiralama-production.up.railway.app/api/rentals/${rentalId}/return`, { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -71,7 +71,7 @@ export default function RentalDetail() {
   // Complete rental mutation
   const completeRentalMutation = useMutation({
     mutationFn: (rentalId: string) => 
-      fetch(`http://localhost:3005/api/rentals/${rentalId}/complete`, { 
+      fetch(`https://arackiralama-production.up.railway.app/api/rentals/${rentalId}/complete`, { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

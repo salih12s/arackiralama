@@ -229,7 +229,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                   <FormControl fullWidth margin="normal" error={!!errors.vehicleId}>
                     <InputLabel>Araç</InputLabel>
                     <Select {...field} label="Araç">
-                      {vehicles?.map((vehicle) => (
+                      {vehicles?.data?.map((vehicle: any) => (
                         <MenuItem key={vehicle.id} value={vehicle.id}>
                           {vehicle.plate} {vehicle.name && `- ${vehicle.name}`}
                         </MenuItem>
