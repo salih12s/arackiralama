@@ -24,22 +24,46 @@ app.use(helmet());
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
-  'http://localhost:5174'
+  'http://localhost:5174',
+  'https://elitefilomuhasebe.com',
+  'http://elitefilomuhasebe.com',
+  'https://www.elitefilomuhasebe.com',
+  'http://www.elitefilomuhasebe.com'
 ];
 
 if (process.env.ALLOWED_ORIGIN) {
-  allowedOrigins.push(process.env.ALLOWED_ORIGIN);
+  if (process.env.ALLOWED_ORIGIN === '*') {
+    // Allow all origins
+  } else {
+    allowedOrigins.push(process.env.ALLOWED_ORIGIN);
+  }
 }
 
 const corsOptions = {
-  origin: allowedOrigins,
+  origin: process.env.ALLOWED_ORIGIN === '*' ? true : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 };
 
+// Add Vary header for proper caching
+app.use((req, res, next) => {
+  res.header('Vary', 'Origin');
+  next();
+});
+
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Enable preflight for all routes
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
