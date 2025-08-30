@@ -1,0 +1,114 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+}
+
+enum VehicleStatus {
+  IDLE
+  RENTED
+  RESERVED
+  SERVICE
+}
+
+enum RentalStatus {
+  ACTIVE
+  RETURNED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(ADMIN)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+model Vehicle {
+  id        String        @id @default(cuid())
+  plate     String        @unique
+  name      String?
+  active    Boolean       @default(true)
+  status    VehicleStatus @default(IDLE)
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  rentals Rental[]
+
+  @@map("vehicles")
+}
+
+model Customer {
+  id       String @id @default(cuid())
+  fullName String @map("full_name")
+  phone    String?
+
+  rentals Rental[]
+
+  @@map("customers")
+}
+
+model Rental {
+  id         String       @id @default(cuid())
+  vehicleId  String       @map("vehicle_id")
+  customerId String       @map("customer_id")
+  startDate  DateTime     @map("start_date")
+  endDate    DateTime     @map("end_date")
+  days       Int
+  dailyPrice Int          @map("daily_price") // in kuruş (cents)
+  kmDiff     Int          @default(0) @map("km_diff") // in kuruş
+  cleaning   Int          @default(0) // in kuruş
+  hgs        Int          @default(0) // in kuruş
+  damage     Int          @default(0) // in kuruş
+  fuel       Int          @default(0) // in kuruş
+  totalDue   Int          @map("total_due") // computed: days*dailyPrice + kmDiff + cleaning + hgs + damage + fuel
+  upfront    Int          @default(0) // in kuruş
+  pay1       Int          @default(0) // in kuruş
+  pay2       Int          @default(0) // in kuruş
+  pay3       Int          @default(0) // in kuruş
+  pay4       Int          @default(0) // in kuruş
+  balance     Int // computed: totalDue - (upfront + pay1 + pay2 + pay3 + pay4 + sum(payments.amount))
+  status      RentalStatus @default(ACTIVE)
+  note        String?
+  deleted     Boolean      @default(false) // Soft delete - silinmişse true
+  deletedAt   DateTime?    @map("deleted_at") // Silinme tarihi
+  completedAt DateTime?    @map("completed_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  vehicle  Vehicle   @relation(fields: [vehicleId], references: [id])
+  customer Customer  @relation(fields: [customerId], references: [id])
+  payments Payment[]
+
+  @@map("rentals")
+}
+
+model Payment {
+  id       String        @id @default(cuid())
+  rentalId String        @map("rental_id")
+  amount   Int // in kuruş
+  paidAt   DateTime      @map("paid_at")
+  method   PaymentMethod
+
+  rental Rental @relation(fields: [rentalId], references: [id])
+
+  @@map("payments")
+}

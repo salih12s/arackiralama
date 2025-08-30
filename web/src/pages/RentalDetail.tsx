@@ -1,0 +1,517 @@
+import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Button,
+  Typography,
+  Paper,
+  Grid,
+  Card,
+  CardContent,
+  Chip,
+  Divider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  Stack,
+  Alert,
+} from '@mui/material';
+import {
+  ArrowBack as ArrowBackIcon,
+  Payment as PaymentIcon,
+  Assignment as AssignmentIcon,
+  Print as PrintIcon,
+} from '@mui/icons-material';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import dayjs from 'dayjs';
+
+import Layout from '../components/Layout';
+import AddPaymentDialog from '../components/AddPaymentDialog';
+import { rentalsApi, formatCurrency, formatDate } from '../api/client';
+
+export default function RentalDetail() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+
+  // Fetch rental details
+  const { data: rental, isLoading, error } = useQuery({
+    queryKey: ['rental', id],
+    queryFn: async () => {
+      const response = await rentalsApi.getById(id!);
+      return response.data;
+    },
+    enabled: !!id,
+    staleTime: 30 * 1000,
+    gcTime: 2 * 60 * 1000,
+  });
+
+  // Return rental mutation
+  const returnRentalMutation = useMutation({
+    mutationFn: (rentalId: string) => 
+      fetch(`http://localhost:3005/api/rentals/${rentalId}/return`, { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      }).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rental', id] });
+      queryClient.invalidateQueries({ queryKey: ['rentals'] });
+    },
+  });
+
+  // Complete rental mutation
+  const completeRentalMutation = useMutation({
+    mutationFn: (rentalId: string) => 
+      fetch(`http://localhost:3005/api/rentals/${rentalId}/complete`, { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      }).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rental', id] });
+      queryClient.invalidateQueries({ queryKey: ['rentals'] });
+    },
+  });
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ACTIVE': return 'success';
+      case 'RETURNED': return 'default';
+      case 'CANCELLED': return 'error';
+      case 'COMPLETED': return 'info';
+      default: return 'default';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'ACTIVE': return 'Aktif';
+      case 'RETURNED': return 'Teslim Edildi';
+      case 'CANCELLED': return 'İptal Edildi';
+      case 'COMPLETED': return 'Tamamlandı';
+      default: return status;
+    }
+  };
+
+  const handleReturnRental = () => {
+    if (rental) {
+      returnRentalMutation.mutate(rental.id);
+    }
+  };
+
+  const handleCompleteRental = () => {
+    if (rental) {
+      completeRentalMutation.mutate(rental.id);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Layout title="Kiralama Detayı">
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography>Kiralama detayları yükleniyor...</Typography>
+        </Paper>
+      </Layout>
+    );
+  }
+
+  if (error || !rental) {
+    return (
+      <Layout title="Kiralama Detayı">
+        <Alert severity="error" sx={{ mb: 3 }}>
+          Kiralama bulunamadı veya yüklenirken hata oluştu.
+        </Alert>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/rentals')}
+        >
+          Geri Dön
+        </Button>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title={`Kiralama Detayı - ${rental.vehicle.plate}`}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/rentals')}
+            variant="outlined"
+          >
+            Geri Dön
+          </Button>
+          
+          <Box>
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+              {rental.vehicle.plate}
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              {rental.vehicle.name || 'Araç Adı Yok'}
+            </Typography>
+          </Box>
+        </Box>
+        
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Chip
+            label={getStatusText(rental.status)}
+            color={getStatusColor(rental.status) as any}
+            size="medium"
+          />
+          
+          <IconButton
+            onClick={() => setPaymentDialogOpen(true)}
+            disabled={rental.status !== 'ACTIVE'}
+            color="primary"
+            title="Ödeme Ekle"
+          >
+            <PaymentIcon />
+          </IconButton>
+          
+          <IconButton
+            onClick={() => window.print()}
+            color="default"
+            title="Yazdır"
+          >
+            <PrintIcon />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      <Grid container spacing={3}>
+        {/* Customer Info */}
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AssignmentIcon />
+                Müşteri Bilgileri
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Ad Soyad
+                </Typography>
+                <Typography variant="h6">
+                  {rental.customer.fullName}
+                </Typography>
+              </Box>
+              
+              {rental.customer.phone && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Telefon
+                  </Typography>
+                  <Typography variant="body1">
+                    {rental.customer.phone}
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Rental Info */}
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AssignmentIcon />
+                Kiralama Bilgileri
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Başlangıç Tarihi
+                  </Typography>
+                  <Typography variant="body1">
+                    {formatDate(rental.startDate)}
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Bitiş Tarihi
+                  </Typography>
+                  <Typography variant="body1">
+                    {formatDate(rental.endDate)}
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Süre
+                  </Typography>
+                  <Typography variant="body1">
+                    {rental.days} gün
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Günlük Ücret
+                  </Typography>
+                  <Typography variant="body1">
+                    {formatCurrency(rental.dailyPrice)}
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary">
+                    Oluşturulma Tarihi
+                  </Typography>
+                  <Typography variant="body1">
+                    {dayjs(rental.createdAt).format('DD/MM/YYYY HH:mm')}
+                  </Typography>
+                </Grid>
+                
+                {rental.note && (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary">
+                      Not
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
+                      "{rental.note}"
+                    </Typography>
+                  </Grid>
+                )}
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Financial Summary */}
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Mali Durum
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              
+              <Grid container spacing={3}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'primary.50', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Günlük Ücret
+                    </Typography>
+                    <Typography variant="h6" color="primary.main">
+                      {formatCurrency(rental.dailyPrice)}
+                    </Typography>
+                  </Box>
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
+                  <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'success.50', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Toplam Tutar
+                    </Typography>
+                    <Typography variant="h6" color="success.main">
+                      {formatCurrency(rental.totalDue)}
+                    </Typography>
+                  </Box>
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
+                  <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'info.50', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Toplam Ödenen
+                    </Typography>
+                    <Typography variant="h6" color="info.main">
+                      {formatCurrency((rental.upfront || 0) + (rental.pay1 || 0) + (rental.pay2 || 0) + (rental.pay3 || 0) + (rental.pay4 || 0) + (rental.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0))}
+                    </Typography>
+                  </Box>
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
+                  <Box sx={{ textAlign: 'center', p: 2, bgcolor: rental.balance > 0 ? 'error.50' : 'success.50', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Kalan Bakiye
+                    </Typography>
+                    <Typography variant="h6" color={rental.balance > 0 ? 'error.main' : 'success.main'}>
+                      {formatCurrency(rental.balance)}
+                    </Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+
+              {/* Extra Costs */}
+              {(rental.kmDiff > 0 || rental.cleaning > 0 || rental.hgs > 0 || rental.damage > 0 || rental.fuel > 0) && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Ek Maliyetler
+                  </Typography>
+                  <Grid container spacing={2}>
+                    {rental.kmDiff > 0 && (
+                      <Grid item xs={6} sm={4} md={2.4}>
+                        <Typography variant="body2" color="text.secondary">
+                          KM Farkı
+                        </Typography>
+                        <Typography variant="body1">
+                          {formatCurrency(rental.kmDiff)}
+                        </Typography>
+                      </Grid>
+                    )}
+                    {rental.cleaning > 0 && (
+                      <Grid item xs={6} sm={4} md={2.4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Temizlik
+                        </Typography>
+                        <Typography variant="body1">
+                          {formatCurrency(rental.cleaning)}
+                        </Typography>
+                      </Grid>
+                    )}
+                    {rental.hgs > 0 && (
+                      <Grid item xs={6} sm={4} md={2.4}>
+                        <Typography variant="body2" color="text.secondary">
+                          HGS
+                        </Typography>
+                        <Typography variant="body1">
+                          {formatCurrency(rental.hgs)}
+                        </Typography>
+                      </Grid>
+                    )}
+                    {rental.damage > 0 && (
+                      <Grid item xs={6} sm={4} md={2.4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Hasar
+                        </Typography>
+                        <Typography variant="body1">
+                          {formatCurrency(rental.damage)}
+                        </Typography>
+                      </Grid>
+                    )}
+                    {rental.fuel > 0 && (
+                      <Grid item xs={6} sm={4} md={2.4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Yakıt
+                        </Typography>
+                        <Typography variant="body1">
+                          {formatCurrency(rental.fuel)}
+                        </Typography>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Payment History */}
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">
+                  Ödeme Geçmişi
+                </Typography>
+                <Button
+                  startIcon={<PaymentIcon />}
+                  onClick={() => setPaymentDialogOpen(true)}
+                  disabled={rental.status !== 'ACTIVE'}
+                  variant="outlined"
+                  size="small"
+                >
+                  Yeni Ödeme
+                </Button>
+              </Box>
+              <Divider sx={{ mb: 2 }} />
+              
+              {rental.payments && rental.payments.length > 0 ? (
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Tarih</TableCell>
+                        <TableCell>Tutar</TableCell>
+                        <TableCell>Yöntem</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {rental.payments.map((payment: any) => (
+                        <TableRow key={payment.id} hover>
+                          <TableCell>
+                            {dayjs(payment.paidAt).format('DD/MM/YYYY HH:mm')}
+                          </TableCell>
+                          <TableCell>
+                            <Typography sx={{ fontWeight: 600, color: 'success.main' }}>
+                              {formatCurrency(payment.amount)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={payment.method === 'CASH' ? 'Nakit' : payment.method === 'CARD' ? 'Kart' : 'Transfer'}
+                              size="small"
+                              variant="outlined"
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Typography color="text.secondary">
+                    Henüz ödeme kaydı bulunmuyor
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Action Buttons */}
+        {rental.status === 'ACTIVE' && (
+          <Grid item xs={12}>
+            <Paper sx={{ p: 2 }}>
+              <Stack direction="row" spacing={2} justifyContent="center">
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  onClick={handleReturnRental}
+                  disabled={returnRentalMutation.isPending}
+                >
+                  {returnRentalMutation.isPending ? 'Teslim Ediliyor...' : 'Teslim Et'}
+                </Button>
+                <Button
+                  variant="contained"
+                  color="success"
+                  onClick={handleCompleteRental}
+                  disabled={completeRentalMutation.isPending}
+                >
+                  {completeRentalMutation.isPending ? 'Tamamlanıyor...' : 'Tamamla'}
+                </Button>
+              </Stack>
+            </Paper>
+          </Grid>
+        )}
+      </Grid>
+
+      {/* Add Payment Dialog */}
+      <AddPaymentDialog
+        open={paymentDialogOpen}
+        onClose={() => setPaymentDialogOpen(false)}
+        rental={rental}
+      />
+    </Layout>
+  );
+}
