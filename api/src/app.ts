@@ -19,10 +19,19 @@ const app = express();
 
 // ---- CORS (EN ÜSTE) ----
 const allowlist = new Set([
+  // Doğru domain - console'da gelen bu
+  "http://elitefilomuhasabe.com",
+  "https://elitefilomuhasabe.com",
+  "http://www.elitefilomuhasabe.com", 
+  "https://www.elitefilomuhasabe.com",
+  
+  // Yanlış yazım da dursun, ileride yönlendirme olursa çakışmasın
   "http://elitefilomuhasebe.com",
-  "https://elitefilomuhasebe.com", 
+  "https://elitefilomuhasebe.com",
   "http://www.elitefilomuhasebe.com",
   "https://www.elitefilomuhasebe.com",
+  
+  // Dev
   "http://localhost:3000",
   "http://localhost:5173",
   "http://localhost:5174"
@@ -33,10 +42,11 @@ if (process.env.ALLOWED_ORIGIN && process.env.ALLOWED_ORIGIN !== '*') {
   allowlist.add(process.env.ALLOWED_ORIGIN);
 }
 
-// Add Vary header for proper caching
-app.use((req, res, next) => { 
-  res.header("Vary", "Origin"); 
-  next(); 
+// Debug: Log incoming origins
+app.use((req, res, next) => {
+  console.log("CORS DEBUG => Origin:", req.headers.origin, "Method:", req.method, "Path:", req.path);
+  res.header("Vary", "Origin");
+  next();
 });
 
 app.use(cors({
@@ -48,12 +58,14 @@ app.use(cors({
     if (process.env.ALLOWED_ORIGIN === '*') return cb(null, true);
     
     // Check if origin is in allowlist
-    cb(null, allowlist.has(origin));
+    const allowed = allowlist.has(origin);
+    console.log(`CORS Check: ${origin} → ${allowed ? 'ALLOWED' : 'BLOCKED'}`);
+    cb(null, allowed);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 204
 }));
 
 // Preflight for all routes
@@ -70,6 +82,12 @@ app.use(helmet());
 app.use((req, res, next) => {
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   next();
+});
+
+// Skip basic auth for OPTIONS requests (preflight)
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") return next(); // Preflight'a dokunma
+  return next();
 });
 
 // Optional basic authentication
