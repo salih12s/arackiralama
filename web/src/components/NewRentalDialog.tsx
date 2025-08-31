@@ -69,7 +69,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
     queryFn: () => customersApi.getAll()
   });
 
-  const customers = customersResponse?.data || [];
+  const customers = customersResponse?.data?.data || [];
 
   // Helper function for numeric inputs
   const handleNumericChange = (field: any, value: string, allowZero: boolean = true) => {

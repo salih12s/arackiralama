@@ -65,7 +65,7 @@ export default function Customers() {
     staleTime: 30 * 1000,
   });
 
-  const customers = customersRes?.data || [];
+  const customers = customersRes?.data?.data || [];
 
   // Create customer mutation
   const createCustomerMutation = useMutation({

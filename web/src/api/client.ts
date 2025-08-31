@@ -263,23 +263,23 @@ export const paymentsApi = {
 // Customers API
 export const customersApi = {
   getAll: (search?: string) => 
-    api.get<Customer[]>(`/customers${search ? `?search=${encodeURIComponent(search)}` : ''}`),
-  getById: (id: string) => api.get<Customer>(`/customers/${id}`),
+    api.get<{ success: boolean; data: Customer[] }>(`/customers${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  getById: (id: string) => api.get<{ success: boolean; data: Customer }>(`/customers/${id}`),
   create: (data: {
     fullName: string;
     phone?: string;
     email?: string;
     address?: string;
     identityNumber?: string;
-  }) => api.post<Customer>('/customers', data),
+  }) => api.post<{ success: boolean; data: Customer }>('/customers', data),
   update: (id: string, data: Partial<{
     fullName: string;
     phone?: string;
     email?: string;
     address?: string;
     identityNumber?: string;
-  }>) => api.put<Customer>(`/customers/${id}`, data),
-  delete: (id: string) => api.delete(`/customers/${id}`),
+  }>) => api.put<{ success: boolean; data: Customer }>(`/customers/${id}`, data),
+  delete: (id: string) => api.delete<{ success: boolean; message: string }>(`/customers/${id}`),
 };
 
 // Reports API
