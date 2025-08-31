@@ -207,7 +207,9 @@ router.post('/', async (req, res) => {
     // Determine vehicle status based on dates
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const newVehicleStatus = startDate <= today ? 'RENTED' : 'RESERVED';
+    // Always set to RENTED when creating a new rental
+    // RESERVED status should only be set manually by the user
+    const newVehicleStatus = 'RENTED';
 
     // Create rental and update vehicle status in transaction
     const result = await prisma.$transaction(async (tx: any) => {
