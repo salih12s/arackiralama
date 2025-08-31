@@ -35,7 +35,6 @@ import {
   Person as PersonIcon,
   Warning as WarningIcon,
   AccountBalance as AccountBalanceIcon,
-  TrendingDown as TrendingDownIcon,
   Edit as EditIcon,
   Save as SaveIcon,
 } from '@mui/icons-material';
@@ -356,19 +355,16 @@ export default function DebtorDetails() {
   const {
     totalCustomers,
     customersWithDebt,
-    totalOutstandingDebt,
-    averageDebt
+    totalOutstandingDebt
   } = useMemo(() => {
     const total = customerDebtHistory.length;
     const withDebt = customerDebtHistory.filter(c => c.currentDebt > 0).length;
     const outstandingDebt = customerDebtHistory.reduce((sum, c) => sum + c.currentDebt, 0);
-    const avgDebt = withDebt > 0 ? outstandingDebt / withDebt : 0;
 
     return {
       totalCustomers: total,
       customersWithDebt: withDebt,
-      totalOutstandingDebt: outstandingDebt,
-      averageDebt: avgDebt
+      totalOutstandingDebt: outstandingDebt
     };
   }, [customerDebtHistory]);
 

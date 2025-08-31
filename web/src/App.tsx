@@ -14,6 +14,7 @@ import Dashboard from './pages/Dashboard';
 import Rentals from './pages/Rentals';
 import RentalDetail from './pages/RentalDetail';
 import Vehicles from './pages/Vehicles';
+import Customers from './pages/Customers';
 import Reports from './pages/Reports';
 import DebtorDetails from './pages/DebtorDetails';
 import VehicleDetail from './pages/VehicleDetail';
@@ -101,6 +102,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Vehicles />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/customers"
+        element={
+          <ProtectedRoute>
+            <Customers />
           </ProtectedRoute>
         }
       />

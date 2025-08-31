@@ -6,7 +6,6 @@ import {
   Grid,
   Card,
   CardContent,
-  CardActions,
   Button,
   Chip,
   TextField,
@@ -24,7 +23,6 @@ import {
   ListItemText,
   Stack,
   Alert,
-  Divider,
   Table,
   TableBody,
   TableCell,
@@ -49,8 +47,6 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
-
 import Layout from '../components/Layout';
 import { vehiclesApi, reportsApi, formatCurrency, Vehicle } from '../api/client';
 

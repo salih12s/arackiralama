@@ -112,6 +112,7 @@ export default function Layout({ children, title }: LayoutProps) {
     { path: '/', label: 'Ana Sayfa', icon: <DashboardIcon /> },
     { path: '/rentals', label: 'Kiralama', icon: <Receipt /> },
     { path: '/vehicles', label: 'Araçlar', icon: <DirectionsCar /> },
+    { path: '/customers', label: 'Müşteriler', icon: <Person /> },
     { path: '/reports', label: 'Raporlar', icon: <Assessment /> },
     { path: '/debtor-details', label: 'Borçlu Detay', icon: <Person /> },
     { path: '/backup', label: 'Yedekleme', icon: <Backup /> },

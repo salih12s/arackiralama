@@ -45,7 +45,6 @@ import {
   Add,
   Visibility,
   Timeline,
-  AttachMoney,
   CheckCircle,
   MoreVert,
   Assignment,
@@ -302,6 +301,7 @@ export default function Dashboard() {
     monthBilled: 0,
     monthCollected: 0,
     monthOutstanding: 0,
+    monthVehicleProfit: 0,
   };
 
   const debtors: DebtorReport[] = debtorsRes?.data ?? [];
@@ -640,84 +640,87 @@ export default function Dashboard() {
 
       {/* KPI CARDS */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
+        {/* 1. Kiradaki Araç Sayısı */}
         <Grid item xs={12} sm={6} md={3}>
-          <KpiCard title="Toplam Araç" value={stats?.totalVehicles ?? 0} />
+          <KpiCard 
+            title="Kiradaki Araç" 
+            value={stats?.rentedToday ?? 0} 
+            color="success" 
+            icon="🚗"
+          />
         </Grid>
+        
+        {/* 2. Boştaki Araç Sayısı */}
         <Grid item xs={12} sm={6} md={3}>
-          <KpiCard title="Bugün Kirada" value={stats?.rentedToday ?? 0} color="success" />
+          <KpiCard 
+            title="Boştaki Araç" 
+            value={stats?.idle ?? 0} 
+            color="primary" 
+            icon="🅿️"
+          />
         </Grid>
+        
+        {/* 3. Rezerveli Araç Sayısı */}
         <Grid item xs={12} sm={6} md={3}>
-          <KpiCard title="Bu Ay Fatura" value={stats?.monthBilled ?? 0} isCurrency />
+          <KpiCard 
+            title="Rezerveli Araç" 
+            value={stats?.reserved ?? 0} 
+            color="warning" 
+            icon="📅"
+          />
         </Grid>
+        
+        {/* 4. Servisteki Araç Sayısı */}
         <Grid item xs={12} sm={6} md={3}>
-          <KpiCard title="Kalan Bakiye" value={stats?.monthOutstanding ?? 0} isCurrency color="error" />
+          <KpiCard 
+            title="Servisteki Araç" 
+            value={stats?.service ?? 0} 
+            color="error" 
+            icon="🔧"
+          />
         </Grid>
-
+        
+        {/* 5. Güncel Kazanç */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <StatRow
-                icon={<Schedule />}
-                label="Rezerve"
-                value={stats?.reserved ?? 0}
-                chipColor="warning"
-              />
-              <Divider sx={{ my: 1.5 }} />
-              <StatRow icon={<Build />} label="Serviste" value={stats?.service ?? 0} chipColor="error" />
-            </CardContent>
-          </Card>
+          <KpiCard 
+            title="Bu Ay Kazanç" 
+            value={stats?.monthCollected ?? 0} 
+            isCurrency 
+            color="success"
+            icon="💰"
+          />
         </Grid>
+        
+        {/* 7. Kazanç Ortalaması (Güncel kazanç / Araç sayısı) */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <StatRow icon={<WarningIcon />} label="Borçlu Kiralama" value={debtors.length} chipColor="error" />
-              <Divider sx={{ my: 1.5 }} />
-              <Typography variant="body2" color="text.secondary">
-                Toplam borç:
-              </Typography>
-              <Typography variant="h6" sx={{ color: 'error.main', fontWeight: 700 }}>
-                {formatCurrency(debtors.reduce((s, d) => s + d.balance, 0))}
-              </Typography>
-            </CardContent>
-          </Card>
+          <KpiCard 
+            title="Araç Başı Ortalama" 
+            value={stats?.totalVehicles > 0 ? Math.round((stats?.monthCollected ?? 0) / stats?.totalVehicles) : 0} 
+            isCurrency 
+            color="info"
+            icon="📊"
+          />
         </Grid>
+        
+        {/* 8. Toplam Borç Miktarı */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <StatRow 
-                icon={<AttachMoney />} 
-                label="Aylık Ortalama" 
-                value={0} 
-                chipColor="info" 
-              />
-              <Divider sx={{ my: 1.5 }} />
-              <Typography variant="body2" color="text.secondary">
-                Günlük Gelir:
-              </Typography>
-              <Typography variant="h6" sx={{ color: 'info.main', fontWeight: 700 }}>
-                {stats?.monthBilled ? formatCurrency(Math.round(stats.monthBilled / (new Date().getDate() || 1))) : formatCurrency(0)}
-              </Typography>
-            </CardContent>
-          </Card>
+          <KpiCard 
+            title="Toplam Borç" 
+            value={stats?.monthOutstanding ?? 0} 
+            isCurrency 
+            color="error"
+            icon="⚠️"
+          />
         </Grid>
+        
+        {/* 9. Toplam Araç Sayısı */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <StatRow 
-                icon={<CheckCircle />} 
-                label="Tamamlanan" 
-                value={completedRentalsRes?.data?.data?.filter((r: any) => r.status === 'COMPLETED')?.length || 0} 
-                chipColor="success" 
-              />
-              <Divider sx={{ my: 1.5 }} />
-              <Typography variant="body2" color="text.secondary">
-                Bu ay:
-              </Typography>
-              <Typography variant="h6" sx={{ color: 'success.main', fontWeight: 700 }}>
-                {activeRentalsRes?.data?.data?.filter((r: any) => r.status === 'ACTIVE')?.length || 0} Aktif
-              </Typography>
-            </CardContent>
-          </Card>
+          <KpiCard 
+            title="Toplam Araç" 
+            value={stats?.totalVehicles ?? 0} 
+            color="primary"
+            icon="🏢"
+          />
         </Grid>
       </Grid>
 
@@ -2465,28 +2468,5 @@ export default function Dashboard() {
         </DialogActions>
       </Dialog>
     </Layout>
-  );
-}
-
-// Helper Components
-function StatRow({
-  icon,
-  label,
-  value,
-  chipColor,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  chipColor?: 'success' | 'warning' | 'error' | 'info' | 'primary' | 'secondary';
-}) {
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        {icon}
-        <Typography variant="body2">{label}</Typography>
-      </Box>
-      <Chip label={value} color={chipColor} size="small" />
-    </Box>
   );
 }

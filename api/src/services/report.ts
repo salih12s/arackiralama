@@ -10,6 +10,7 @@ export interface DashboardStats {
   monthBilled: number;
   monthCollected: number;
   monthOutstanding: number;
+  monthVehicleProfit: number; // Sadece kiralama ücreti + km farkı
 }
 
 export interface MonthlyReportItem {
@@ -88,6 +89,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   let monthBilled = 0;
   let monthCollected = 0;
   let monthOutstanding = 0;
+  let monthVehicleProfit = 0;
 
   monthlyRentals.forEach((rental: any) => {
     monthBilled += rental.totalDue;
@@ -98,6 +100,11 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     
     monthCollected += collected;
     monthOutstanding += Math.max(0, rental.totalDue - collected);
+
+    // Araç kazancı = Kiralama ücreti (günlük ücret * gün) + KM farkı ücreti
+    const rentalPrice = (rental.dailyPrice || 0) * (rental.days || 0);
+    const kmCost = (rental.kmDiff || 0) * 2; // 2 TL/km varsayılan
+    monthVehicleProfit += rentalPrice + kmCost;
   });
 
   return {
@@ -108,7 +115,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     service: statusCounts.SERVICE || 0,
     monthBilled,
     monthCollected,
-    monthOutstanding
+    monthOutstanding,
+    monthVehicleProfit
   };
 }
 

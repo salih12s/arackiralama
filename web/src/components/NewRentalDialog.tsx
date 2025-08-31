@@ -14,6 +14,7 @@ import {
   Typography,
   Box,
   Alert,
+  Autocomplete,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useForm, Controller } from 'react-hook-form';
@@ -22,7 +23,7 @@ import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
 
-import { vehiclesApi, rentalsApi, formatCurrency } from '../api/client';
+import { vehiclesApi, rentalsApi, customersApi, formatCurrency, Customer } from '../api/client';
 
 const rentalSchema = z.object({
   vehicleId: z.string().min(1, 'Araç seçimi gereklidir'),
@@ -61,6 +62,14 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
   const [endDate, setEndDate] = useState<Dayjs | null>(dayjs().add(1, 'day'));
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('18:00');
+
+  // Fetch customers for autocomplete
+  const { data: customersResponse } = useQuery({
+    queryKey: ['customers'],
+    queryFn: () => customersApi.getAll()
+  });
+
+  const customers = customersResponse?.data || [];
 
   // Helper function for numeric inputs
   const handleNumericChange = (field: any, value: string, allowZero: boolean = true) => {
@@ -283,13 +292,49 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                 control={control}
                 defaultValue=""
                 render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    label="Müşteri Adı"
-                    margin="normal"
-                    error={!!errors.customerName}
-                    helperText={errors.customerName?.message}
+                  <Autocomplete<Customer, false, false, true>
+                    options={customers}
+                    getOptionLabel={(option) => 
+                      typeof option === 'string' ? option : option.fullName
+                    }
+                    freeSolo
+                    value={field.value}
+                    onChange={(_event, value) => {
+                      const name = typeof value === 'string' ? value : value?.fullName || '';
+                      field.onChange(name);
+                      // If customer is selected, populate phone field
+                      if (value && typeof value === 'object') {
+                        setValue('customerPhone', value.phone || '');
+                      }
+                    }}
+                    onInputChange={(_event, inputValue) => {
+                      field.onChange(inputValue);
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        fullWidth
+                        label="Müşteri Adı"
+                        margin="normal"
+                        error={!!errors.customerName}
+                        helperText={errors.customerName?.message}
+                        placeholder="Müşteri adı yazın veya seçin..."
+                      />
+                    )}
+                    renderOption={(props, option) => (
+                      <Box component="li" {...props}>
+                        <Box>
+                          <Typography variant="body2">
+                            {typeof option === 'string' ? option : (option as Customer).fullName}
+                          </Typography>
+                          {typeof option === 'object' && (option as Customer).phone && (
+                            <Typography variant="caption" color="text.secondary">
+                              {(option as Customer).phone}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    )}
                   />
                 )}
               />

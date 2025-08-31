@@ -93,6 +93,16 @@ export default function VehicleDetail() {
   const activeRentals = rentals.filter((r: any) => r.status === 'ACTIVE').length;
   const totalRevenue = vehicleIncome.collected || 0;
   const outstandingAmount = vehicleIncome.outstanding || 0;
+  
+  // Calculate vehicle profit (only rental price + km difference)
+  const vehicleProfit = rentals.reduce((total: number, rental: any) => {
+    if (rental.status === 'RETURNED') {
+      const rentalPrice = (rental.dailyPrice || 0) * (rental.days || 0);
+      const kmDiff = rental.kmDiff || 0;
+      return total + rentalPrice + kmDiff;
+    }
+    return total;
+  }, 0);
 
   // Get status info
   const getStatusColor = (status: string) => {
@@ -161,7 +171,7 @@ export default function VehicleDetail() {
 
       {/* KPI Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card sx={{ 
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             color: 'white',
@@ -185,7 +195,7 @@ export default function VehicleDetail() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card sx={{ 
             background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
             color: 'white',
@@ -209,7 +219,7 @@ export default function VehicleDetail() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card sx={{ 
             background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
             color: 'white',
@@ -233,7 +243,7 @@ export default function VehicleDetail() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card sx={{ 
             background: outstandingAmount > 0 
               ? 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' 
@@ -253,6 +263,31 @@ export default function VehicleDetail() {
                 </Box>
                 <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
                   <AssignmentIcon sx={{ fontSize: 32 }} />
+                </Avatar>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Vehicle Profit Card */}
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card sx={{ 
+            background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+            color: 'white',
+            height: '100%'
+          }}>
+            <CardContent>
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                <Box>
+                  <Typography variant="h4" component="div" sx={{ fontWeight: 700, mb: 1 }}>
+                    {formatCurrency(vehicleProfit)}
+                  </Typography>
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                    Araç Kazancı
+                  </Typography>
+                </Box>
+                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+                  <TrendingUpIcon sx={{ fontSize: 32 }} />
                 </Avatar>
               </Stack>
             </CardContent>

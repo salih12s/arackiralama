@@ -71,6 +71,18 @@ export interface Customer {
   phone?: string;
 }
 
+export interface Customer {
+  id: string;
+  fullName: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  identityNumber?: string;
+  createdAt: string;
+  updatedAt: string;
+  rentalCount?: number;
+}
+
 export interface Rental {
   customerName: any;
   customerPhone: any;
@@ -127,6 +139,7 @@ export interface DashboardStats {
   monthBilled: number;
   monthCollected: number;
   monthOutstanding: number;
+  monthVehicleProfit: number; // Sadece kiralama ücreti + km farkı
 }
 
 export interface MonthlyReport {
@@ -245,6 +258,28 @@ export const rentalsApi = {
 export const paymentsApi = {
   updatePaymentDate: (paymentId: string, paidAt: string) => 
     api.patch<Payment>(`/payments/${paymentId}/date`, { paidAt }),
+};
+
+// Customers API
+export const customersApi = {
+  getAll: (search?: string) => 
+    api.get<Customer[]>(`/customers${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  getById: (id: string) => api.get<Customer>(`/customers/${id}`),
+  create: (data: {
+    fullName: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    identityNumber?: string;
+  }) => api.post<Customer>('/customers', data),
+  update: (id: string, data: Partial<{
+    fullName: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    identityNumber?: string;
+  }>) => api.put<Customer>(`/customers/${id}`, data),
+  delete: (id: string) => api.delete(`/customers/${id}`),
 };
 
 // Reports API
