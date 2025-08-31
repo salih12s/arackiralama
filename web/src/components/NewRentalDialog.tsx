@@ -144,38 +144,26 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
     enabled: open,
   });
 
-  // Calculate days when dates change manually
+  // Tarih ve gün hesaplama mantığı - bug-free
+  // Başlangıç tarihi değişirse: bitiş tarihi = başlangıç + gün sayısı
+  // Gün sayısı değişirse: bitiş tarihi = başlangıç + gün sayısı
+  // Bitiş tarihi değişirse: gün sayısı = bitiş - başlangıç
   useEffect(() => {
     if (startDate && endDate && endDate.isAfter(startDate)) {
       const calculatedDays = endDate.diff(startDate, 'day');
-      if (calculatedDays > 0 && calculatedDays !== days) {
+      if (calculatedDays !== days) {
         setValue('days', calculatedDays, { shouldValidate: false });
-        setValue('startDate', startDate.toDate(), { shouldValidate: false });
-        setValue('endDate', endDate.toDate(), { shouldValidate: false });
       }
     }
-  }, [startDate, endDate, setValue]);
-
-  // Update end date when days change manually
-  useEffect(() => {
-    if (startDate && days && days > 0 && !isNaN(days)) {
+    // Başlangıç tarihi veya gün sayısı değişirse bitiş tarihini güncelle
+    if (startDate && days && days > 0) {
       const newEndDate = startDate.add(days, 'day');
-      if (!newEndDate.isSame(endDate, 'day')) {
+      if (!endDate || !newEndDate.isSame(endDate, 'day')) {
         setEndDate(newEndDate);
         setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
       }
     }
-  }, [days, startDate, setValue]);
-
-  // Update dates when start date changes (keeping same duration)
-  useEffect(() => {
-    if (startDate && days && days > 0) {
-      const newEndDate = startDate.add(days, 'day');
-      setEndDate(newEndDate);
-      setValue('startDate', startDate.toDate(), { shouldValidate: false });
-      setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
-    }
-  }, [startDate, setValue]); // days'i dependency'den çıkardık
+  }, [startDate, endDate, days, setValue]);
 
   // Set preselected vehicle when dialog opens
   useEffect(() => {

@@ -370,52 +370,6 @@ export default function Customers() {
                 />
               </Grid>
               
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Telefon"
-                  value={formData.phone}
-                  onChange={handleChange('phone')}
-                  error={!!errors.phone}
-                  helperText={errors.phone}
-                />
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange('email')}
-                  error={!!errors.email}
-                  helperText={errors.email}
-                />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Adres"
-                  multiline
-                  rows={2}
-                  value={formData.address}
-                  onChange={handleChange('address')}
-                  error={!!errors.address}
-                  helperText={errors.address}
-                />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="TC Kimlik No"
-                  value={formData.identityNumber}
-                  onChange={handleChange('identityNumber')}
-                  error={!!errors.identityNumber}
-                  helperText={errors.identityNumber}
-                />
-              </Grid>
             </Grid>
           </DialogContent>
           
