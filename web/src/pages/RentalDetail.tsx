@@ -31,7 +31,7 @@ import dayjs from 'dayjs';
 
 import Layout from '../components/Layout';
 import AddPaymentDialog from '../components/AddPaymentDialog';
-import { rentalsApi, formatCurrency, formatDate } from '../api/client';
+import { rentalsApi, formatCurrency } from '../api/client';
 
 export default function RentalDetail() {
   const { id } = useParams<{ id: string }>();
@@ -241,7 +241,7 @@ export default function RentalDetail() {
                     Başlangıç Tarihi
                   </Typography>
                   <Typography variant="body1">
-                    {formatDate(rental.startDate)}
+                    {dayjs(rental.startDate).format('DD/MM/YYYY HH:mm')}
                   </Typography>
                 </Grid>
                 
@@ -250,7 +250,7 @@ export default function RentalDetail() {
                     Bitiş Tarihi
                   </Typography>
                   <Typography variant="body1">
-                    {formatDate(rental.endDate)}
+                    {dayjs(rental.endDate).format('DD/MM/YYYY HH:mm')}
                   </Typography>
                 </Grid>
                 
@@ -350,6 +350,177 @@ export default function RentalDetail() {
                   </Box>
                 </Grid>
               </Grid>
+
+              {/* Payment Plan Details */}
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Ödeme Planı Detayları
+                </Typography>
+                <Grid container spacing={2}>
+                  {/* Upfront Payment */}
+                  <Grid item xs={6} sm={4} md={2.4}>
+                    <Box 
+                      sx={{ 
+                        p: 2, 
+                        border: 1, 
+                        borderColor: 'primary.main', 
+                        borderRadius: 1,
+                        bgcolor: 'primary.50' 
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        Peşin Ödeme
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                        {formatCurrency(rental.upfront || 0)}
+                      </Typography>
+                      <Typography variant="caption" color="success.main">
+                        ✓ Ödenmiş
+                      </Typography>
+                    </Box>
+                  </Grid>
+
+                  {/* 1st Payment */}
+                  {rental.pay1 > 0 && (
+                    <Grid item xs={6} sm={4} md={2.4}>
+                      <Box 
+                        sx={{ 
+                          p: 2, 
+                          border: 1, 
+                          borderColor: 'secondary.main', 
+                          borderRadius: 1,
+                          bgcolor: 'secondary.50' 
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          1. Ödeme
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {formatCurrency(rental.pay1)}
+                        </Typography>
+                        {rental.payDate1 && (
+                          <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                            {dayjs(rental.payDate1).format('DD/MM/YYYY')}
+                          </Typography>
+                        )}
+                        <Typography variant="caption" color="success.main">
+                          ✓ Ödenmiş
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
+
+                  {/* 2nd Payment */}
+                  {rental.pay2 > 0 && (
+                    <Grid item xs={6} sm={4} md={2.4}>
+                      <Box 
+                        sx={{ 
+                          p: 2, 
+                          border: 1, 
+                          borderColor: 'info.main', 
+                          borderRadius: 1,
+                          bgcolor: 'info.50' 
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          2. Ödeme
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {formatCurrency(rental.pay2)}
+                        </Typography>
+                        {rental.payDate2 && (
+                          <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                            {dayjs(rental.payDate2).format('DD/MM/YYYY')}
+                          </Typography>
+                        )}
+                        <Typography variant="caption" color="success.main">
+                          ✓ Ödenmiş
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
+
+                  {/* 3rd Payment */}
+                  {rental.pay3 > 0 && (
+                    <Grid item xs={6} sm={4} md={2.4}>
+                      <Box 
+                        sx={{ 
+                          p: 2, 
+                          border: 1, 
+                          borderColor: 'warning.main', 
+                          borderRadius: 1,
+                          bgcolor: 'warning.50' 
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          3. Ödeme
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {formatCurrency(rental.pay3)}
+                        </Typography>
+                        {rental.payDate3 && (
+                          <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                            {dayjs(rental.payDate3).format('DD/MM/YYYY')}
+                          </Typography>
+                        )}
+                        <Typography variant="caption" color="success.main">
+                          ✓ Ödenmiş
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
+
+                  {/* 4th Payment */}
+                  {rental.pay4 > 0 && (
+                    <Grid item xs={6} sm={4} md={2.4}>
+                      <Box 
+                        sx={{ 
+                          p: 2, 
+                          border: 1, 
+                          borderColor: 'error.main', 
+                          borderRadius: 1,
+                          bgcolor: 'error.50' 
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          4. Ödeme
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {formatCurrency(rental.pay4)}
+                        </Typography>
+                        {rental.payDate4 && (
+                          <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                            {dayjs(rental.payDate4).format('DD/MM/YYYY')}
+                          </Typography>
+                        )}
+                        <Typography variant="caption" color="success.main">
+                          ✓ Ödenmiş
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
+
+                  {/* Additional Payments if any */}
+                  {rental.payments && rental.payments.length > 0 && (
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Ek Ödemeler:
+                      </Typography>
+                      <Stack direction="row" spacing={1} flexWrap="wrap">
+                        {rental.payments.map((payment: any) => (
+                          <Chip
+                            key={payment.id}
+                            label={`${formatCurrency(payment.amount)} (${payment.method === 'CASH' ? 'Nakit' : payment.method === 'CARD' ? 'Kart' : 'Transfer'}) - ${dayjs(payment.paidAt).format('DD/MM/YYYY HH:mm')}`}
+                            size="small"
+                            color="success"
+                            variant="outlined"
+                          />
+                        ))}
+                      </Stack>
+                    </Grid>
+                  )}
+                </Grid>
+              </Box>
 
               {/* Extra Costs */}
               {(rental.kmDiff > 0 || rental.cleaning > 0 || rental.hgs > 0 || rental.damage > 0 || rental.fuel > 0) && (

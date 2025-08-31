@@ -94,6 +94,10 @@ export interface Rental {
   pay2: number;
   pay3: number;
   pay4: number;
+  payDate1?: string;
+  payDate2?: string;
+  payDate3?: string;
+  payDate4?: string;
   balance: number;
   status: 'ACTIVE' | 'RETURNED' | 'COMPLETED' | 'CANCELLED';
   note?: string;

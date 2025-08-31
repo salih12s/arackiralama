@@ -527,25 +527,6 @@ export default function DebtorDetails() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ height: '100%', bgcolor: 'success.50', border: '1px solid', borderColor: 'success.200' }}>
-            <CardContent>
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                <Box>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, color: 'success.main' }}>
-                    {formatCurrency(averageDebt)}
-                  </Typography>
-                  <Typography variant="body2" color="success.main" sx={{ fontWeight: 500 }}>
-                    Ortalama Borç
-                  </Typography>
-                </Box>
-                <Avatar sx={{ bgcolor: 'success.main', color: 'white' }}>
-                  <TrendingDownIcon />
-                </Avatar>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
       </Grid>
 
       {/* Search and Filter */}
@@ -855,7 +836,7 @@ export default function DebtorDetails() {
                 {selectedCustomer?.customerName} - Detaylı Borç Analizi
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Toplam {selectedCustomer?.totalRentals} kiralama, {selectedCustomer?.paymentHistory.length} ödeme
+                Ödenmemiş {selectedCustomer?.debtHistory.filter(d => d.status === 'UNPAID').length} kiralama, {selectedCustomer?.paymentHistory.length} ödeme
               </Typography>
             </Box>
             <Chip
@@ -924,9 +905,9 @@ export default function DebtorDetails() {
                 </Grid>
               </Grid>
 
-              {/* All Rental History */}
+              {/* Unpaid Rental History */}
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Tüm Kiralama Geçmişi
+                Ödenmemiş Kiralamalar
               </Typography>
               <TableContainer sx={{ maxHeight: 400, mb: 3 }}>
                 <Table stickyHeader size="small">
@@ -945,7 +926,20 @@ export default function DebtorDetails() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {selectedCustomer.debtHistory.map((debt) => (
+                    {selectedCustomer.debtHistory
+                      .filter((debt) => debt.status === 'UNPAID') // Sadece borçlu olanları göster
+                      .length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} align="center">
+                          <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
+                            🎉 Bu müşterinin ödenmemiş borcu bulunmuyor!
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      selectedCustomer.debtHistory
+                        .filter((debt) => debt.status === 'UNPAID')
+                        .map((debt) => (
                       <TableRow key={debt.rentalId} hover>
                         <TableCell>
                           <Box>
@@ -1040,7 +1034,7 @@ export default function DebtorDetails() {
                           />
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )))}
                   </TableBody>
                 </Table>
               </TableContainer>

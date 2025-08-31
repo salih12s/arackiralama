@@ -80,7 +80,6 @@ import {
 import Layout from '../components/Layout';
 import KpiCard from '../components/KpiCard';
 import NewRentalDialog from '../components/NewRentalDialog';
-import NewVehicleDialog from '../components/NewVehicleDialog';
 import AddPaymentDialog from '../components/AddPaymentDialog';
 import EditRentalDialog from '../components/EditRentalDialog';
 
@@ -88,7 +87,6 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [newRentalOpen, setNewRentalOpen] = useState(false);
-  const [newVehicleOpen, setNewVehicleOpen] = useState(false);
   const [debtorDeleteDialog, setDebtorDeleteDialog] = useState<{open: boolean; rental: any}>({
     open: false,
     rental: null
@@ -957,14 +955,6 @@ export default function Dashboard() {
             <DirectionsCar sx={{ color: 'success.main' }} />
             Boşta Olan Araçlar ({idleVehicles.length})
           </Typography>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => setNewVehicleOpen(true)}
-            sx={{ bgcolor: 'success.main', '&:hover': { bgcolor: 'success.dark' } }}
-          >
-            Yeni Araç Ekle
-          </Button>
         </Box>
 
         {/* Araçlar Filtreleme */}
@@ -2049,12 +2039,6 @@ export default function Dashboard() {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Yeni Araç Dialog'u */}
-      <NewVehicleDialog 
-        open={newVehicleOpen} 
-        onClose={() => setNewVehicleOpen(false)} 
-      />
 
       {/* Kiralama Silme Dialog'u */}
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, rental: null })}>

@@ -32,13 +32,16 @@ interface PaymentFormData {
   amount: string;
   method: 'CASH' | 'CARD' | 'TRANSFER';
   paidAt: string;
+  paidTime: string;
 }
 
 export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDialogProps) {
+  const now = new Date();
   const [formData, setFormData] = useState<PaymentFormData>({
     amount: '',
     method: 'CASH',
-    paidAt: new Date().toISOString().split('T')[0],
+    paidAt: now.toISOString().split('T')[0],
+    paidTime: now.toTimeString().slice(0, 5), // HH:MM format
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -130,10 +133,12 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
   });
 
   const resetForm = () => {
+    const now = new Date();
     setFormData({
       amount: '',
       method: 'CASH',
-      paidAt: new Date().toISOString().split('T')[0],
+      paidAt: now.toISOString().split('T')[0],
+      paidTime: now.toTimeString().slice(0, 5),
     });
     setErrors({});
   };
@@ -179,7 +184,7 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
       await addPaymentMutation.mutateAsync({
         amount, // TL olarak gönder (örn. 5000)
         method: formData.method,
-        paidAt: new Date(formData.paidAt).toISOString(),
+        paidAt: new Date(`${formData.paidAt}T${formData.paidTime}:00`).toISOString(),
       });
     } catch (error) {
       console.error('Ödeme eklenirken hata:', error);
@@ -319,14 +324,24 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
                   </Select>
                 </FormControl>
 
-                <TextField
-                  label="Ödeme Tarihi"
-                  type="date"
-                  value={formData.paidAt}
-                  onChange={handleChange('paidAt')}
-                  fullWidth
-                  InputLabelProps={{ shrink: true }}
-                />
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <TextField
+                    label="Ödeme Tarihi"
+                    type="date"
+                    value={formData.paidAt}
+                    onChange={handleChange('paidAt')}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  <TextField
+                    label="Saat"
+                    type="time"
+                    value={formData.paidTime}
+                    onChange={handleChange('paidTime')}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Box>
               </>
             )}
           </Box>

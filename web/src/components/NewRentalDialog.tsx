@@ -29,19 +29,21 @@ const rentalSchema = z.object({
   customerName: z.string().min(1, 'Müşteri adı gereklidir'),
   customerPhone: z.string().optional(),
   startDate: z.date(),
+  startTime: z.string().default('09:00'),
   endDate: z.date(),
-  days: z.number().int().positive(),
-  dailyPrice: z.number().positive('Günlük ücret pozitif olmalıdır'),
-  kmDiff: z.number().default(0),
-  cleaning: z.number().default(0),
-  hgs: z.number().default(0),
-  damage: z.number().default(0),
-  fuel: z.number().default(0),
-  upfront: z.number().default(0),
-  pay1: z.number().default(0),
-  pay2: z.number().default(0),
-  pay3: z.number().default(0),
-  pay4: z.number().default(0),
+  endTime: z.string().default('18:00'),
+  days: z.number().int().min(1, 'Minimum 1 gün olmalıdır'),
+  dailyPrice: z.number().min(0, 'Günlük ücret negatif olamaz'),
+  kmDiff: z.number().min(0).default(0),
+  cleaning: z.number().min(0).default(0),
+  hgs: z.number().min(0).default(0),
+  damage: z.number().min(0).default(0),
+  fuel: z.number().min(0).default(0),
+  upfront: z.number().min(0).default(0),
+  pay1: z.number().min(0).default(0),
+  pay2: z.number().min(0).default(0),
+  pay3: z.number().min(0).default(0),
+  pay4: z.number().min(0).default(0),
   note: z.string().optional(),
 });
 
@@ -57,6 +59,25 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
   const queryClient = useQueryClient();
   const [startDate, setStartDate] = useState<Dayjs | null>(dayjs());
   const [endDate, setEndDate] = useState<Dayjs | null>(dayjs().add(1, 'day'));
+  const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('18:00');
+
+  // Helper function for numeric inputs
+  const handleNumericChange = (field: any, value: string, allowZero: boolean = true) => {
+    if (value === '') {
+      field.onChange('');
+      return;
+    }
+    const numValue = parseFloat(value) || 0;
+    const finalValue = allowZero ? Math.max(0, numValue) : Math.max(1, numValue);
+    field.onChange(finalValue);
+  };
+
+  const handleNumericBlur = (field: any, value: string, allowZero: boolean = true) => {
+    const numValue = parseFloat(value) || 0;
+    const finalValue = allowZero ? Math.max(0, numValue) : Math.max(1, numValue);
+    field.onChange(finalValue);
+  };
 
   const {
     control,
@@ -70,6 +91,8 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
     defaultValues: {
       days: 1,
       dailyPrice: 150, // 150 TRY
+      startTime: '09:00',
+      endTime: '18:00',
       kmDiff: 0,
       cleaning: 0,
       hgs: 0,
@@ -116,18 +139,20 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
   useEffect(() => {
     if (startDate && endDate && endDate.isAfter(startDate)) {
       const calculatedDays = endDate.diff(startDate, 'day');
-      setValue('days', calculatedDays);
-      setValue('startDate', startDate.toDate());
-      setValue('endDate', endDate.toDate());
+      if (calculatedDays > 0) {
+        setValue('days', calculatedDays, { shouldValidate: false });
+        setValue('startDate', startDate.toDate(), { shouldValidate: false });
+        setValue('endDate', endDate.toDate(), { shouldValidate: false });
+      }
     }
   }, [startDate, endDate, setValue]);
 
-  // Update end date when days change
+  // Update end date when days change (but not if user is typing)
   useEffect(() => {
-    if (startDate && days && days > 0) {
+    if (startDate && days && days > 0 && !isNaN(days)) {
       const newEndDate = startDate.add(days, 'day');
       setEndDate(newEndDate);
-      setValue('endDate', newEndDate.toDate());
+      setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
     }
   }, [days, startDate, setValue]);
 
@@ -136,8 +161,8 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
     if (startDate && days && days > 0) {
       const newEndDate = startDate.add(days, 'day');
       setEndDate(newEndDate);
-      setValue('startDate', startDate.toDate());
-      setValue('endDate', newEndDate.toDate());
+      setValue('startDate', startDate.toDate(), { shouldValidate: false });
+      setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
     }
   }, [startDate]);
 
@@ -164,8 +189,12 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
         pay2: Math.round((data.pay2 || 0) * 100),
         pay3: Math.round((data.pay3 || 0) * 100),
         pay4: Math.round((data.pay4 || 0) * 100),
-        startDate: dayjs(data.startDate).toISOString(),
-        endDate: dayjs(data.endDate).toISOString(),
+        startDate: startDate && startTime ? 
+          dayjs(`${startDate.format('YYYY-MM-DD')}T${startTime}:00`).toISOString() :
+          dayjs(data.startDate).toISOString(),
+        endDate: endDate && endTime ? 
+          dayjs(`${endDate.format('YYYY-MM-DD')}T${endTime}:00`).toISOString() :
+          dayjs(data.endDate).toISOString(),
       };
       return rentalsApi.create(payload);
     },
@@ -203,6 +232,8 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
       reset();
       setStartDate(dayjs());
       setEndDate(dayjs().add(1, 'day'));
+      setStartTime('09:00');
+      setEndTime('18:00');
       onClose();
     }
   };
@@ -282,33 +313,55 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
             </Grid>
 
             {/* Date Range */}
-            <Grid item xs={12} md={3}>
-              <DatePicker
-                label="Başlangıç Tarihi"
-                value={startDate}
-                onChange={setStartDate}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    margin: 'normal',
-                  },
-                }}
-              />
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <DatePicker
+                  label="Başlangıç Tarihi"
+                  value={startDate}
+                  onChange={setStartDate}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      margin: 'normal',
+                    },
+                  }}
+                />
+                <TextField
+                  label="Saat"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  margin="normal"
+                  sx={{ minWidth: 120 }}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Box>
             </Grid>
 
-            <Grid item xs={12} md={3}>
-              <DatePicker
-                label="Bitiş Tarihi"
-                value={endDate}
-                onChange={setEndDate}
-                minDate={startDate || undefined}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    margin: 'normal',
-                  },
-                }}
-              />
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <DatePicker
+                  label="Bitiş Tarihi"
+                  value={endDate}
+                  onChange={setEndDate}
+                  minDate={startDate || undefined}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      margin: 'normal',
+                    },
+                  }}
+                />
+                <TextField
+                  label="Saat"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  margin="normal"
+                  sx={{ minWidth: 120 }}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Box>
             </Grid>
 
             {/* Days and Daily Price */}
@@ -323,11 +376,24 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                     label="Gün Sayısı"
                     type="number"
                     margin="normal"
-                    inputProps={{ min: 1 }}
+                    inputProps={{ min: 1, step: 1 }}
                     onChange={(e) => {
-                      const newDays = parseInt(e.target.value) || 1;
+                      const value = e.target.value;
+                      // Allow empty string for deletion, but set minimum 1 when focusing out
+                      if (value === '') {
+                        field.onChange('');
+                        return;
+                      }
+                      const newDays = Math.max(1, parseInt(value) || 1);
                       field.onChange(newDays);
-                      setValue('days', newDays);
+                      setValue('days', newDays, { shouldValidate: false });
+                    }}
+                    onBlur={(e) => {
+                      // Ensure minimum 1 when user leaves the field
+                      const value = parseInt(e.target.value) || 1;
+                      const finalDays = Math.max(1, value);
+                      field.onChange(finalDays);
+                      setValue('days', finalDays);
                     }}
                     error={!!errors.days}
                     helperText={errors.days?.message}
@@ -347,7 +413,9 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                     label="Günlük Ücret (TRY)"
                     type="number"
                     margin="normal"
-                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    inputProps={{ min: 0, step: 0.01 }}
+                    onChange={(e) => handleNumericChange(field, e.target.value, false)}
+                    onBlur={(e) => handleNumericBlur(field, e.target.value, false)}
                     error={!!errors.dailyPrice}
                     helperText={errors.dailyPrice?.message}
                   />
@@ -380,7 +448,9 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                       label={field.label}
                       type="number"
                       margin="normal"
-                      onChange={(e) => formField.onChange(parseFloat(e.target.value) || 0)}
+                      inputProps={{ min: 0, step: 0.01 }}
+                      onChange={(e) => handleNumericChange(formField, e.target.value, true)}
+                      onBlur={(e) => handleNumericBlur(formField, e.target.value, true)}
                     />
                   )}
                 />
@@ -412,7 +482,9 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                       label={field.label}
                       type="number"
                       margin="normal"
-                      onChange={(e) => formField.onChange(parseFloat(e.target.value) || 0)}
+                      inputProps={{ min: 0, step: 0.01 }}
+                      onChange={(e) => handleNumericChange(formField, e.target.value, true)}
+                      onBlur={(e) => handleNumericBlur(formField, e.target.value, true)}
                     />
                   )}
                 />
