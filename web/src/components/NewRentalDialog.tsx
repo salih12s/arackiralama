@@ -144,11 +144,11 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
     enabled: open,
   });
 
-  // Calculate days when dates change
+  // Calculate days when dates change manually
   useEffect(() => {
     if (startDate && endDate && endDate.isAfter(startDate)) {
       const calculatedDays = endDate.diff(startDate, 'day');
-      if (calculatedDays > 0) {
+      if (calculatedDays > 0 && calculatedDays !== days) {
         setValue('days', calculatedDays, { shouldValidate: false });
         setValue('startDate', startDate.toDate(), { shouldValidate: false });
         setValue('endDate', endDate.toDate(), { shouldValidate: false });
@@ -156,16 +156,18 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
     }
   }, [startDate, endDate, setValue]);
 
-  // Update end date when days change (but not if user is typing)
+  // Update end date when days change manually
   useEffect(() => {
     if (startDate && days && days > 0 && !isNaN(days)) {
       const newEndDate = startDate.add(days, 'day');
-      setEndDate(newEndDate);
-      setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
+      if (!newEndDate.isSame(endDate, 'day')) {
+        setEndDate(newEndDate);
+        setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
+      }
     }
   }, [days, startDate, setValue]);
 
-  // Update end date when start date changes (keeping the same number of days)
+  // Update dates when start date changes (keeping same duration)
   useEffect(() => {
     if (startDate && days && days > 0) {
       const newEndDate = startDate.add(days, 'day');
@@ -173,7 +175,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
       setValue('startDate', startDate.toDate(), { shouldValidate: false });
       setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
     }
-  }, [startDate]);
+  }, [startDate, setValue]); // days'i dependency'den çıkardık
 
   // Set preselected vehicle when dialog opens
   useEffect(() => {

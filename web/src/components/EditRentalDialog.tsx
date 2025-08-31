@@ -14,6 +14,7 @@ import {
   Typography,
   Box,
   Alert,
+  Autocomplete,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useForm, Controller } from 'react-hook-form';
@@ -22,7 +23,7 @@ import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
 
-import { vehiclesApi, rentalsApi, formatCurrency, Rental, Vehicle } from '../api/client';
+import { vehiclesApi, rentalsApi, customersApi, formatCurrency, Rental, Vehicle, Customer } from '../api/client';
 
 const rentalSchema = z.object({
   vehicleId: z.string().min(1, 'Araç seçimi gereklidir'),
@@ -57,6 +58,14 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
   const queryClient = useQueryClient();
   const [startDate, setStartDate] = useState<Dayjs | null>(dayjs());
   const [endDate, setEndDate] = useState<Dayjs | null>(dayjs().add(1, 'day'));
+
+  // Fetch customers for autocomplete
+  const { data: customersResponse } = useQuery({
+    queryKey: ['customers'],
+    queryFn: () => customersApi.getAll()
+  });
+
+  const customers = customersResponse?.data?.data || [];
 
   const rentalId = rental?.id;
   const {
@@ -154,34 +163,38 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
     }
   }, [rentalData, setValue, rental]);
 
-  // Calculate days when dates change
+  // Calculate days when dates change manually
   useEffect(() => {
     if (startDate && endDate && endDate.isAfter(startDate)) {
       const calculatedDays = endDate.diff(startDate, 'day');
-      setValue('days', calculatedDays);
-      setValue('startDate', startDate.toDate());
-      setValue('endDate', endDate.toDate());
+      if (calculatedDays > 0 && calculatedDays !== days) {
+        setValue('days', calculatedDays, { shouldValidate: false });
+        setValue('startDate', startDate.toDate(), { shouldValidate: false });
+        setValue('endDate', endDate.toDate(), { shouldValidate: false });
+      }
     }
   }, [startDate, endDate, setValue]);
 
-  // Update end date when days change
+  // Update end date when days change manually
   useEffect(() => {
-    if (startDate && days && days > 0) {
+    if (startDate && days && days > 0 && !isNaN(days)) {
       const newEndDate = startDate.add(days, 'day');
-      setEndDate(newEndDate);
-      setValue('endDate', newEndDate.toDate());
+      if (!newEndDate.isSame(endDate, 'day')) {
+        setEndDate(newEndDate);
+        setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
+      }
     }
   }, [days, startDate, setValue]);
 
-  // Update end date when start date changes (keeping the same number of days)
+  // Update dates when start date changes (keeping same duration)
   useEffect(() => {
     if (startDate && days && days > 0) {
       const newEndDate = startDate.add(days, 'day');
       setEndDate(newEndDate);
-      setValue('startDate', startDate.toDate());
-      setValue('endDate', newEndDate.toDate());
+      setValue('startDate', startDate.toDate(), { shouldValidate: false });
+      setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
     }
-  }, [startDate]);
+  }, [startDate, setValue]); // days'i dependency'den çıkardık
 
   const updateRentalMutation = useMutation({
     mutationFn: (data: RentalFormData) => {
@@ -289,13 +302,49 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                 name="customerName"
                 control={control}
                 render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    label="Müşteri Adı"
-                    margin="normal"
-                    error={!!errors.customerName}
-                    helperText={errors.customerName?.message}
+                  <Autocomplete<Customer, false, false, true>
+                    options={customers}
+                    getOptionLabel={(option) => 
+                      typeof option === 'string' ? option : option.fullName
+                    }
+                    freeSolo
+                    value={field.value}
+                    onChange={(_event, value) => {
+                      const name = typeof value === 'string' ? value : value?.fullName || '';
+                      field.onChange(name);
+                      // If customer is selected, populate phone field
+                      if (value && typeof value === 'object') {
+                        setValue('customerPhone', value.phone || '');
+                      }
+                    }}
+                    onInputChange={(_event, inputValue) => {
+                      field.onChange(inputValue);
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        fullWidth
+                        label="Müşteri Adı"
+                        margin="normal"
+                        error={!!errors.customerName}
+                        helperText={errors.customerName?.message}
+                        placeholder="Müşteri adı yazın veya seçin..."
+                      />
+                    )}
+                    renderOption={(props, option) => (
+                      <Box component="li" {...props}>
+                        <Box>
+                          <Typography variant="body2">
+                            {typeof option === 'string' ? option : (option as Customer).fullName}
+                          </Typography>
+                          {typeof option === 'object' && (option as Customer).phone && (
+                            <Typography variant="caption" color="text.secondary">
+                              {(option as Customer).phone}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    )}
                   />
                 )}
               />
