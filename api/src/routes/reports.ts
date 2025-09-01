@@ -15,7 +15,11 @@ router.use(authenticateToken);
 // GET /api/stats/today
 router.get('/today', async (req, res) => {
   try {
-    const stats = await getDashboardStats();
+    const { month, year } = req.query;
+    const monthNum = month ? parseInt(month as string, 10) : undefined;
+    const yearNum = year ? parseInt(year as string, 10) : undefined;
+    
+    const stats = await getDashboardStats(monthNum, yearNum);
     res.json(stats);
   } catch (error) {
     console.error('Get dashboard stats error:', error);

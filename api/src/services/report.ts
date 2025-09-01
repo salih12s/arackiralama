@@ -40,10 +40,13 @@ export interface DebtorReport {
   days: number;
 }
 
-export async function getDashboardStats(): Promise<DashboardStats> {
+export async function getDashboardStats(month?: number, year?: number): Promise<DashboardStats> {
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const targetMonth = month ?? now.getMonth() + 1; // 1-12
+  const targetYear = year ?? now.getFullYear();
+  
+  const startOfMonth = new Date(targetYear, targetMonth - 1, 1);
+  const endOfMonth = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
 
   // Get vehicle counts by status
   const vehicleCounts = await prisma.vehicle.groupBy({
@@ -56,22 +59,6 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     acc[item.status] = item._count;
     return acc;
   }, {} as Record<string, number>);
-
-  // Get active rentals for today
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const endOfToday = new Date(today);
-  endOfToday.setHours(23, 59, 59, 999);
-
-  const activeRentals = await prisma.rental.findMany({
-    where: {
-      status: 'ACTIVE',
-      startDate: { lte: endOfToday },
-      endDate: { gte: today }
-    }
-  });
-
-  const rentedToday = activeRentals.length;
 
   // Calculate month totals
   const monthlyRentals = await prisma.rental.findMany({
@@ -91,25 +78,69 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   let monthOutstanding = 0;
   let monthVehicleProfit = 0;
 
-  monthlyRentals.forEach((rental: any) => {
-    monthBilled += rental.totalDue;
+  // Helper function to calculate how many days of a rental fall within a specific month
+  const calculateDaysInMonth = (startDate: Date, endDate: Date, targetMonth: number, targetYear: number): number => {
+    const monthStart = new Date(targetYear, targetMonth - 1, 1);
+    const monthEnd = new Date(targetYear, targetMonth, 0); // Son gün
     
-    const paymentSum = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
-    const manualPayments = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
-    const collected = paymentSum + manualPayments;
+    const rangeStart = startDate > monthStart ? startDate : monthStart;
+    const rangeEnd = endDate < monthEnd ? endDate : monthEnd;
     
-    monthCollected += collected;
-    monthOutstanding += Math.max(0, rental.totalDue - collected);
+    if (rangeStart > rangeEnd) return 0;
+    
+    const timeDiff = rangeEnd.getTime() - rangeStart.getTime();
+    return Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1; // +1 çünkü aynı gün de dahil
+  };
 
-    // Araç kazancı = Kiralama ücreti (günlük ücret * gün) + KM farkı ücreti
-    const rentalPrice = (rental.dailyPrice || 0) * (rental.days || 0);
-    const kmCost = (rental.kmDiff || 0) * 2; // 2 TL/km varsayılan
-    monthVehicleProfit += rentalPrice + kmCost;
+  monthlyRentals.forEach((rental: any) => {
+    const startDate = new Date(rental.startDate);
+    const endDate = new Date(rental.endDate);
+    
+    // Bu ay için kaç gün düşüyor hesapla
+    const daysInCurrentMonth = calculateDaysInMonth(startDate, endDate, targetMonth, targetYear);
+    
+    console.log(`🔍 Rental Debug - ${rental.id}:`);
+    console.log(`  Start: ${startDate.toISOString().split('T')[0]}, End: ${endDate.toISOString().split('T')[0]}`);
+    console.log(`  Days in ${targetMonth}/${targetYear}: ${daysInCurrentMonth}`);
+    console.log(`  Daily rate: ${rental.dailyPrice}, Total days: ${rental.days}`);
+    
+    if (daysInCurrentMonth > 0) {
+      // Bu aya düşen kısmı hesapla
+      const dailyRate = rental.dailyPrice || 0;
+      const monthlyPortion = daysInCurrentMonth * dailyRate;
+      
+      // KM farkı ve diğer ek maliyetler kiralama başlangıcındaki aya eklenir
+      let additionalCosts = 0;
+      if (startDate.getMonth() + 1 === targetMonth && startDate.getFullYear() === targetYear) {
+        additionalCosts = (rental.kmDiff || 0) + (rental.cleaning || 0) + (rental.hgs || 0) + (rental.damage || 0) + (rental.fuel || 0);
+      }
+      
+      monthBilled += monthlyPortion + additionalCosts;
+      
+      console.log(`  Monthly portion: ${monthlyPortion}, Additional costs: ${additionalCosts}`);
+      console.log(`  Total billed for this month: ${monthlyPortion + additionalCosts}`);
+      
+      // Ödemeler için de aynı oranı uygula
+      const paymentSum = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
+      const manualPayments = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
+      const totalPayments = paymentSum + manualPayments;
+      
+      // Ödeme oranını hesapla (toplam ödenen / toplam borç)
+      const paymentRatio = rental.totalDue > 0 ? totalPayments / rental.totalDue : 0;
+      const monthlyPaymentPortion = (monthlyPortion + additionalCosts) * paymentRatio;
+      
+      monthCollected += monthlyPaymentPortion;
+      monthOutstanding += Math.max(0, (monthlyPortion + additionalCosts) - monthlyPaymentPortion);
+
+      // Araç kazancı = Bu aya düşen kiralama ücreti + KM farkı (sadece başlangıç ayında)
+      const kmProfit = startDate.getMonth() + 1 === targetMonth && startDate.getFullYear() === targetYear ? (rental.kmDiff || 0) : 0;
+      monthVehicleProfit += monthlyPortion + kmProfit;
+    }
   });
 
   return {
     totalVehicles: Object.values(statusCounts).reduce((sum: number, count: any) => sum + count, 0),
-    rentedToday,
+    rentedToday: statusCounts.RENTED || 0, // Araç durumu RENTED olanların sayısı
     idle: statusCounts.IDLE || 0,
     reserved: statusCounts.RESERVED || 0,
     service: statusCounts.SERVICE || 0,
@@ -142,15 +173,53 @@ export async function getMonthlyReport(year: number): Promise<MonthlyReportItem[
     let collected = 0;
     let outstanding = 0;
 
+    // Helper function to calculate how many days of a rental fall within a specific month
+    const calculateDaysInMonth = (rentalStart: Date, rentalEnd: Date, targetMonth: number, targetYear: number): number => {
+      const monthStart = new Date(targetYear, targetMonth - 1, 1);
+      const monthEnd = new Date(targetYear, targetMonth, 0); // Son gün
+      
+      const rangeStart = rentalStart > monthStart ? rentalStart : monthStart;
+      const rangeEnd = rentalEnd < monthEnd ? rentalEnd : monthEnd;
+      
+      if (rangeStart > rangeEnd) return 0;
+      
+      const timeDiff = rangeEnd.getTime() - rangeStart.getTime();
+      return Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1; // +1 çünkü aynı gün de dahil
+    };
+
     rentals.forEach((rental: any) => {
-      billed += rental.totalDue;
+      const rentalStartDate = new Date(rental.startDate);
+      const rentalEndDate = new Date(rental.endDate);
       
-      const paymentSum = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
-      const manualPayments = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
-      const totalCollected = paymentSum + manualPayments;
+      // Bu ay için kaç gün düşüyor hesapla
+      const daysInCurrentMonth = calculateDaysInMonth(rentalStartDate, rentalEndDate, month, year);
       
-      collected += totalCollected;
-      outstanding += Math.max(0, rental.totalDue - totalCollected);
+      if (daysInCurrentMonth > 0) {
+        // Bu aya düşen kısmı hesapla
+        const dailyRate = rental.dailyPrice || 0;
+        const monthlyPortion = daysInCurrentMonth * dailyRate;
+        
+        // KM farkı ve diğer ek maliyetler kiralama başlangıcındaki aya eklenir
+        let additionalCosts = 0;
+        if (rentalStartDate.getMonth() + 1 === month && rentalStartDate.getFullYear() === year) {
+          additionalCosts = (rental.kmDiff || 0) + (rental.cleaning || 0) + (rental.hgs || 0) + (rental.damage || 0) + (rental.fuel || 0);
+        }
+        
+        const totalMonthlyBilling = monthlyPortion + additionalCosts;
+        billed += totalMonthlyBilling;
+        
+        // Ödemeler için de aynı oranı uygula
+        const paymentSum = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
+        const manualPayments = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
+        const totalPayments = paymentSum + manualPayments;
+        
+        // Ödeme oranını hesapla (toplam ödenen / toplam borç)
+        const paymentRatio = rental.totalDue > 0 ? totalPayments / rental.totalDue : 0;
+        const monthlyPaymentPortion = totalMonthlyBilling * paymentRatio;
+        
+        collected += monthlyPaymentPortion;
+        outstanding += Math.max(0, totalMonthlyBilling - monthlyPaymentPortion);
+      }
     });
 
     reports.push({
@@ -185,18 +254,23 @@ export async function getVehicleIncomeReport(): Promise<VehicleIncomeReport[]> {
     let outstanding = 0;
 
     vehicle.rentals.forEach((rental: any) => {
-      // Tüm kiralamalardan gelir hesapla (silinmiş olanlar dahil)
-      billed += rental.totalDue;
+      // Araç geliri = Sadece kiralama ücreti + KM farkı (temizlik, HGS vs. hariç)
+      const vehicleIncome = (rental.days * rental.dailyPrice) + (rental.kmDiff || 0);
+      billed += vehicleIncome;
       
       const paymentSum = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
       const manualPayments = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
       const totalCollected = paymentSum + manualPayments;
       
-      collected += totalCollected;
+      // Toplanan tutarın araç gelirine oranını hesapla
+      const paymentRatio = rental.totalDue > 0 ? totalCollected / rental.totalDue : 0;
+      const vehicleCollected = vehicleIncome * paymentRatio;
+      
+      collected += vehicleCollected;
       
       // Outstanding sadece silinmemiş kiralamalar için hesapla
       if (!rental.deleted) {
-        outstanding += Math.max(0, rental.totalDue - totalCollected);
+        outstanding += Math.max(0, vehicleIncome - vehicleCollected);
       }
     });
 

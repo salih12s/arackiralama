@@ -9,6 +9,7 @@ export interface DashboardStats {
   monthBilled: number;
   monthCollected: number;
   monthOutstanding: number;
+  monthVehicleProfit: number; // Sadece kiralama ücreti + km farkı
 }
 
 export interface MonthlyReportItem {
@@ -21,8 +22,12 @@ export interface MonthlyReportItem {
 }
 
 export const reportsApi = {
-  getDashboardStats: async (): Promise<DashboardStats> => {
-    const response = await api.get('/reports/dashboard');
+  getDashboardStats: async (month?: number, year?: number): Promise<DashboardStats> => {
+    const params = new URLSearchParams();
+    if (month) params.append('month', month.toString());
+    if (year) params.append('year', year.toString());
+    
+    const response = await api.get(`/stats/today?${params.toString()}`);
     return response.data;
   },
 

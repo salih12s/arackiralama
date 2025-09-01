@@ -144,26 +144,45 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
     enabled: open,
   });
 
-  // Tarih ve gün hesaplama mantığı - bug-free
-  // Başlangıç tarihi değişirse: bitiş tarihi = başlangıç + gün sayısı
-  // Gün sayısı değişirse: bitiş tarihi = başlangıç + gün sayısı
-  // Bitiş tarihi değişirse: gün sayısı = bitiş - başlangıç
-  useEffect(() => {
-    if (startDate && endDate && endDate.isAfter(startDate)) {
-      const calculatedDays = endDate.diff(startDate, 'day');
-      if (calculatedDays !== days) {
-        setValue('days', calculatedDays, { shouldValidate: false });
-      }
+  // Date calculation handlers - no useEffect to prevent infinite loops
+  const handleStartDateChange = (newStartDate: Dayjs | null) => {
+    if (!newStartDate) return;
+    
+    setStartDate(newStartDate);
+    setValue('startDate', newStartDate.toDate(), { shouldValidate: false });
+    
+    // Calculate end date based on current days
+    const currentDays = watch('days') || 1;
+    const newEndDate = newStartDate.add(currentDays - 1, 'day'); // -1 because days include both start and end
+    setEndDate(newEndDate);
+    setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
+  };
+
+  const handleEndDateChange = (newEndDate: Dayjs | null) => {
+    if (!newEndDate || !startDate) return;
+    
+    setEndDate(newEndDate);
+    setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
+    
+    // Calculate days based on date difference (inclusive)
+    if (newEndDate.isAfter(startDate) || newEndDate.isSame(startDate, 'day')) {
+      const calculatedDays = newEndDate.diff(startDate, 'day') + 1; // +1 to include both start and end days
+      setValue('days', calculatedDays, { shouldValidate: false });
     }
-    // Başlangıç tarihi veya gün sayısı değişirse bitiş tarihini güncelle
-    if (startDate && days && days > 0) {
-      const newEndDate = startDate.add(days, 'day');
-      if (!endDate || !newEndDate.isSame(endDate, 'day')) {
-        setEndDate(newEndDate);
-        setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
-      }
-    }
-  }, [startDate, endDate, days, setValue]);
+  };
+
+  const handleDaysChange = (newDays: number) => {
+    if (!startDate || newDays < 1) return;
+    
+    setValue('days', newDays, { shouldValidate: false });
+    
+    // Calculate end date based on new days
+    // newDays = 1 means same day (start and end same)
+    // newDays = 2 means start day + 1 day = 2 days total
+    const newEndDate = startDate.add(newDays - 1, 'day');
+    setEndDate(newEndDate);
+    setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
+  };
 
   // Set preselected vehicle when dialog opens
   useEffect(() => {
@@ -171,6 +190,14 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
       setValue('vehicleId', preselectedVehicle.id);
     }
   }, [preselectedVehicle, open, setValue]);
+
+  // Initialize form dates when dialog opens
+  useEffect(() => {
+    if (open) {
+      setValue('startDate', startDate?.toDate() || dayjs().toDate(), { shouldValidate: false });
+      setValue('endDate', endDate?.toDate() || dayjs().add(1, 'day').toDate(), { shouldValidate: false });
+    }
+  }, [open, setValue]); // Only depend on open and setValue, not the date states
 
   const createRentalMutation = useMutation({
     mutationFn: (data: RentalFormData) => {
@@ -353,7 +380,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                 <DatePicker
                   label="Başlangıç Tarihi"
                   value={startDate}
-                  onChange={setStartDate}
+                  onChange={handleStartDateChange}
                   slotProps={{
                     textField: {
                       fullWidth: true,
@@ -378,7 +405,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                 <DatePicker
                   label="Bitiş Tarihi"
                   value={endDate}
-                  onChange={setEndDate}
+                  onChange={handleEndDateChange}
                   minDate={startDate || undefined}
                   slotProps={{
                     textField: {
@@ -421,14 +448,14 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                       }
                       const newDays = Math.max(1, parseInt(value) || 1);
                       field.onChange(newDays);
-                      setValue('days', newDays, { shouldValidate: false });
+                      handleDaysChange(newDays);
                     }}
                     onBlur={(e) => {
                       // Ensure minimum 1 when user leaves the field
                       const value = parseInt(e.target.value) || 1;
                       const finalDays = Math.max(1, value);
                       field.onChange(finalDays);
-                      setValue('days', finalDays);
+                      handleDaysChange(finalDays);
                     }}
                     error={!!errors.days}
                     helperText={errors.days?.message}
@@ -517,7 +544,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                       label={field.label}
                       type="number"
                       margin="normal"
-                      inputProps={{ min: 0, step: 0.01 }}
+                      inputProps={{ step: 0.01 }}
                       onChange={(e) => handleNumericChange(formField, e.target.value, true)}
                       onBlur={(e) => handleNumericBlur(formField, e.target.value, true)}
                     />

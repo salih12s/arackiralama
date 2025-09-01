@@ -27,8 +27,6 @@ import {
   Add as AddIcon,
   Search as SearchIcon,
   Person as PersonIcon,
-  Phone as PhoneIcon,
-  Email as EmailIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Close as CloseIcon,
@@ -209,7 +207,7 @@ export default function Customers() {
         <Paper sx={{ p: 3, mb: 3 }}>
           <TextField
             fullWidth
-            placeholder="Müşteri ara (isim, telefon, email)..."
+            placeholder="Müşteri ara (isim)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
@@ -228,8 +226,7 @@ export default function Customers() {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Müşteri</TableCell>
-                  <TableCell>İletişim</TableCell>
+                  <TableCell>Müşteri Adı</TableCell>
                   <TableCell>Kiralama Sayısı</TableCell>
                   <TableCell>Kayıt Tarihi</TableCell>
                   <TableCell align="right">İşlemler</TableCell>
@@ -238,13 +235,13 @@ export default function Customers() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} align="center">
+                    <TableCell colSpan={4} align="center">
                       Yükleniyor...
                     </TableCell>
                   </TableRow>
                 ) : customers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} align="center">
+                    <TableCell colSpan={4} align="center">
                       {searchTerm ? 'Arama kriterinize uygun müşteri bulunamadı' : 'Henüz müşteri kaydı yok'}
                     </TableCell>
                   </TableRow>
@@ -256,39 +253,10 @@ export default function Customers() {
                           <Avatar sx={{ bgcolor: 'primary.main' }}>
                             {customer.fullName.charAt(0).toUpperCase()}
                           </Avatar>
-                          <Box>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                              {customer.fullName}
-                            </Typography>
-                            {customer.identityNumber && (
-                              <Typography variant="caption" color="text.secondary">
-                                TC: {customer.identityNumber}
-                              </Typography>
-                            )}
-                          </Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                            {customer.fullName}
+                          </Typography>
                         </Box>
-                      </TableCell>
-                      
-                      <TableCell>
-                        <Stack spacing={0.5}>
-                          {customer.phone && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <PhoneIcon fontSize="small" color="action" />
-                              <Typography variant="body2">{customer.phone}</Typography>
-                            </Box>
-                          )}
-                          {customer.email && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <EmailIcon fontSize="small" color="action" />
-                              <Typography variant="body2">{customer.email}</Typography>
-                            </Box>
-                          )}
-                          {customer.address && (
-                            <Typography variant="caption" color="text.secondary">
-                              {customer.address}
-                            </Typography>
-                          )}
-                        </Stack>
                       </TableCell>
                       
                       <TableCell>

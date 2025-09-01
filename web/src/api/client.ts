@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://arackiralama-production.up.railway.app/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3005/api',
   timeout: 30000, // Increase timeout
 });
 
@@ -284,7 +284,13 @@ export const customersApi = {
 
 // Reports API
 export const reportsApi = {
-  getDashboardStats: () => api.get<DashboardStats>('/stats/today'),
+  getDashboardStats: (month?: number, year?: number) => {
+    const params = new URLSearchParams();
+    if (month) params.append('month', month.toString());
+    if (year) params.append('year', year.toString());
+    
+    return api.get<DashboardStats>(`/stats/today?${params.toString()}`);
+  },
   getMonthlyReport: (year: number) =>
     api.get<MonthlyReport[]>(`/reports/monthly?year=${year}`),
   getVehicleIncomeReport: () => api.get<VehicleIncomeReport[]>('/reports/vehicle-income'),

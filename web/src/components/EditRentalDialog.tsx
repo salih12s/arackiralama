@@ -112,7 +112,11 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
   // Calculate totals (in TRY)
   const [days, dailyPrice, kmDiff, cleaning, hgs, damage, fuel, upfront, pay1, pay2, pay3, pay4] = watchedValues;
   const totalDueTRY = (days || 0) * (dailyPrice || 0) + (kmDiff || 0) + (cleaning || 0) + (hgs || 0) + (damage || 0) + (fuel || 0);
-  const totalPaidTRY = (upfront || 0) + (pay1 || 0) + (pay2 || 0) + (pay3 || 0) + (pay4 || 0);
+  
+  // Toplam ödenen = Planlanan ödemeler + Ek ödemeler
+  const plannedPaidTRY = (upfront || 0) + (pay1 || 0) + (pay2 || 0) + (pay3 || 0) + (pay4 || 0);
+  const additionalPaidTRY = rental?.payments ? rental.payments.reduce((sum, p) => sum + (p.amount / 100), 0) : 0; // payments kuruş cinsinden
+  const totalPaidTRY = plannedPaidTRY + additionalPaidTRY;
   const balanceTRY = totalDueTRY - totalPaidTRY;
 
   // Fetch rental details (only if we need fresh data, but we already have it)
@@ -163,38 +167,45 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
     }
   }, [rentalData, setValue, rental]);
 
-  // Calculate days when dates change manually
-  useEffect(() => {
-    if (startDate && endDate && endDate.isAfter(startDate)) {
-      const calculatedDays = endDate.diff(startDate, 'day');
-      if (calculatedDays > 0 && calculatedDays !== days) {
-        setValue('days', calculatedDays, { shouldValidate: false });
-        setValue('startDate', startDate.toDate(), { shouldValidate: false });
-        setValue('endDate', endDate.toDate(), { shouldValidate: false });
-      }
-    }
-  }, [startDate, endDate, setValue]);
+  // Date calculation handlers - no useEffect to prevent infinite loops
+  const handleStartDateChange = (newStartDate: Dayjs | null) => {
+    if (!newStartDate) return;
+    
+    setStartDate(newStartDate);
+    setValue('startDate', newStartDate.toDate(), { shouldValidate: false });
+    
+    // Calculate end date based on current days
+    const currentDays = watch('days') || 1;
+    const newEndDate = newStartDate.add(currentDays - 1, 'day'); // -1 because days include both start and end
+    setEndDate(newEndDate);
+    setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
+  };
 
-  // Update end date when days change manually
-  useEffect(() => {
-    if (startDate && days && days > 0 && !isNaN(days)) {
-      const newEndDate = startDate.add(days, 'day');
-      if (!newEndDate.isSame(endDate, 'day')) {
-        setEndDate(newEndDate);
-        setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
-      }
+  const handleEndDateChange = (newEndDate: Dayjs | null) => {
+    if (!newEndDate || !startDate) return;
+    
+    setEndDate(newEndDate);
+    setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
+    
+    // Calculate days based on date difference (inclusive)
+    if (newEndDate.isAfter(startDate) || newEndDate.isSame(startDate, 'day')) {
+      const calculatedDays = newEndDate.diff(startDate, 'day') + 1; // +1 to include both start and end days
+      setValue('days', calculatedDays, { shouldValidate: false });
     }
-  }, [days, startDate, setValue]);
+  };
 
-  // Update dates when start date changes (keeping same duration)
-  useEffect(() => {
-    if (startDate && days && days > 0) {
-      const newEndDate = startDate.add(days, 'day');
-      setEndDate(newEndDate);
-      setValue('startDate', startDate.toDate(), { shouldValidate: false });
-      setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
-    }
-  }, [startDate, setValue]); // days'i dependency'den çıkardık
+  const handleDaysChange = (newDays: number) => {
+    if (!startDate || newDays < 1) return;
+    
+    setValue('days', newDays, { shouldValidate: false });
+    
+    // Calculate end date based on new days
+    // newDays = 1 means same day (start and end same)
+    // newDays = 2 means start day + 1 day = 2 days total
+    const newEndDate = startDate.add(newDays - 1, 'day');
+    setEndDate(newEndDate);
+    setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
+  };
 
   const updateRentalMutation = useMutation({
     mutationFn: (data: RentalFormData) => {
@@ -371,7 +382,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
               <DatePicker
                 label="Başlangıç Tarihi"
                 value={startDate}
-                onChange={(newValue) => setStartDate(newValue)}
+                onChange={handleStartDateChange}
                 sx={{ width: '100%', mt: 2, mb: 1 }}
               />
             </Grid>
@@ -387,7 +398,11 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                     label="Gün Sayısı"
                     type="number"
                     margin="normal"
-                    onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                    onChange={(e) => {
+                      const newDays = parseInt(e.target.value) || 0;
+                      field.onChange(newDays);
+                      handleDaysChange(newDays);
+                    }}
                     error={!!errors.days}
                     helperText={errors.days?.message}
                   />
@@ -399,7 +414,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
               <DatePicker
                 label="Bitiş Tarihi"
                 value={endDate}
-                onChange={(newValue) => setEndDate(newValue)}
+                onChange={handleEndDateChange}
                 sx={{ width: '100%', mt: 2, mb: 1 }}
                 disabled
               />
@@ -482,7 +497,16 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                       label={field.label}
                       type="number"
                       margin="normal"
-                      onChange={(e) => formField.onChange(parseFloat(e.target.value) || 0)}
+                      inputProps={{ step: 0.01 }}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '') {
+                          formField.onChange('');
+                        } else {
+                          const numValue = parseFloat(value);
+                          formField.onChange(isNaN(numValue) ? 0 : numValue);
+                        }
+                      }}
                     />
                   )}
                 />
@@ -514,7 +538,9 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                 <Typography variant="h6" gutterBottom>
                   Hesaplama Özeti
                 </Typography>
-                <Grid container spacing={2}>
+                
+                {/* Ana mali bilgiler */}
+                <Grid container spacing={2} sx={{ mb: 2 }}>
                   <Grid item xs={4}>
                     <Typography variant="body2">
                       <strong>Toplam Ödenecek: {formatCurrency(Math.round(totalDueTRY * 100))}</strong>
@@ -531,6 +557,44 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                     </Typography>
                   </Grid>
                 </Grid>
+
+                {/* Ek Ödemeler (Ara Ödemeler) */}
+                {rental?.payments && rental.payments.length > 0 && (
+                  <Box sx={{ mt: 2, p: 2, bgcolor: 'info.50', borderRadius: 1, border: '1px solid', borderColor: 'info.200' }}>
+                    <Typography variant="subtitle2" gutterBottom sx={{ color: 'info.main', fontWeight: 600 }}>
+                      Ek Ödemeler ({rental.payments.length} adet)
+                    </Typography>
+                    <Grid container spacing={1}>
+                      {rental.payments.map((payment, index) => (
+                        <Grid item xs={12} sm={6} md={4} key={payment.id}>
+                          <Box sx={{ 
+                            p: 1, 
+                            bgcolor: 'white', 
+                            borderRadius: 0.5, 
+                            border: '1px solid', 
+                            borderColor: 'grey.300',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 0.5
+                          }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
+                              {index + 1}. {formatCurrency(payment.amount)}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {payment.method === 'CASH' ? 'Nakit' : payment.method === 'CARD' ? 'Kart' : 'Transfer'}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {dayjs(payment.paidAt).format('DD.MM.YYYY HH:mm')}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      ))}
+                    </Grid>
+                    <Typography variant="body2" sx={{ mt: 1, fontWeight: 600, color: 'info.dark' }}>
+                      Ek Ödemeler Toplamı: {formatCurrency(rental.payments.reduce((sum, p) => sum + p.amount, 0))}
+                    </Typography>
+                  </Box>
+                )}
               </Box>
             </Grid>
           </Grid>

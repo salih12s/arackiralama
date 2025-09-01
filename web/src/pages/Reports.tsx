@@ -23,19 +23,10 @@ import {
   MenuItem,
   Divider,
   Alert,
-  Tabs,
-  Tab,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  LinearProgress,
-  IconButton,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
   MonetizationOn as MoneyIcon,
-  DirectionsCar as CarIcon,
-  Assessment as AssessmentIcon,
   Warning as WarningIcon,
   AccountBalance as AccountBalanceIcon,
   Timeline as TimelineIcon,
@@ -55,17 +46,16 @@ import {
   Pie,
   Cell,
   ComposedChart,
-  Area,
-  AreaChart,
   Legend,
 } from 'recharts';
 import dayjs from 'dayjs';
 
 import Layout from '../components/Layout';
-import { reportsApi, formatCurrency, rentalsApi, vehiclesApi } from '../api/client';
+import { reportsApi, formatCurrency, vehiclesApi } from '../api/client';
 
 export default function Reports() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number | 'all'>('all');
   const navigate = useNavigate();
 
   // Fetch monthly report
@@ -86,12 +76,6 @@ export default function Reports() {
     queryFn: () => reportsApi.getDebtors(),
   });
 
-  // Fetch all rentals for advanced analytics
-  const { data: allRentalsData } = useQuery({
-    queryKey: ['all-rentals-analytics'],
-    queryFn: () => rentalsApi.getAll({ limit: 1000 }),
-  });
-
   // Fetch vehicles data
   const { data: allVehiclesData } = useQuery({
     queryKey: ['all-vehicles-analytics'],
@@ -99,10 +83,14 @@ export default function Reports() {
   });
 
   // Calculate advanced analytics
-  const monthlyStats = monthlyData?.data || [];
+  const allMonthlyStats = monthlyData?.data || [];
+  // Ay filtresine göre verileri filtrele
+  const monthlyStats = selectedMonth === 'all' 
+    ? allMonthlyStats 
+    : allMonthlyStats.filter(month => month.month === selectedMonth);
+    
   const vehicleStats = vehicleIncomeData?.data || [];
   const debtorsList = debtorsData?.data || [];
-  const rentals = allRentalsData?.data?.data || [];
   const vehicles = allVehiclesData?.data || [];
 
   // Calculate KPIs
@@ -125,32 +113,6 @@ export default function Reports() {
     profitMargin: month.billed > 0 ? ((month.collected - month.outstanding) / month.billed * 100) : 0,
     collectionRate: month.billed > 0 ? (month.collected / month.billed * 100) : 0,
   }));
-
-  // Top performing vehicles
-  const topVehicles = vehicleStats
-    .sort((a, b) => b.collected - a.collected)
-    .slice(0, 5)
-    .map(vehicle => ({
-      ...vehicle,
-      efficiency: vehicle.billed > 0 ? (vehicle.collected / vehicle.billed * 100) : 0,
-    }));
-
-  // Recent activity data (last 30 days rentals)
-  const recentRentals = rentals
-    .filter(rental => dayjs().diff(dayjs(rental.createdAt), 'days') <= 30)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  const dailyRevenue: Record<string, { date: string; revenue: number; count: number }> = {};
-  recentRentals.forEach(rental => {
-    const day = dayjs(rental.createdAt).format('MM/DD');
-    if (!dailyRevenue[day]) {
-      dailyRevenue[day] = { date: day, revenue: 0, count: 0 };
-    }
-    dailyRevenue[day].revenue += rental.totalDue;
-    dailyRevenue[day].count += 1;
-  });
-
-  const dailyRevenueData = Object.values(dailyRevenue).slice(-14); // Last 14 days
 
   return (
     <Layout title="Raporlar ve Analizler">
@@ -178,6 +140,33 @@ export default function Reports() {
               ))}
             </Select>
           </FormControl>
+          
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Ay</InputLabel>
+            <Select
+              value={selectedMonth}
+              label="Ay"
+              onChange={(e) => setSelectedMonth(e.target.value as number | 'all')}
+            >
+              <MenuItem value="all">Tüm Aylar</MenuItem>
+              {[
+                { value: 1, label: 'Ocak' },
+                { value: 2, label: 'Şubat' },
+                { value: 3, label: 'Mart' },
+                { value: 4, label: 'Nisan' },
+                { value: 5, label: 'Mayıs' },
+                { value: 6, label: 'Haziran' },
+                { value: 7, label: 'Temmuz' },
+                { value: 8, label: 'Ağustos' },
+                { value: 9, label: 'Eylül' },
+                { value: 10, label: 'Ekim' },
+                { value: 11, label: 'Kasım' },
+                { value: 12, label: 'Aralık' }
+              ].map(month => (
+                <MenuItem key={month.value} value={month.value}>{month.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Stack>
       </Box>
 
@@ -192,7 +181,7 @@ export default function Reports() {
                     {formatCurrency(totalRevenue)}
                   </Typography>
                   <Typography variant="body2" color="primary.main" sx={{ fontWeight: 500 }}>
-                    Toplam Gelir ({selectedYear})
+                    Toplam Gelir ({selectedYear}{selectedMonth !== 'all' ? ` - ${['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'][selectedMonth as number]}` : ''})
                   </Typography>
                 </Box>
                 <Avatar sx={{ bgcolor: 'primary.main', color: 'white' }}>
@@ -270,7 +259,7 @@ export default function Reports() {
           <Paper sx={{ p: 3, height: '100%' }}>
             <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
               <TimelineIcon color="primary" />
-              Aylık Gelir Trend Analizi ({selectedYear})
+              Aylık Gelir Trend Analizi ({selectedYear}{selectedMonth !== 'all' ? ` - ${['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'][selectedMonth as number]}` : ''})
             </Typography>
             <Box sx={{ height: 400, mt: 2 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -341,60 +330,6 @@ export default function Reports() {
               <Typography variant="body2" color="text.secondary" align="center">
                 Toplam {vehicles.length} araç
               </Typography>
-            </Box>
-          </Paper>
-        </Grid>
-
-        {/* Daily Revenue (Last 14 Days) */}
-        <Grid item xs={12} lg={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <AssessmentIcon color="primary" />
-              Son 14 Gün Günlük Gelir
-            </Typography>
-            <Box sx={{ height: 300, mt: 2 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={dailyRevenueData}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => formatCurrency(value)} />
-                  <Tooltip formatter={(value: any) => [formatCurrency(value), 'Günlük Gelir']} />
-                  <Area 
-                    type="monotone" 
-                    dataKey="revenue" 
-                    stroke="#8884d8" 
-                    fillOpacity={1} 
-                    fill="url(#colorRevenue)" 
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </Box>
-          </Paper>
-        </Grid>
-
-        {/* Top Performing Vehicles */}
-        <Grid item xs={12} lg={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <CarIcon color="primary" />
-              En Performanslı Araçlar
-            </Typography>
-            <Box sx={{ height: 300, mt: 2 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topVehicles} layout="horizontal">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(value) => formatCurrency(value)} />
-                  <YAxis dataKey="plate" type="category" tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(value: any) => [formatCurrency(value), 'Tahsil Edilen']} />
-                  <Bar dataKey="collected" fill="#2e7d32" />
-                </BarChart>
-              </ResponsiveContainer>
             </Box>
           </Paper>
         </Grid>
@@ -551,17 +486,6 @@ export default function Reports() {
                 </Typography>
                 <Typography variant="h6" color="success.main" sx={{ fontWeight: 700 }}>
                   {vehicles.filter(v => v.status === 'RENTED').length} araç
-                </Typography>
-              </Box>
-
-              <Box sx={{ p: 2, bgcolor: 'warning.50', borderRadius: 2, border: '1px solid', borderColor: 'warning.200' }}>
-                <Typography variant="body2" color="warning.main" sx={{ fontWeight: 600 }}>
-                  Ortalama Günlük Gelir
-                </Typography>
-                <Typography variant="h6" color="warning.main" sx={{ fontWeight: 700 }}>
-                  {formatCurrency(dailyRevenueData.length > 0 ? 
-                    (dailyRevenueData as Array<{ revenue: number }>).reduce((sum, day) => sum + day.revenue, 0) / dailyRevenueData.length : 0
-                  )}
                 </Typography>
               </Box>
 

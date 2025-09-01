@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
+import dayjs from 'dayjs';
 import {
   Box,
   Grid,
@@ -36,6 +37,8 @@ import {
   InputAdornment,
   Avatar,
   Select,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import {
   DirectionsCar,
@@ -64,7 +67,6 @@ import {
   Edit as EditIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import {
   reportsApi,
@@ -86,6 +88,8 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [newRentalOpen, setNewRentalOpen] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(dayjs().month() + 1); // 1-12
+  const [selectedYear, setSelectedYear] = useState(dayjs().year());
   const [debtorDeleteDialog, setDebtorDeleteDialog] = useState<{open: boolean; rental: any}>({
     open: false,
     rental: null
@@ -147,8 +151,8 @@ export default function Dashboard() {
 
   // === DATA FETCH ===
   const { data: statsRes, isFetching: statsLoading } = useQuery({
-    queryKey: ['dashboard-stats'],
-    queryFn: reportsApi.getDashboardStats,
+    queryKey: ['dashboard-stats', selectedMonth, selectedYear],
+    queryFn: () => reportsApi.getDashboardStats(selectedMonth, selectedYear),
     staleTime: 30 * 1000, // 30 saniye fresh tut
     gcTime: 2 * 60 * 1000, // 2 dakika cache'de sakla
   });
@@ -308,6 +312,19 @@ export default function Dashboard() {
   const idleVehicles: Vehicle[] = idleVehiclesRes?.data ?? [];
   const reservedVehicles: Vehicle[] = reservedVehiclesRes?.data ?? [];
   const serviceVehicles: Vehicle[] = serviceVehiclesRes?.data ?? [];
+
+  // Helper function to get month name
+  const getMonthName = (month: number): string => {
+    const monthNames = [
+      '', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+    ];
+    return monthNames[month] || '';
+  };
+
+  // Determine if we're viewing current month or not
+  const isCurrentMonth = selectedMonth === dayjs().month() + 1 && selectedYear === dayjs().year();
+  const monthDisplayText = isCurrentMonth ? 'Bu Ay' : `${getMonthName(selectedMonth)} ${selectedYear}`;
 
   // === UTILITY FUNCTIONS ===
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, rental: Rental) => {
@@ -638,6 +655,61 @@ export default function Dashboard() {
         </Stack>
       </Box>
 
+      {/* MONTH/YEAR SELECTOR */}
+      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          İstatistikler:
+        </Typography>
+        
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <InputLabel>Ay</InputLabel>
+          <Select
+            value={selectedMonth}
+            label="Ay"
+            onChange={(e) => setSelectedMonth(e.target.value as number)}
+          >
+            <MenuItem value={1}>Ocak</MenuItem>
+            <MenuItem value={2}>Şubat</MenuItem>
+            <MenuItem value={3}>Mart</MenuItem>
+            <MenuItem value={4}>Nisan</MenuItem>
+            <MenuItem value={5}>Mayıs</MenuItem>
+            <MenuItem value={6}>Haziran</MenuItem>
+            <MenuItem value={7}>Temmuz</MenuItem>
+            <MenuItem value={8}>Ağustos</MenuItem>
+            <MenuItem value={9}>Eylül</MenuItem>
+            <MenuItem value={10}>Ekim</MenuItem>
+            <MenuItem value={11}>Kasım</MenuItem>
+            <MenuItem value={12}>Aralık</MenuItem>
+          </Select>
+        </FormControl>
+        
+        <FormControl size="small" sx={{ minWidth: 100 }}>
+          <InputLabel>Yıl</InputLabel>
+          <Select
+            value={selectedYear}
+            label="Yıl"
+            onChange={(e) => setSelectedYear(e.target.value as number)}
+          >
+            <MenuItem value={2024}>2024</MenuItem>
+            <MenuItem value={2025}>2025</MenuItem>
+            <MenuItem value={2026}>2026</MenuItem>
+          </Select>
+        </FormControl>
+        
+        {(selectedMonth !== dayjs().month() + 1 || selectedYear !== dayjs().year()) && (
+          <Button 
+            size="small" 
+            onClick={() => {
+              setSelectedMonth(dayjs().month() + 1);
+              setSelectedYear(dayjs().year());
+            }}
+            sx={{ textTransform: 'none' }}
+          >
+            Bu Aya Dön
+          </Button>
+        )}
+      </Box>
+
       {/* KPI CARDS */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {/* 1. Kiradaki Araç Sayısı */}
@@ -683,7 +755,7 @@ export default function Dashboard() {
         {/* 5. Güncel Kazanç */}
         <Grid item xs={12} sm={6} md={3}>
           <KpiCard 
-            title="Bu Ay Kazanç" 
+            title={`${monthDisplayText} Kazanç`}
             value={stats?.monthCollected ?? 0} 
             isCurrency 
             color="success"
@@ -705,7 +777,7 @@ export default function Dashboard() {
         {/* 8. Toplam Borç Miktarı */}
         <Grid item xs={12} sm={6} md={3}>
           <KpiCard 
-            title="Toplam Borç" 
+            title={`${monthDisplayText} Borç`}
             value={stats?.monthOutstanding ?? 0} 
             isCurrency 
             color="error"
@@ -1782,235 +1854,366 @@ export default function Dashboard() {
             Kiralama Detayları
           </Typography>
         </DialogTitle>
-        <DialogContent dividers>
-          {detailDialog.rental && (
-            <Grid container spacing={3}>
-              {/* Sol Kolon - Genel Bilgiler */}
-              <Grid item xs={12} md={6}>
-                <Card sx={{ p: 2, bgcolor: 'grey.50' }}>
-                  <Typography variant="h6" sx={{ mb: 2, color: 'primary.main', fontWeight: 600 }}>
-                    Genel Bilgiler
+        <DialogContent dividers sx={{ maxHeight: '80vh', overflow: 'auto' }}>
+          {detailDialog.rental && (() => {
+            // Hesaplamaları yap
+            const totalAllPaid = (detailDialog.rental.upfront || 0) + 
+                                (detailDialog.rental.pay1 || 0) + 
+                                (detailDialog.rental.pay2 || 0) + 
+                                (detailDialog.rental.pay3 || 0) + 
+                                (detailDialog.rental.pay4 || 0) +
+                                (detailDialog.rental.payments ? detailDialog.rental.payments.reduce((sum: number, p: any) => sum + p.amount, 0) : 0);
+            const remainingBalance = detailDialog.rental.totalDue - totalAllPaid;
+            
+            // Araç geliri hesaplaması: Temel gelir (gün × günlük ücret) + KM farkı
+            const vehicleRevenue = (detailDialog.rental.days * detailDialog.rental.dailyPrice) + (detailDialog.rental.kmDiff || 0);
+
+            return (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {/* Üst Kısım - Genel Özet */}
+                <Alert severity={remainingBalance <= 0 ? "success" : "info"}>
+                  <Typography variant="h6" gutterBottom>
+                    Kiralama Özeti
                   </Typography>
                   
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" color="text.secondary">Araç:</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {detailDialog.rental.vehicle?.plate}
+                  {/* Temel Mali Bilgiler Grid */}
+                  <Grid container spacing={2} sx={{ mb: 2 }}>
+                    <Grid item xs={6} sm={2.4}>
+                      <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'success.100', borderRadius: 1 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Toplam Ödenecek
+                        </Typography>
+                        <Typography variant="h6" color="success.dark" sx={{ fontWeight: 700 }}>
+                          {formatCurrency(detailDialog.rental.totalDue)}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={2.4}>
+                      <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'info.100', borderRadius: 1 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Toplam Ödenen
+                        </Typography>
+                        <Typography variant="h6" color="info.dark" sx={{ fontWeight: 700 }}>
+                          {formatCurrency(totalAllPaid)}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={2.4}>
+                      <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'warning.100', borderRadius: 1 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Araç Geliri
+                        </Typography>
+                        <Typography variant="h6" color="warning.dark" sx={{ fontWeight: 700 }}>
+                          {formatCurrency(vehicleRevenue)}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={2.4}>
+                      <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'primary.100', borderRadius: 1 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Kapora
+                        </Typography>
+                        <Typography variant="h6" color="primary.dark" sx={{ fontWeight: 700 }}>
+                          {formatCurrency(detailDialog.rental.upfront || 0)}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={2.4}>
+                      <Box sx={{ textAlign: 'center', p: 1, bgcolor: remainingBalance > 0 ? 'error.100' : 'success.100', borderRadius: 1 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Kalan Bakiye
+                        </Typography>
+                        <Typography variant="h6" color={remainingBalance > 0 ? 'error.dark' : 'success.dark'} sx={{ fontWeight: 700 }}>
+                          {formatCurrency(remainingBalance)}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+
+                  {/* Ek Maliyetler */}
+                  {(detailDialog.rental.kmDiff > 0 || detailDialog.rental.cleaning > 0 || detailDialog.rental.hgs > 0 || detailDialog.rental.damage > 0 || detailDialog.rental.fuel > 0) && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
+                        Ek Maliyetler
                       </Typography>
+                      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                        {detailDialog.rental.kmDiff > 0 && (
+                          <Chip label={`KM Farkı: ${formatCurrency(detailDialog.rental.kmDiff)}`} size="small" variant="outlined" />
+                        )}
+                        {detailDialog.rental.cleaning > 0 && (
+                          <Chip label={`Temizlik: ${formatCurrency(detailDialog.rental.cleaning)}`} size="small" variant="outlined" />
+                        )}
+                        {detailDialog.rental.hgs > 0 && (
+                          <Chip label={`HGS: ${formatCurrency(detailDialog.rental.hgs)}`} size="small" variant="outlined" />
+                        )}
+                        {detailDialog.rental.damage > 0 && (
+                          <Chip label={`Hasar: ${formatCurrency(detailDialog.rental.damage)}`} size="small" variant="outlined" />
+                        )}
+                        {detailDialog.rental.fuel > 0 && (
+                          <Chip label={`Yakıt: ${formatCurrency(detailDialog.rental.fuel)}`} size="small" variant="outlined" />
+                        )}
+                      </Stack>
                     </Box>
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" color="text.secondary">Müşteri:</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {detailDialog.rental.customer?.fullName}
+                  )}
+                </Alert>
+
+                {/* Alt Kısım - Detaylı Bilgiler Grid */}
+                <Grid container spacing={3}>
+                  {/* Sol Kolon - Genel Bilgiler */}
+                  <Grid item xs={12} md={6}>
+                    <Card sx={{ p: 2, bgcolor: 'grey.50' }}>
+                      <Typography variant="h6" sx={{ mb: 2, color: 'primary.main', fontWeight: 600 }}>
+                        Genel Bilgiler
                       </Typography>
-                    </Box>
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" color="text.secondary">Telefon:</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {detailDialog.rental.customer?.phone || 'Belirtilmemiş'}
-                      </Typography>
-                    </Box>
-                    
-                    <Divider />
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" color="text.secondary">Başlangıç:</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {dayjs(detailDialog.rental.startDate).format('DD.MM.YYYY')}
-                      </Typography>
-                    </Box>
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" color="text.secondary">Bitiş:</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {dayjs(detailDialog.rental.endDate).format('DD.MM.YYYY')}
-                      </Typography>
-                    </Box>
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" color="text.secondary">Gün Sayısı:</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {detailDialog.rental.days} gün
-                      </Typography>
-                    </Box>
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" color="text.secondary">Günlük Ücret:</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {formatCurrency(detailDialog.rental.dailyPrice)}
-                      </Typography>
-                    </Box>
-                    
-                    {detailDialog.rental.note && (
-                      <>
-                        <Divider />
-                        <Box>
-                          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>Not:</Typography>
+                      
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">Araç:</Typography>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {detailDialog.rental.note}
+                            {detailDialog.rental.vehicle?.plate}
                           </Typography>
                         </Box>
-                      </>
-                    )}
-                  </Box>
-                </Card>
-              </Grid>
-
-              {/* Sağ Kolon - Mali Bilgiler */}
-              <Grid item xs={12} md={6}>
-                <Card sx={{ p: 2, bgcolor: 'success.50' }}>
-                  <Typography variant="h6" sx={{ mb: 2, color: 'success.main', fontWeight: 600 }}>
-                    Mali Detaylar
-                  </Typography>
-                  
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" color="text.secondary">Temel Tutar:</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {formatCurrency(detailDialog.rental.days * detailDialog.rental.dailyPrice)}
-                      </Typography>
-                    </Box>
-                    
-                    {detailDialog.rental.kmDiff > 0 && (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">Km Farkı:</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {formatCurrency(detailDialog.rental.kmDiff)}
-                        </Typography>
-                      </Box>
-                    )}
-                    
-                    {detailDialog.rental.cleaning > 0 && (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">Temizlik:</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {formatCurrency(detailDialog.rental.cleaning)}
-                        </Typography>
-                      </Box>
-                    )}
-                    
-                    {detailDialog.rental.hgs > 0 && (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">HGS:</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {formatCurrency(detailDialog.rental.hgs)}
-                        </Typography>
-                      </Box>
-                    )}
-                    
-                    {detailDialog.rental.damage > 0 && (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">Hasar:</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {formatCurrency(detailDialog.rental.damage)}
-                        </Typography>
-                      </Box>
-                    )}
-                    
-                    {detailDialog.rental.fuel > 0 && (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">Yakıt:</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {formatCurrency(detailDialog.rental.fuel)}
-                        </Typography>
-                      </Box>
-                    )}
-                    
-                    <Divider />
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body1" sx={{ fontWeight: 700 }}>Toplam Tutar:</Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                        {formatCurrency(detailDialog.rental.totalDue)}
-                      </Typography>
-                    </Box>
-                    
-                    <Divider />
-                    
-                    <Typography variant="subtitle2" sx={{ color: 'text.secondary', mt: 1 }}>
-                      Ödemeler:
-                    </Typography>
-                    
-                    {detailDialog.rental.upfront > 0 && (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">Kapora:</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
-                          {formatCurrency(detailDialog.rental.upfront)}
-                        </Typography>
-                      </Box>
-                    )}
-                    
-                    {detailDialog.rental.pay1 > 0 && (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">1. Ödeme:</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
-                          {formatCurrency(detailDialog.rental.pay1)}
-                        </Typography>
-                      </Box>
-                    )}
-                    
-                    {detailDialog.rental.pay2 > 0 && (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">2. Ödeme:</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
-                          {formatCurrency(detailDialog.rental.pay2)}
-                        </Typography>
-                      </Box>
-                    )}
-                    
-                    {detailDialog.rental.pay3 > 0 && (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">3. Ödeme:</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
-                          {formatCurrency(detailDialog.rental.pay3)}
-                        </Typography>
-                      </Box>
-                    )}
-                    
-                    {detailDialog.rental.pay4 > 0 && (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">4. Ödeme:</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
-                          {formatCurrency(detailDialog.rental.pay4)}
-                        </Typography>
-                      </Box>
-                    )}
-                    
-                    <Divider />
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body1" sx={{ fontWeight: 700 }}>Toplam Ödenen:</Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 700, color: 'success.main' }}>
-                        {formatCurrency(
-                          detailDialog.rental.upfront + 
-                          detailDialog.rental.pay1 + 
-                          detailDialog.rental.pay2 + 
-                          detailDialog.rental.pay3 + 
-                          detailDialog.rental.pay4
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">Müşteri:</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {detailDialog.rental.customer?.fullName}
+                          </Typography>
+                        </Box>
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">Telefon:</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {detailDialog.rental.customer?.phone || 'Belirtilmemiş'}
+                          </Typography>
+                        </Box>
+                        
+                        <Divider />
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">Başlangıç:</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {dayjs(detailDialog.rental.startDate).format('DD.MM.YYYY')}
+                          </Typography>
+                        </Box>
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">Bitiş:</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {dayjs(detailDialog.rental.endDate).format('DD.MM.YYYY')}
+                          </Typography>
+                        </Box>
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">Gün Sayısı:</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {detailDialog.rental.days} gün
+                          </Typography>
+                        </Box>
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">Günlük Ücret:</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {formatCurrency(detailDialog.rental.dailyPrice)}
+                          </Typography>
+                        </Box>
+                        
+                        {detailDialog.rental.note && (
+                          <>
+                            <Divider />
+                            <Box>
+                              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>Not:</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                {detailDialog.rental.note}
+                              </Typography>
+                            </Box>
+                          </>
                         )}
+                      </Box>
+                    </Card>
+                  </Grid>
+
+                  {/* Sağ Kolon - Mali Bilgiler */}
+                  <Grid item xs={12} md={6}>
+                    <Card sx={{ p: 2, bgcolor: 'success.50' }}>
+                      <Typography variant="h6" sx={{ mb: 2, color: 'success.main', fontWeight: 600 }}>
+                        Mali Detaylar
                       </Typography>
-                    </Box>
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body1" sx={{ fontWeight: 700 }}>Kalan Bakiye:</Typography>
-                      <Typography 
-                        variant="body1" 
-                        sx={{ 
-                          fontWeight: 700, 
-                          color: detailDialog.rental.balance > 0 ? 'error.main' : 'success.main'
-                        }}
-                      >
-                        {formatCurrency(detailDialog.rental.balance)}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Card>
-              </Grid>
-            </Grid>
-          )}
+                      
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">Temel Tutar:</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {formatCurrency(detailDialog.rental.days * detailDialog.rental.dailyPrice)}
+                          </Typography>
+                        </Box>
+                        
+                        {detailDialog.rental.kmDiff > 0 && (
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="body2" color="text.secondary">Km Farkı:</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {formatCurrency(detailDialog.rental.kmDiff)}
+                            </Typography>
+                          </Box>
+                        )}
+                        
+                        {detailDialog.rental.cleaning > 0 && (
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="body2" color="text.secondary">Temizlik:</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {formatCurrency(detailDialog.rental.cleaning)}
+                            </Typography>
+                          </Box>
+                        )}
+                        
+                        {detailDialog.rental.hgs > 0 && (
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="body2" color="text.secondary">HGS:</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {formatCurrency(detailDialog.rental.hgs)}
+                            </Typography>
+                          </Box>
+                        )}
+                        
+                        {detailDialog.rental.damage > 0 && (
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="body2" color="text.secondary">Hasar:</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {formatCurrency(detailDialog.rental.damage)}
+                            </Typography>
+                          </Box>
+                        )}
+                        
+                        {detailDialog.rental.fuel > 0 && (
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="body2" color="text.secondary">Yakıt:</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {formatCurrency(detailDialog.rental.fuel)}
+                            </Typography>
+                          </Box>
+                        )}
+                        
+                        <Divider />
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body1" sx={{ fontWeight: 700 }}>Toplam Tutar:</Typography>
+                          <Typography variant="body1" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                            {formatCurrency(detailDialog.rental.totalDue)}
+                          </Typography>
+                        </Box>
+                        
+                        <Divider />
+                        
+                        <Typography variant="subtitle2" sx={{ color: 'text.secondary', mt: 1 }}>
+                          Planlanan Ödemeler:
+                        </Typography>
+                        
+                        {detailDialog.rental.upfront > 0 && (
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="body2" color="text.secondary">Kapora:</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
+                              {formatCurrency(detailDialog.rental.upfront)}
+                            </Typography>
+                          </Box>
+                        )}
+                        
+                        {detailDialog.rental.pay1 > 0 && (
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="body2" color="text.secondary">1. Ödeme:</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
+                              {formatCurrency(detailDialog.rental.pay1)}
+                            </Typography>
+                          </Box>
+                        )}
+                        
+                        {detailDialog.rental.pay2 > 0 && (
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="body2" color="text.secondary">2. Ödeme:</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
+                              {formatCurrency(detailDialog.rental.pay2)}
+                            </Typography>
+                          </Box>
+                        )}
+                        
+                        {detailDialog.rental.pay3 > 0 && (
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="body2" color="text.secondary">3. Ödeme:</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
+                              {formatCurrency(detailDialog.rental.pay3)}
+                            </Typography>
+                          </Box>
+                        )}
+                        
+                        {detailDialog.rental.pay4 > 0 && (
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="body2" color="text.secondary">4. Ödeme:</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
+                              {formatCurrency(detailDialog.rental.pay4)}
+                            </Typography>
+                          </Box>
+                        )}
+                        
+                        <Divider />
+
+                        {/* Ek Ödemeler */}
+                        {detailDialog.rental.payments && detailDialog.rental.payments.length > 0 && (
+                          <>
+                            <Typography variant="subtitle2" sx={{ color: 'text.secondary', mt: 1 }}>
+                              Ek Ödemeler ({detailDialog.rental.payments.length} adet):
+                            </Typography>
+                            {detailDialog.rental.payments.map((payment: any, index: number) => (
+                              <Box key={payment.id} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="body2" color="text.secondary">
+                                  {index + 1}. Ödeme ({payment.method === 'CASH' ? 'Nakit' : payment.method === 'CARD' ? 'Kart' : 'Transfer'}):
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
+                                  {formatCurrency(payment.amount)}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </>
+                        )}
+                        
+                        <Divider />
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body1" sx={{ fontWeight: 700 }}>Toplam Ödenen:</Typography>
+                          <Typography variant="body1" sx={{ fontWeight: 700, color: 'success.main' }}>
+                            {formatCurrency(totalAllPaid)}
+                          </Typography>
+                        </Box>
+                        
+                        <Divider />
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body1" sx={{ fontWeight: 700 }}>Araç Geliri:</Typography>
+                          <Typography variant="body1" sx={{ fontWeight: 700, color: 'warning.main' }}>
+                            {formatCurrency(vehicleRevenue)}
+                          </Typography>
+                        </Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem', fontStyle: 'italic' }}>
+                          (Temel Tutar + KM Farkı + Ödemeler)
+                        </Typography>
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body1" sx={{ fontWeight: 700 }}>Kalan Bakiye:</Typography>
+                          <Typography 
+                            variant="body1" 
+                            sx={{ 
+                              fontWeight: 700, 
+                              color: remainingBalance > 0 ? 'error.main' : 'success.main'
+                            }}
+                          >
+                            {formatCurrency(remainingBalance)}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Card>
+                  </Grid>
+                </Grid>
+              </Box>
+            );
+          })()}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDetailDialog({ open: false, rental: null })}>
