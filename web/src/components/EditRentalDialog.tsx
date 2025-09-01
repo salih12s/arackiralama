@@ -118,6 +118,9 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
   const additionalPaidTRY = rental?.payments ? rental.payments.reduce((sum, p) => sum + (p.amount / 100), 0) : 0; // payments kuruş cinsinden
   const totalPaidTRY = plannedPaidTRY + additionalPaidTRY;
   const balanceTRY = totalDueTRY - totalPaidTRY;
+  
+  // Borç tamamen kapanmış mı kontrolü
+  const isDebtFullyPaid = balanceTRY <= 0;
 
   // Fetch rental details (only if we need fresh data, but we already have it)
   const { data: rentalResponse } = useQuery({
@@ -497,6 +500,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                       label={field.label}
                       type="number"
                       margin="normal"
+                      disabled={isDebtFullyPaid && field.name !== 'upfront'} // Peşin hariç diğerleri disable
                       inputProps={{ step: 0.01 }}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -512,6 +516,17 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                 />
               </Grid>
             ))}
+
+            {/* Debt Fully Paid Warning */}
+            {isDebtFullyPaid && (
+              <Grid item xs={12}>
+                <Alert severity="success" sx={{ mt: 1 }}>
+                  <Typography variant="body2">
+                    💰 Bu kiralama tamamen ödenmiştir. Ek ödemeler (1-4. Ödeme) değiştirilemez.
+                  </Typography>
+                </Alert>
+              </Grid>
+            )}
 
             {/* Note */}
             <Grid item xs={12}>

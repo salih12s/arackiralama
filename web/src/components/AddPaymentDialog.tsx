@@ -155,6 +155,13 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
+    // Eğer kiralama tamamen ödenmişse ödeme yapılamaz
+    if (remainingAmountTL <= 0) {
+      newErrors.amount = 'Bu kiralama zaten tamamen ödenmiş. Ek ödeme yapılamaz.';
+      setErrors(newErrors);
+      return false;
+    }
+
     // Amount validation
     if (!formData.amount) {
       newErrors.amount = 'Ödeme tutarı gereklidir';

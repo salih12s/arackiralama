@@ -49,6 +49,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { vehiclesApi, reportsApi, formatCurrency, Vehicle } from '../api/client';
+import { rentalsApi } from '../api/rentals';
 
 export default function Vehicles() {
   const [search, setSearch] = useState('');
@@ -81,7 +82,36 @@ export default function Vehicles() {
     gcTime: 5 * 60 * 1000, // 5 dakika cache
   });
 
+  // Fetch all rentals for total invoice calculation
+  const { data: rentalsResponse } = useQuery({
+    queryKey: ['all-rentals'],
+    queryFn: () => rentalsApi.getAll(),
+    staleTime: 2 * 60 * 1000, // 2 dakika fresh
+    gcTime: 5 * 60 * 1000, // 5 dakika cache
+  });
+
   const incomeData = incomeResponse?.data;
+  const rentalsData = rentalsResponse?.data;
+
+  // Calculate total invoice amount (all rental amounts including fees)
+  const totalInvoiceAmount = rentalsData?.reduce((total: number, rental: any) => {
+    const baseAmount = (rental.days || 0) * (rental.dailyPrice || 0);
+    const kmAmount = rental.kmDiff || 0;
+    const hgsAmount = rental.hgs || 0;
+    const cleaningAmount = rental.cleaning || 0;
+    const damageAmount = rental.damage || 0;
+    const fuelAmount = rental.fuel || 0;
+    
+    return total + baseAmount + kmAmount + hgsAmount + cleaningAmount + damageAmount + fuelAmount;
+  }, 0) || 0;
+
+  // Calculate total revenue (only rental price + km fees)
+  const totalRevenue = rentalsData?.reduce((total: number, rental: any) => {
+    const baseAmount = (rental.days || 0) * (rental.dailyPrice || 0);
+    const kmAmount = rental.kmDiff || 0;
+    
+    return total + baseAmount + kmAmount;
+  }, 0) || 0;
 
   // Create vehicle mutation
   const createVehicleMutation = useMutation({
@@ -243,7 +273,7 @@ export default function Vehicles() {
 
       {/* KPI Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card sx={{ 
             height: '100%',
             border: '1px solid',
@@ -267,7 +297,7 @@ export default function Vehicles() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card sx={{ 
             height: '100%',
             border: '1px solid',
@@ -291,7 +321,7 @@ export default function Vehicles() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card sx={{ 
             height: '100%',
             border: '1px solid',
@@ -315,7 +345,7 @@ export default function Vehicles() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <Card sx={{ 
             height: '100%',
             border: '1px solid',
@@ -325,16 +355,37 @@ export default function Vehicles() {
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                 <Box>
                   <Typography variant="h4" component="div" sx={{ fontWeight: 700, mb: 1, color: 'warning.main' }}>
-                    {incomeData?.reduce((total: number, item: any) => total + (item.collected || 0), 0) 
-                      ? formatCurrency(incomeData.reduce((total: number, item: any) => total + (item.collected || 0), 0))
-                      : '₺0'
-                    }
+                    {formatCurrency(totalRevenue)}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Toplam Gelir
                   </Typography>
                 </Box>
                 <Avatar sx={{ bgcolor: 'warning.main', width: 56, height: 56 }}>
+                  <AssessmentIcon sx={{ fontSize: 32 }} />
+                </Avatar>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card sx={{ 
+            height: '100%',
+            border: '1px solid',
+            borderColor: 'divider'
+          }}>
+            <CardContent>
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                <Box>
+                  <Typography variant="h4" component="div" sx={{ fontWeight: 700, mb: 1, color: 'info.main' }}>
+                    {formatCurrency(totalInvoiceAmount)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Toplam Fatura
+                  </Typography>
+                </Box>
+                <Avatar sx={{ bgcolor: 'info.main', width: 56, height: 56 }}>
                   <AssessmentIcon sx={{ fontSize: 32 }} />
                 </Avatar>
               </Stack>

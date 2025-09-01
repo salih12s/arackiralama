@@ -273,19 +273,29 @@ export default function Rentals() {
             </Box>
           ) : (
             <TableContainer>
-              <Table>
+              <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 700 }}>Araç</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Müşteri</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Tarihler</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Süre</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }} align="right">Günlük Ücret</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }} align="right">Toplam Tutar</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }} align="right">Kalan Bakiye</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Ödeme</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Durum</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }} align="center">İşlemler</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 80, fontSize: '0.75rem', padding: '4px 8px' }}>Araç</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 100, fontSize: '0.75rem', padding: '4px 8px' }}>Müşteri</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 80, fontSize: '0.75rem', padding: '4px 8px' }}>Tarihler</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 40, fontSize: '0.75rem', padding: '4px 8px' }}>Süre</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 60, fontSize: '0.75rem', padding: '4px 8px' }} align="right">Günlük</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 60, fontSize: '0.75rem', padding: '4px 8px' }} align="right">KM</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 50, fontSize: '0.75rem', padding: '4px 8px' }} align="right">HGS</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 60, fontSize: '0.75rem', padding: '4px 8px' }} align="right">Temizlik</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 50, fontSize: '0.75rem', padding: '4px 8px' }} align="right">Hasar</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 50, fontSize: '0.75rem', padding: '4px 8px' }} align="right">Yakıt</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 50, fontSize: '0.75rem', padding: '4px 8px' }} align="right">Peşin</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 50, fontSize: '0.75rem', padding: '4px 8px' }} align="right">1.Taksit</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 50, fontSize: '0.75rem', padding: '4px 8px' }} align="right">2.Taksit</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 50, fontSize: '0.75rem', padding: '4px 8px' }} align="right">3.Taksit</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 50, fontSize: '0.75rem', padding: '4px 8px' }} align="right">4.Taksit</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 70, fontSize: '0.75rem', padding: '4px 8px' }} align="right">Toplam</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 60, fontSize: '0.75rem', padding: '4px 8px' }} align="right">Bakiye</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 70, fontSize: '0.75rem', padding: '4px 8px' }}>Durum</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 80, fontSize: '0.75rem', padding: '4px 8px' }}>Not</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 60, fontSize: '0.75rem', padding: '4px 8px' }} align="center">İşlem</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -320,44 +330,38 @@ export default function Rentals() {
                           }
                         }}
                       >
-                        <TableCell>
-                          <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                              {rental.vehicle.plate}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {rental.vehicle.name || 'Araç Adı Yok'}
-                            </Typography>
-                          </Box>
+                        <TableCell sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.75rem' }}>
+                            {rental.vehicle.plate}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                            {rental.vehicle.name || '-'}
+                          </Typography>
                         </TableCell>
                         
-                        <TableCell>
-                          <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              {rental.customer.fullName}
+                        <TableCell sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
+                            {rental.customer.fullName}
+                          </Typography>
+                          {rental.customer.phone && (
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                              {rental.customer.phone}
                             </Typography>
-                            {rental.customer.phone && (
-                              <Typography variant="caption" color="text.secondary">
-                                {rental.customer.phone}
-                              </Typography>
-                            )}
-                          </Box>
+                          )}
                         </TableCell>
                         
-                        <TableCell>
-                          <Box>
-                            <Typography variant="body2">
-                              {formatDate(rental.startDate)}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {formatDate(rental.endDate)}
-                            </Typography>
-                          </Box>
+                        <TableCell sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
+                            {formatDate(rental.startDate)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                            {formatDate(rental.endDate)}
+                          </Typography>
                         </TableCell>
                         
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {rental.days} gün
+                        <TableCell sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
+                            {rental.days}g
                           </Typography>
                           {statusInfo && rental.status === 'ACTIVE' && (
                             <Chip 
@@ -365,28 +369,89 @@ export default function Rentals() {
                               size="small" 
                               color={statusColor as any}
                               variant="outlined"
-                              sx={{ fontSize: '0.65rem', height: 20, mt: 0.5 }}
+                              sx={{ fontSize: '0.6rem', height: 18, mt: 0.5 }}
                             />
                           )}
                         </TableCell>
                         
-                        <TableCell align="right">
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        <TableCell align="right" sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
                             {formatCurrency(rental.dailyPrice)}
                           </Typography>
                         </TableCell>
+
+                        <TableCell align="right" sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
+                            {formatCurrency(rental.kmDiff || 0)}
+                          </Typography>
+                        </TableCell>
+
+                        <TableCell align="right" sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
+                            {formatCurrency(rental.hgs || 0)}
+                          </Typography>
+                        </TableCell>
+
+                        <TableCell align="right" sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
+                            {formatCurrency(rental.cleaning || 0)}
+                          </Typography>
+                        </TableCell>
+
+                        <TableCell align="right" sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
+                            {formatCurrency(rental.damage || 0)}
+                          </Typography>
+                        </TableCell>
+
+                        <TableCell align="right" sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
+                            {formatCurrency(rental.fuel || 0)}
+                          </Typography>
+                        </TableCell>
+
+                        <TableCell align="right" sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
+                            {formatCurrency(rental.upfront || 0)}
+                          </Typography>
+                        </TableCell>
+
+                        <TableCell align="right" sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
+                            {formatCurrency(rental.pay1 || 0)}
+                          </Typography>
+                        </TableCell>
+
+                        <TableCell align="right" sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
+                            {formatCurrency(rental.pay2 || 0)}
+                          </Typography>
+                        </TableCell>
+
+                        <TableCell align="right" sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
+                            {formatCurrency(rental.pay3 || 0)}
+                          </Typography>
+                        </TableCell>
+
+                        <TableCell align="right" sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
+                            {formatCurrency(rental.pay4 || 0)}
+                          </Typography>
+                        </TableCell>
                         
-                        <TableCell align="right">
-                          <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
+                        <TableCell align="right" sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main', fontSize: '0.75rem' }}>
                             {formatCurrency(rental.totalDue)}
                           </Typography>
                         </TableCell>
                         
-                        <TableCell align="right">
+                        <TableCell align="right" sx={{ padding: '4px 8px' }}>
                           <Typography 
                             variant="body2" 
                             sx={{ 
                               fontWeight: 600,
+                              fontSize: '0.75rem',
                               color: rental.balance > 0 ? 'error.main' : 'success.main'
                             }}
                           >
@@ -394,22 +459,23 @@ export default function Rentals() {
                           </Typography>
                         </TableCell>
                         
-                        <TableCell>
-                          <Typography variant="body2">
-                            {rental.payments?.length || 0} ödeme
-                          </Typography>
-                        </TableCell>
-                        
-                        <TableCell>
+                        <TableCell sx={{ padding: '4px 8px' }}>
                           <Chip
                             label={getStatusText(rental.status)}
                             color={getStatusColor(rental.status) as any}
                             size="small"
-                            variant="filled"
+                            variant="outlined"
+                            sx={{ fontSize: '0.65rem', height: 20 }}
                           />
                         </TableCell>
+
+                        <TableCell sx={{ padding: '4px 8px' }}>
+                          <Typography variant="body2" sx={{ maxWidth: 80, wordWrap: 'break-word', fontSize: '0.75rem' }}>
+                            {rental.note || '-'}
+                          </Typography>
+                        </TableCell>
                         
-                        <TableCell align="center">
+                        <TableCell align="center" sx={{ padding: '4px 8px' }}>
                           <Stack direction="row" spacing={0.5} justifyContent="center">
                             <Tooltip title="Ödeme Ekle">
                               <IconButton
@@ -420,27 +486,30 @@ export default function Rentals() {
                                   setPaymentDialogOpen(true);
                                 }}
                                 color="primary"
+                                sx={{ padding: '2px' }}
                               >
-                                <PaymentIcon fontSize="small" />
+                                <PaymentIcon sx={{ fontSize: '16px' }} />
                               </IconButton>
                             </Tooltip>
                             
-                            <Tooltip title="Detayları Görüntüle">
+                            <Tooltip title="Detay">
                               <IconButton
                                 size="small"
                                 onClick={() => navigate(`/rentals/${rental.id}`)}
                                 color="info"
+                                sx={{ padding: '2px' }}
                               >
-                                <AssignmentIcon fontSize="small" />
+                                <AssignmentIcon sx={{ fontSize: '16px' }} />
                               </IconButton>
                             </Tooltip>
                             
-                            <Tooltip title="Daha Fazla">
+                            <Tooltip title="Menu">
                               <IconButton
                                 size="small"
                                 onClick={(e) => handleMenuOpen(e, rental)}
+                                sx={{ padding: '2px' }}
                               >
-                                <MoreVertIcon fontSize="small" />
+                                <MoreVertIcon sx={{ fontSize: '16px' }} />
                               </IconButton>
                             </Tooltip>
                           </Stack>

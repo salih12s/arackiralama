@@ -52,6 +52,7 @@ import dayjs from 'dayjs';
 
 import Layout from '../components/Layout';
 import { reportsApi, formatCurrency, vehiclesApi } from '../api/client';
+import { rentalsApi } from '../api/rentals';
 
 export default function Reports() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -64,11 +65,11 @@ export default function Reports() {
     queryFn: () => reportsApi.getMonthlyReport(selectedYear),
   });
 
-  // Fetch vehicle income report
-  const { data: vehicleIncomeData } = useQuery({
-    queryKey: ['vehicle-income'],
-    queryFn: () => reportsApi.getVehicleIncomeReport(),
-  });
+  // This query is removed as it's not currently used
+  // const { data: vehicleIncomeData } = useQuery({
+  //   queryKey: ['vehicle-income'],
+  //   queryFn: () => reportsApi.getVehicleIncomeReport(),
+  // });
 
   // Fetch debtors
   const { data: debtorsData } = useQuery({
@@ -82,6 +83,12 @@ export default function Reports() {
     queryFn: () => vehiclesApi.getAll(),
   });
 
+  // Fetch all rentals for pure revenue calculation
+  const { data: rentalsData } = useQuery({
+    queryKey: ['all-rentals-analytics'],
+    queryFn: () => rentalsApi.getAll(),
+  });
+
   // Calculate advanced analytics
   const allMonthlyStats = monthlyData?.data || [];
   // Ay filtresine göre verileri filtrele
@@ -89,9 +96,56 @@ export default function Reports() {
     ? allMonthlyStats 
     : allMonthlyStats.filter(month => month.month === selectedMonth);
     
-  const vehicleStats = vehicleIncomeData?.data || [];
+  // const vehicleStats = vehicleIncomeData?.data || [];
   const debtorsList = debtorsData?.data || [];
   const vehicles = allVehiclesData?.data || [];
+  const rentals = rentalsData?.data || [];
+
+  // Helper function for month names
+  const getMonthName = (month: number) => {
+    const months = [
+      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+    ];
+    return months[month - 1];
+  };
+
+  // Calculate pure revenue per vehicle (only rental + KM fees)
+  const vehicleRevenueStats = vehicles.map(vehicle => {
+    const vehicleRentals = rentals.filter(rental => rental.vehicleId === vehicle.id);
+    const pureRevenue = vehicleRentals.reduce((total, rental) => {
+      const rentalPrice = (rental.days || 0) * (rental.dailyPrice || 0);
+      const kmRevenue = rental.kmDiff || 0;
+      return total + rentalPrice + kmRevenue;
+    }, 0);
+    
+    return {
+      plate: vehicle.plate,
+      name: vehicle.name || vehicle.plate,
+      revenue: pureRevenue
+    };
+  }).sort((a, b) => b.revenue - a.revenue);
+
+  // Calculate monthly revenue data for line chart
+  const monthlyRevenueData = allMonthlyStats.map(month => {
+    const monthRentals = rentals.filter(rental => {
+      const rentalMonth = new Date(rental.startDate).getMonth() + 1;
+      const rentalYear = new Date(rental.startDate).getFullYear();
+      return rentalMonth === month.month && rentalYear === selectedYear;
+    });
+    
+    const monthPureRevenue = monthRentals.reduce((total, rental) => {
+      const rentalPrice = (rental.days || 0) * (rental.dailyPrice || 0);
+      const kmRevenue = rental.kmDiff || 0;
+      return total + rentalPrice + kmRevenue;
+    }, 0);
+
+    return {
+      month: month.month,
+      monthName: getMonthName(month.month),
+      revenue: monthPureRevenue
+    };
+  });
 
   // Calculate KPIs
   const totalRevenue = monthlyStats.reduce((sum, month) => sum + month.billed, 0);
@@ -334,16 +388,16 @@ export default function Reports() {
           </Paper>
         </Grid>
 
-        {/* Vehicle Performance Efficiency */}
+        {/* Pure Vehicle Revenue Analysis */}
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
               <TrendingUpIcon color="primary" />
-              Araç Performans Analizi - Detaylı Görünüm
+              Araç Başına Gelir Analizi (Kira + KM)
             </Typography>
             <Box sx={{ height: 400, mt: 2 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={vehicleStats}>
+                <BarChart data={vehicleRevenueStats}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis 
                     dataKey="plate" 
@@ -354,13 +408,37 @@ export default function Reports() {
                   />
                   <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => formatCurrency(value)} />
                   <Tooltip 
+                    formatter={(value: any) => [formatCurrency(value), 'Gelir']}
+                    labelStyle={{ color: '#000' }}
+                  />
+                  <Bar dataKey="revenue" fill="#1976d2" name="Net Gelir" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+          </Paper>
+        </Grid>
+
+        {/* Monthly Revenue Trend */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <TimelineIcon color="primary" />
+              Aylık Gelir Analizi
+            </Typography>
+            <Box sx={{ height: 300, mt: 2 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyRevenueData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="monthName" 
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => formatCurrency(value)} />
+                  <Tooltip 
                     formatter={(value: any) => [formatCurrency(value)]}
                     labelStyle={{ color: '#000' }}
                   />
-                  <Legend />
-                  <Bar dataKey="billed" fill="#1976d2" name="Faturalandırılan" />
-                  <Bar dataKey="collected" fill="#2e7d32" name="Tahsil Edilen" />
-                  <Bar dataKey="outstanding" fill="#d32f2f" name="Kalan Bakiye" />
+                  <Bar dataKey="revenue" fill="#2e7d32" name="Aylık Gelir" />
                 </BarChart>
               </ResponsiveContainer>
             </Box>

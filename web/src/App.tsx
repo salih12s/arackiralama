@@ -19,6 +19,7 @@ import Reports from './pages/Reports';
 import DebtorDetails from './pages/DebtorDetails';
 import VehicleDetail from './pages/VehicleDetail';
 import Backup from './pages/Backup';
+import { DetailedReport } from './pages/DetailedReport';
 
 // Set dayjs locale
 dayjs.locale('tr');
@@ -134,6 +135,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Reports />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/detailed-report"
+        element={
+          <ProtectedRoute>
+            <DetailedReport />
           </ProtectedRoute>
         }
       />

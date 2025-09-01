@@ -3,13 +3,14 @@ import api from './client';
 export interface Vehicle {
   id: string;
   plate: string;
-  brand: string;
-  model: string;
-  year: number;
-  color: string;
+  name?: string;
+  brand?: string;
+  model?: string;
+  year?: number;
+  color?: string;
   status: 'IDLE' | 'RENTED' | 'RESERVED' | 'SERVICE';
+  active: boolean;
   createdAt: string;
-  updatedAt: string;
 }
 
 export const vehiclesApi = {

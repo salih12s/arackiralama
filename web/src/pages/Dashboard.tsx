@@ -78,6 +78,7 @@ import {
   Rental,
   Vehicle,
 } from '../api/client';
+import { apiClient } from '../services/api';
 import Layout from '../components/Layout';
 import KpiCard from '../components/KpiCard';
 import NewRentalDialog from '../components/NewRentalDialog';
@@ -162,6 +163,24 @@ export default function Dashboard() {
     queryFn: reportsApi.getDebtors,
     staleTime: 30 * 1000, // 30 saniye fresh tut
     gcTime: 2 * 60 * 1000, // 2 dakika cache'de sakla
+  });
+
+  // Financial dashboard verisini getir (en çok/az kazanan araçlar için)
+  const { data: overallPerformance } = useQuery({
+    queryKey: ['overall-vehicle-performance'],
+    queryFn: () => apiClient.get('/reports/overall-vehicle-performance')
+      .then((res: any) => res.data),
+    staleTime: 5 * 60 * 1000, // 5 dakika
+    gcTime: 10 * 60 * 1000, // 10 dakika
+  });
+
+  // Borç bilgileri için aylık financial dashboard'u da kullanalım
+  const { data: monthlyFinancialData } = useQuery({
+    queryKey: ['monthly-financial-dashboard', selectedMonth, selectedYear],
+    queryFn: () => apiClient.get(`/reports/financial-dashboard?month=${selectedMonth}&year=${selectedYear}`)
+      .then((res: any) => res.data),
+    staleTime: 30 * 1000,
+    gcTime: 2 * 60 * 1000,
   });
 
 
@@ -1032,6 +1051,30 @@ export default function Dashboard() {
           </Typography>
         </Box>
 
+        {/* En Çok/Az Kazanan Araçlar Bilgisi */}
+        {overallPerformance && (
+          <Box sx={{ mb: 3, display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            {overallPerformance.topEarningVehicle && (
+              <Chip
+                icon={<TrendingUpIcon />}
+                label={`En Çok Kazanan: ${overallPerformance.topEarningVehicle.plate} - ${formatCurrency(overallPerformance.topEarningVehicle.earnings)}`}
+                color="success"
+                variant="outlined"
+                sx={{ fontWeight: 'bold' }}
+              />
+            )}
+            {overallPerformance.lowestEarningVehicle && (
+              <Chip
+                icon={<TrendingUpIcon sx={{ transform: 'rotate(180deg)' }} />}
+                label={`En Az Kazanan: ${overallPerformance.lowestEarningVehicle.plate} - ${formatCurrency(overallPerformance.lowestEarningVehicle.earnings)}`}
+                color="warning"
+                variant="outlined"
+                sx={{ fontWeight: 'bold' }}
+              />
+            )}
+          </Box>
+        )}
+
         {/* Araçlar Filtreleme */}
         <TextField
           size="small"
@@ -1076,9 +1119,30 @@ export default function Dashboard() {
                 .map((vehicle) => (
                 <TableRow key={vehicle.id} hover>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
-                      {vehicle.plate}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
+                        {vehicle.plate}
+                      </Typography>
+                      {/* En Çok/Az Kazanan Bilgisi */}
+                      {overallPerformance?.topEarningVehicle?.plate === vehicle.plate && (
+                        <Chip
+                          icon={<TrendingUpIcon />}
+                          label="En Çok Kazanan"
+                          color="success"
+                          size="small"
+                          variant="outlined"
+                        />
+                      )}
+                      {overallPerformance?.lowestEarningVehicle?.plate === vehicle.plate && (
+                        <Chip
+                          icon={<TrendingUpIcon sx={{ transform: 'rotate(180deg)' }} />}
+                          label="En Az Kazanan"
+                          color="warning"
+                          size="small"
+                          variant="outlined"
+                        />
+                      )}
+                    </Box>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
@@ -1614,10 +1678,31 @@ export default function Dashboard() {
       {/* Borçlu Müşteriler Tablosu */}
       <Paper sx={{ p: 2, mt: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
-            <WarningIcon sx={{ mr: 1, color: 'error.main' }} />
-            Borçlu Müşteriler
-          </Typography>
+          <Box>
+            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
+              <WarningIcon sx={{ mr: 1, color: 'error.main' }} />
+              Borçlu Müşteriler
+            </Typography>
+            {/* Toplam Borç ve Kişi Sayısı */}
+            {monthlyFinancialData && (
+              <Box sx={{ mt: 1, display: 'flex', gap: 2 }}>
+                <Chip
+                  icon={<PersonIcon />}
+                  label={`Toplam ${monthlyFinancialData.debtorCount} borçlu müşteri`}
+                  color="warning"
+                  size="small"
+                  variant="outlined"
+                />
+                <Chip
+                  icon={<MoneyIcon />}
+                  label={`Toplam borç: ${formatCurrency(monthlyFinancialData.currentReceivables)}`}
+                  color="error"
+                  size="small"
+                  variant="outlined"
+                />
+              </Box>
+            )}
+          </Box>
           
           <Stack direction="row" spacing={1}>
             <Button
