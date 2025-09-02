@@ -12,7 +12,6 @@ import reportRoutes from './routes/reports';
 import analyticsRoutes from './routes/analytics';
 import backupRoutes from './routes/backup';
 import customerRoutes from './routes/customers';
-import financialRoutes from './routes/financial';
 
 // Load environment variables
 dotenv.config();
@@ -114,7 +113,6 @@ app.use('/api/stats', reportRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/backup', backupRoutes);
-app.use('/api/financial', financialRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
