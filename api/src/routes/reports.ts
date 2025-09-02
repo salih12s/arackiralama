@@ -69,30 +69,4 @@ router.get('/debtors', async (req, res) => {
   }
 });
 
-// GET /api/reports/financial-dashboard
-router.get('/financial-dashboard', async (req, res) => {
-  try {
-    const { month, year } = req.query;
-    const monthNum = month ? parseInt(month as string, 10) : undefined;
-    const yearNum = year ? parseInt(year as string, 10) : undefined;
-    
-    const dashboard = await getFinancialDashboard(monthNum, yearNum);
-    res.json(dashboard);
-  } catch (error) {
-    console.error('Get financial dashboard error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// GET /api/reports/overall-vehicle-performance
-router.get('/overall-vehicle-performance', async (req, res) => {
-  try {
-    const performance = await getOverallVehiclePerformance();
-    res.json(performance);
-  } catch (error) {
-    console.error('Get overall vehicle performance error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 export default router;

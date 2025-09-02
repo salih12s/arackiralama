@@ -1,5 +1,4 @@
 import { prisma } from '../db/prisma';
-import { isRentalActiveToday } from './rentalCalc';
 
 export interface DashboardStats {
   totalVehicles: number;
@@ -341,4 +340,24 @@ export async function getDebtorReport(): Promise<DebtorReport[]> {
     .filter(rental => rental.balance > 0); // Sadece borcu olanları al
 
   return debtors;
+}
+
+// Financial Dashboard fonksiyonu
+export async function getFinancialDashboard() {
+  // Placeholder implementation
+  return {
+    totalRevenue: 0,
+    monthlyRevenue: 0,
+    outstandingPayments: 0,
+    vehiclePerformance: []
+  };
+}
+
+// Overall Vehicle Performance fonksiyonu
+export async function getOverallVehiclePerformance() {
+  // Placeholder implementation
+  return {
+    topEarningVehicle: null,
+    lowestEarningVehicle: null
+  };
 }
