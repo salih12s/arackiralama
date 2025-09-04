@@ -356,12 +356,15 @@ export default function Reports() {
         ) : (
           <Box sx={{ width: '100%', height: { xs: 250, sm: 300, md: 400 } }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyTotalChartData} margin={{ 
-                top: 20, 
-                right: { xs: 10, sm: 30 }, 
-                left: { xs: 10, sm: 20 }, 
-                bottom: 5 
-              }}>
+              <BarChart 
+                data={monthlyTotalChartData} 
+                margin={{ 
+                  top: 20, 
+                  right: 30, 
+                  left: 20, 
+                  bottom: 5 
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis 
@@ -413,7 +416,7 @@ export default function Reports() {
             </Typography>
           </Box>
         ) : (
-          <Box sx={{ width: '100%', height: 400 }}>
+          <Box sx={{ width: '100%', height: { xs: 250, sm: 300, md: 400 } }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyVehicleChartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }} barCategoryGap="40%">
                 <CartesianGrid strokeDasharray="3 3" />
