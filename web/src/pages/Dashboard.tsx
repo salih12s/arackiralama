@@ -700,7 +700,7 @@ export default function Dashboard() {
   // Toplam alacak hesaplaması (borçlu kişiler listesinden toplam)
   const totalDebt = useMemo(() => {
     if (!debtorsRes || !Array.isArray(debtorsRes)) return 0;
-    return debtorsRes.reduce((sum: number, debtor: any) => sum + (debtor.totalDebt || 0), 0);
+    return debtorsRes.reduce((sum: number, debtor: any) => sum + (debtor.totalDebt || 0), 0) / 100;
   }, [debtorsRes]);
 
   // Helper function to get month name

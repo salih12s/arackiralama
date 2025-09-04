@@ -358,7 +358,7 @@ export default function RentalDetail() {
                       Toplam Tutar
                     </Typography>
                     <Typography variant="h6" color="success.main">
-                      {formatCurrency(rental.totalDue / 100)}
+                      {formatCurrency(rental.totalDue)}
                     </Typography>
                   </Box>
                 </Grid>
@@ -383,7 +383,7 @@ export default function RentalDetail() {
                       Kalan Bakiye
                     </Typography>
                     <Typography variant="h6" color={rental.balance > 0 ? 'error.main' : 'success.main'}>
-                      {formatCurrency(rental.balance / 100)}
+                      {formatCurrency(rental.balance)}
                     </Typography>
                   </Box>
                 </Grid>
