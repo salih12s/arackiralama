@@ -23,7 +23,12 @@ export default function DebtorDetails() {
   // Fetch debtors data
   const { data: debtorsData, isLoading: debtorsLoading, error: debtorsError, refetch } = useQuery({
     queryKey: ['debtors'],
-    queryFn: () => reportsApi.getDebtors(),
+    queryFn: async () => {
+      console.log('🔄 Fetching debtors...');
+      const result = await reportsApi.getDebtors();
+      console.log('📋 Debtors API response:', result);
+      return result;
+    },
     staleTime: 0, // Cache'i devre dışı bırak
     gcTime: 0, // Garbage collection süresini sıfırla
     refetchOnWindowFocus: true,
@@ -34,13 +39,16 @@ export default function DebtorDetails() {
   // API'den dönen veriyi güvenli şekilde işle
   const debtors = Array.isArray(debtorsData) ? debtorsData : [];
   const totalDebt = debtors.reduce((sum: number, debtor: any) => sum + (debtor.totalDebt || 0), 0);
+  
+  console.log('🔍 Debtors Debug:', { debtorsData, debtors, totalDebt });
 
   if (debtorsError) {
+    console.error('❌ Debtors API Error:', debtorsError);
     return (
       <Layout title="Borçlu Müşteri Detayları">
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 8 }}>
           <Alert severity="error" sx={{ mb: 2 }}>
-            Borçlu müşteri verileri yüklenirken hata oluştu.
+            Borçlu müşteri verileri yüklenirken hata oluştu: {debtorsError?.message}
           </Alert>
         </Box>
       </Layout>

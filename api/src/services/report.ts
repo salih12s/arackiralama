@@ -281,9 +281,9 @@ export async function getVehicleIncomeReport(): Promise<VehicleIncomeReport[]> {
     return {
       plate: vehicle.plate,
       vehicleId: vehicle.id,
-      billed: billed / 100, // Kuruş'tan TL'ye çevir
-      collected: collected / 100, // Kuruş'tan TL'ye çevir
-      outstanding: outstanding / 100 // Kuruş'tan TL'ye çevir
+      billed: billed, // Kuruş'tan TL'ye çevir
+      collected: collected, // Kuruş'tan TL'ye çevir
+      outstanding: outstanding // Kuruş'tan TL'ye çevir
     };
   });
 }
@@ -342,8 +342,8 @@ export async function getDebtorReport(): Promise<{ customerId: string; customerN
     const paidFromPayments = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
     const totalPaid = paidFromRental + paidFromPayments;
     
-    // Gerçek kalan borç hesapla - AllRentals mantığıyla
-    const actualBalance = (rental.totalDue / 100) - totalPaid;
+    // Gerçek kalan borç hesapla - AllRentals mantığıyla (TL cinsinden)
+    const actualBalance = rental.totalDue - totalPaid;
     
     if (actualBalance > 0) {
       const customerId = rental.customer.id;
