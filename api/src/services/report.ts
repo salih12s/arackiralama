@@ -279,8 +279,11 @@ export async function getVehicleIncomeReport(): Promise<VehicleIncomeReport[]> {
     });
 
     return {
-      licensePlate: vehicle.plate,
-      totalRevenue: collected / 100 // Kuruş'tan TL'ye çevir
+      plate: vehicle.plate,
+      vehicleId: vehicle.id,
+      billed: billed / 100, // Kuruş'tan TL'ye çevir
+      collected: collected / 100, // Kuruş'tan TL'ye çevir
+      outstanding: outstanding / 100 // Kuruş'tan TL'ye çevir
     };
   });
 }
