@@ -333,6 +333,8 @@ export async function getDebtorReport(): Promise<{ customerId: string; customerN
     }
   });
 
+  console.log(`🔍 Found ${rentals.length} rentals for debt calculation`);
+
   // Müşteri bazında borç toplamı
   const customerDebtMap = new Map<string, { customerName: string; totalDebt: number }>();
 
@@ -343,7 +345,16 @@ export async function getDebtorReport(): Promise<{ customerId: string; customerN
     const totalPaid = paidFromRental + paidFromPayments;
     
     // Gerçek kalan borç hesapla - Backend'den kuruş cinsinden gelir, TL olarak hesapla
-    const actualBalance = rental.totalDue - (totalPaid * 100);
+    const actualBalance = rental.totalDue - totalPaid;
+    
+    console.log(`🔍 Rental ${rental.id}:`, {
+      totalDue: rental.totalDue,
+      paidFromRental,
+      paidFromPayments,
+      totalPaid,
+      actualBalance,
+      customer: rental.customer.fullName
+    });
     
     if (actualBalance > 0) {
       const customerId = rental.customer.id;
@@ -366,6 +377,8 @@ export async function getDebtorReport(): Promise<{ customerId: string; customerN
     customerName: data.customerName,
     totalDebt: data.totalDebt // Kuruş cinsinden döndürülür, frontend'de /100 ile TL'ye çevrilir
   }));
+
+  console.log(`🔍 Final debtors result:`, debtorList);
 
   return debtorList.sort((a, b) => b.totalDebt - a.totalDebt); // Borcu fazla olandan aza sırala
 }
