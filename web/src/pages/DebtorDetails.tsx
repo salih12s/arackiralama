@@ -63,21 +63,34 @@ export default function DebtorDetails() {
   return (
     <Layout title="Borçlu Müşteri Detayları">
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'stretch', sm: 'center' }, 
+        mb: { xs: 2, sm: 4 },
+        flexDirection: { xs: 'column', sm: 'row' },
+        gap: { xs: 1, sm: 0 }
+      }}>
         <Box>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 0.5 }}>
+          <Typography variant="h4" component="h1" sx={{ 
+            fontWeight: 700, 
+            mb: 0.5,
+            fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' }
+          }}>
             💳 Borçlu Müşteri Detayları
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="text.secondary" sx={{
+            fontSize: { xs: '0.875rem', sm: '1rem' }
+          }}>
             Ödenmemiş borcu bulunan müşteriler ve borç tutarları
           </Typography>
         </Box>
       </Box>
 
-      <Grid container spacing={4}>
+      <Grid container spacing={{ xs: 2, sm: 4 }}>
         {/* Left Side - Debtors Table */}
         <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 3 }}>
+          <Paper sx={{ p: { xs: 2, sm: 3 } }}>
             <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>
               📋 Borçlu Müşteriler
             </Typography>
@@ -132,13 +145,17 @@ export default function DebtorDetails() {
         <Grid item xs={12} md={4}>
           <Paper 
             sx={{ 
-              p: 4, 
+              p: { xs: 3, sm: 4 }, 
               textAlign: 'center',
               background: 'linear-gradient(145deg, #f8f9fa 0%, #e9ecef 100%)',
               border: '2px solid #dee2e6'
             }}
           >
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'text.secondary' }}>
+            <Typography variant="h6" gutterBottom sx={{ 
+              fontWeight: 600, 
+              color: 'text.secondary',
+              fontSize: { xs: '1rem', sm: '1.25rem' }
+            }}>
               💰 Toplam Borç
             </Typography>
             
@@ -147,7 +164,8 @@ export default function DebtorDetails() {
               sx={{ 
                 fontWeight: 700,
                 color: 'error.main',
-                mb: 2
+                mb: 2,
+                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' }
               }}
             >
               {formatCurrency(totalDebt)}

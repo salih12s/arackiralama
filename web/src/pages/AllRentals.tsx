@@ -230,17 +230,30 @@ export const AllRentals: React.FC = () => {
 
   return (
     <Layout>
-      <Container maxWidth={false} sx={{ mt: 2, mb: 2, px: 1 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-          <Typography variant="h5" component="h1" sx={{ fontWeight: 700 }}>
+      <Container maxWidth={false} sx={{ mt: { xs: 1, sm: 2 }, mb: { xs: 1, sm: 2 }, px: { xs: 0.5, sm: 1 } }}>
+        <Stack 
+          direction={{ xs: 'column', sm: 'row' }} 
+          justifyContent="space-between" 
+          alignItems={{ xs: 'stretch', sm: 'center' }} 
+          sx={{ mb: { xs: 2, sm: 3 } }}
+          spacing={{ xs: 2, sm: 0 }}
+        >
+          <Typography variant="h5" component="h1" sx={{ 
+            fontWeight: 700,
+            fontSize: { xs: '1.25rem', sm: '1.5rem' }
+          }}>
             📋 Tüm Kiralamalar
           </Typography>
-          <Stack direction="row" spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <Button
               startIcon={<DownloadIcon />}
               onClick={handleExport}
               variant="outlined"
               size="small"
+              sx={{
+                fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                px: { xs: 1, sm: 1.5 }
+              }}
             >
               Excel'e Aktar
             </Button>
@@ -249,6 +262,10 @@ export const AllRentals: React.FC = () => {
               onClick={handlePrint}
               variant="outlined"
               size="small"
+              sx={{
+                fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                px: { xs: 1, sm: 1.5 }
+              }}
             >
               Yazdır
             </Button>
@@ -256,14 +273,19 @@ export const AllRentals: React.FC = () => {
         </Stack>
 
         {/* Filters */}
-        <Paper sx={{ mb: 2, p: 1.5 }}>
-          <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+        <Paper sx={{ mb: 2, p: { xs: 1, sm: 1.5 } }}>
+          <Stack 
+            direction={{ xs: 'column', sm: 'row' }} 
+            spacing={1.5} 
+            alignItems={{ xs: 'stretch', sm: 'center' }} 
+            flexWrap="wrap"
+          >
             <TextField
               placeholder="Müşteri adı, araç markası/modeli veya plaka ile ara..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               size="small"
-              sx={{ minWidth: 250, flexGrow: 1 }}
+              sx={{ minWidth: { xs: 'auto', sm: 250 }, flexGrow: 1 }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -272,7 +294,7 @@ export const AllRentals: React.FC = () => {
                 ),
               }}
             />
-            <FormControl size="small" sx={{ minWidth: 160 }}>
+            <FormControl size="small" sx={{ minWidth: { xs: 'auto', sm: 160 }, width: { xs: '100%', sm: 'auto' } }}>
               <InputLabel>Araç Seçiniz</InputLabel>
               <Select
                 value={selectedVehicle}

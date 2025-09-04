@@ -146,31 +146,56 @@ export default function RentalDetail() {
   return (
     <Layout title={`Kiralama Detayı - ${rental.vehicle.plate}`}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'stretch', sm: 'center' }, 
+        mb: { xs: 2, sm: 4 },
+        flexDirection: { xs: 'column', sm: 'row' },
+        gap: { xs: 2, sm: 0 }
+      }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Button
             startIcon={<ArrowBackIcon />}
             onClick={() => navigate('/rentals')}
             variant="outlined"
+            size="small"
+            sx={{
+              fontSize: { xs: '0.75rem', sm: '0.875rem' },
+              px: { xs: 1, sm: 1.5 }
+            }}
           >
             Geri Dön
           </Button>
           
           <Box>
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+            <Typography variant="h4" component="h1" sx={{ 
+              fontWeight: 700,
+              fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' }
+            }}>
               {rental.vehicle.plate}
             </Typography>
-            <Typography variant="body1" color="text.secondary">
+            <Typography variant="body1" color="text.secondary" sx={{
+              fontSize: { xs: '0.875rem', sm: '1rem' }
+            }}>
               {rental.vehicle.name || 'Araç Adı Yok'}
             </Typography>
           </Box>
         </Box>
         
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack 
+          direction={{ xs: 'row', sm: 'row' }} 
+          spacing={1} 
+          alignItems="center"
+          justifyContent={{ xs: 'flex-end', sm: 'flex-start' }}
+        >
           <Chip
             label={getStatusText(rental.status)}
             color={getStatusColor(rental.status) as any}
-            size="medium"
+            size="small"
+            sx={{
+              fontSize: { xs: '0.65rem', sm: '0.75rem' }
+            }}
           />
           
           <IconButton
@@ -178,26 +203,35 @@ export default function RentalDetail() {
             disabled={rental.status !== 'ACTIVE'}
             color="primary"
             title="Ödeme Ekle"
+            size="small"
+            sx={{ p: { xs: 0.5, sm: 1 } }}
           >
-            <PaymentIcon />
+            <PaymentIcon sx={{ fontSize: { xs: 16, sm: 20 } }} />
           </IconButton>
           
           <IconButton
             onClick={() => window.print()}
             color="default"
             title="Yazdır"
+            size="small"
+            sx={{ p: { xs: 0.5, sm: 1 } }}
           >
-            <PrintIcon />
+            <PrintIcon sx={{ fontSize: { xs: 16, sm: 20 } }} />
           </IconButton>
         </Stack>
       </Box>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={{ xs: 2, sm: 3 }}>
         {/* Customer Info */}
         <Grid item xs={12} md={6}>
           <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+              <Typography variant="h6" gutterBottom sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 1,
+                fontSize: { xs: '1rem', sm: '1.25rem' }
+              }}>
                 <AssignmentIcon />
                 Müşteri Bilgileri
               </Typography>

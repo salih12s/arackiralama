@@ -2179,53 +2179,93 @@ export default function Dashboard() {
                   </Typography>
                   
                   {/* Temel Mali Bilgiler Grid */}
-                  <Grid container spacing={2} sx={{ mb: 2 }}>
+                  <Grid container spacing={{ xs: 1, sm: 2 }} sx={{ mb: 2 }}>
                     <Grid item xs={6} sm={2.4}>
-                      <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'success.100', borderRadius: 1 }}>
-                        <Typography variant="caption" color="text.secondary">
+                      <Box sx={{ 
+                        textAlign: 'center', 
+                        p: { xs: 0.5, sm: 1 }, 
+                        bgcolor: 'success.100', 
+                        borderRadius: 1 
+                      }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.6rem', sm: '0.75rem' } }}>
                           Toplam Ödenecek
                         </Typography>
-                        <Typography variant="h6" color="success.dark" sx={{ fontWeight: 700 }}>
+                        <Typography variant="h6" color="success.dark" sx={{ 
+                          fontWeight: 700,
+                          fontSize: { xs: '0.9rem', sm: '1.25rem' }
+                        }}>
                           {formatCurrency(totalDueTL)}
                         </Typography>
                       </Box>
                     </Grid>
                     <Grid item xs={6} sm={2.4}>
-                      <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'info.100', borderRadius: 1 }}>
-                        <Typography variant="caption" color="text.secondary">
+                      <Box sx={{ 
+                        textAlign: 'center', 
+                        p: { xs: 0.5, sm: 1 }, 
+                        bgcolor: 'info.100', 
+                        borderRadius: 1 
+                      }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.6rem', sm: '0.75rem' } }}>
                           Toplam Ödenen
                         </Typography>
-                        <Typography variant="h6" color="info.dark" sx={{ fontWeight: 700 }}>
+                        <Typography variant="h6" color="info.dark" sx={{ 
+                          fontWeight: 700,
+                          fontSize: { xs: '0.9rem', sm: '1.25rem' }
+                        }}>
                           {formatCurrency(totalAllPaid)}
                         </Typography>
                       </Box>
                     </Grid>
                     <Grid item xs={6} sm={2.4}>
-                      <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'warning.100', borderRadius: 1 }}>
-                        <Typography variant="caption" color="text.secondary">
+                      <Box sx={{ 
+                        textAlign: 'center', 
+                        p: { xs: 0.5, sm: 1 }, 
+                        bgcolor: 'warning.100', 
+                        borderRadius: 1 
+                      }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.6rem', sm: '0.75rem' } }}>
                           Araç Geliri
                         </Typography>
-                        <Typography variant="h6" color="warning.dark" sx={{ fontWeight: 700 }}>
+                        <Typography variant="h6" color="warning.dark" sx={{ 
+                          fontWeight: 700,
+                          fontSize: { xs: '0.9rem', sm: '1.25rem' }
+                        }}>
                           {formatCurrency(vehicleRevenue)}
                         </Typography>
                       </Box>
                     </Grid>
                     <Grid item xs={6} sm={2.4}>
-                      <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'primary.100', borderRadius: 1 }}>
-                        <Typography variant="caption" color="text.secondary">
+                      <Box sx={{ 
+                        textAlign: 'center', 
+                        p: { xs: 0.5, sm: 1 }, 
+                        bgcolor: 'primary.100', 
+                        borderRadius: 1 
+                      }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.6rem', sm: '0.75rem' } }}>
                           Kapora
                         </Typography>
-                        <Typography variant="h6" color="primary.dark" sx={{ fontWeight: 700 }}>
+                        <Typography variant="h6" color="primary.dark" sx={{ 
+                          fontWeight: 700,
+                          fontSize: { xs: '0.9rem', sm: '1.25rem' }
+                        }}>
                           {formatCurrency(detailDialog.rental.upfront || 0)}
                         </Typography>
                       </Box>
                     </Grid>
                     <Grid item xs={6} sm={2.4}>
-                      <Box sx={{ textAlign: 'center', p: 1, bgcolor: remainingBalance > 0 ? 'error.100' : 'success.100', borderRadius: 1 }}>
-                        <Typography variant="caption" color="text.secondary">
+                      <Box sx={{ 
+                        textAlign: 'center', 
+                        p: { xs: 0.5, sm: 1 }, 
+                        bgcolor: remainingBalance > 0 ? 'error.100' : 'success.100', 
+                        borderRadius: 1 
+                      }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.6rem', sm: '0.75rem' } }}>
                           Kalan Bakiye
                         </Typography>
-                        <Typography variant="h6" color={remainingBalance > 0 ? 'error.dark' : 'success.dark'} sx={{ fontWeight: 700 }}>
+                        <Typography variant="h6" color={remainingBalance > 0 ? 'error.dark' : 'success.dark'} sx={{ 
+                          fontWeight: 700,
+                          fontSize: { xs: '0.9rem', sm: '1.25rem' }
+                        }}>
                           {formatCurrency(remainingBalance)}
                         </Typography>
                       </Box>
@@ -2260,11 +2300,16 @@ export default function Dashboard() {
                 </Alert>
 
                 {/* Alt Kısım - Detaylı Bilgiler Grid */}
-                <Grid container spacing={3}>
+                <Grid container spacing={{ xs: 1, sm: 2, md: 3 }}>
                   {/* Sol Kolon - Genel Bilgiler */}
                   <Grid item xs={12} md={6}>
-                    <Card sx={{ p: 2, bgcolor: 'grey.50' }}>
-                      <Typography variant="h6" sx={{ mb: 2, color: 'primary.main', fontWeight: 600 }}>
+                    <Card sx={{ p: { xs: 1, sm: 2 }, bgcolor: 'grey.50' }}>
+                      <Typography variant="h6" sx={{ 
+                        mb: 2, 
+                        color: 'primary.main', 
+                        fontWeight: 600,
+                        fontSize: { xs: '1rem', sm: '1.25rem' }
+                      }}>
                         Genel Bilgiler
                       </Typography>
                       
@@ -2725,25 +2770,36 @@ export default function Dashboard() {
             return (
               <Box>
                 {/* KPI Cards */}
-                <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid container spacing={{ xs: 1, sm: 2 }} sx={{ mb: 3 }}>
                   <Grid item xs={12} sm={6} md={3}>
                     <Card sx={{ 
                       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                       color: 'white',
                       height: '100%'
                     }}>
-                      <CardContent sx={{ p: 2 }}>
+                      <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                           <Box>
-                            <Typography variant="h6" component="div" sx={{ fontWeight: 700, mb: 0.5 }}>
+                            <Typography variant="h6" component="div" sx={{ 
+                              fontWeight: 700, 
+                              mb: 0.5,
+                              fontSize: { xs: '1rem', sm: '1.25rem' }
+                            }}>
                               {formatCurrency(totalRevenue)}
                             </Typography>
-                            <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                            <Typography variant="caption" sx={{ 
+                              opacity: 0.9,
+                              fontSize: { xs: '0.65rem', sm: '0.75rem' }
+                            }}>
                               Toplam Gelir
                             </Typography>
                           </Box>
-                          <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 40, height: 40 }}>
-                            <MoneyIcon sx={{ fontSize: 20 }} />
+                          <Avatar sx={{ 
+                            bgcolor: 'rgba(255,255,255,0.2)', 
+                            width: { xs: 32, sm: 40 }, 
+                            height: { xs: 32, sm: 40 } 
+                          }}>
+                            <MoneyIcon sx={{ fontSize: { xs: 16, sm: 20 } }} />
                           </Avatar>
                         </Stack>
                       </CardContent>
@@ -2756,18 +2812,29 @@ export default function Dashboard() {
                       color: 'white',
                       height: '100%'
                     }}>
-                      <CardContent sx={{ p: 2 }}>
+                      <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                           <Box>
-                            <Typography variant="h6" component="div" sx={{ fontWeight: 700, mb: 0.5 }}>
+                            <Typography variant="h6" component="div" sx={{ 
+                              fontWeight: 700, 
+                              mb: 0.5,
+                              fontSize: { xs: '1rem', sm: '1.25rem' }
+                            }}>
                               {totalRentals}
                             </Typography>
-                            <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                            <Typography variant="caption" sx={{ 
+                              opacity: 0.9,
+                              fontSize: { xs: '0.65rem', sm: '0.75rem' }
+                            }}>
                               Toplam Kiralama
                             </Typography>
                           </Box>
-                          <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 40, height: 40 }}>
-                            <CalendarIcon sx={{ fontSize: 20 }} />
+                          <Avatar sx={{ 
+                            bgcolor: 'rgba(255,255,255,0.2)', 
+                            width: { xs: 32, sm: 40 }, 
+                            height: { xs: 32, sm: 40 } 
+                          }}>
+                            <CalendarIcon sx={{ fontSize: { xs: 16, sm: 20 } }} />
                           </Avatar>
                         </Stack>
                       </CardContent>
@@ -2780,18 +2847,29 @@ export default function Dashboard() {
                       color: 'white',
                       height: '100%'
                     }}>
-                      <CardContent sx={{ p: 2 }}>
+                      <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                           <Box>
-                            <Typography variant="h6" component="div" sx={{ fontWeight: 700, mb: 0.5 }}>
+                            <Typography variant="h6" component="div" sx={{ 
+                              fontWeight: 700, 
+                              mb: 0.5,
+                              fontSize: { xs: '1rem', sm: '1.25rem' }
+                            }}>
                               {activeRentals}
                             </Typography>
-                            <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                            <Typography variant="caption" sx={{ 
+                              opacity: 0.9,
+                              fontSize: { xs: '0.65rem', sm: '0.75rem' }
+                            }}>
                               Aktif Kiralama
                             </Typography>
                           </Box>
-                          <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 40, height: 40 }}>
-                            <TrendingUpIcon sx={{ fontSize: 20 }} />
+                          <Avatar sx={{ 
+                            bgcolor: 'rgba(255,255,255,0.2)', 
+                            width: { xs: 32, sm: 40 }, 
+                            height: { xs: 32, sm: 40 } 
+                          }}>
+                            <TrendingUpIcon sx={{ fontSize: { xs: 16, sm: 20 } }} />
                           </Avatar>
                         </Stack>
                       </CardContent>
@@ -2806,18 +2884,29 @@ export default function Dashboard() {
                       color: 'white',
                       height: '100%'
                     }}>
-                      <CardContent sx={{ p: 2 }}>
+                      <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                           <Box>
-                            <Typography variant="h6" component="div" sx={{ fontWeight: 700, mb: 0.5 }}>
+                            <Typography variant="h6" component="div" sx={{ 
+                              fontWeight: 700, 
+                              mb: 0.5,
+                              fontSize: { xs: '1rem', sm: '1.25rem' }
+                            }}>
                               {formatCurrency(outstandingAmount)}
                             </Typography>
-                            <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                            <Typography variant="caption" sx={{ 
+                              opacity: 0.9,
+                              fontSize: { xs: '0.65rem', sm: '0.75rem' }
+                            }}>
                               Kalan Bakiye
                             </Typography>
                           </Box>
-                          <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 40, height: 40 }}>
-                            <Assignment sx={{ fontSize: 20 }} />
+                          <Avatar sx={{ 
+                            bgcolor: 'rgba(255,255,255,0.2)', 
+                            width: { xs: 32, sm: 40 }, 
+                            height: { xs: 32, sm: 40 } 
+                          }}>
+                            <Assignment sx={{ fontSize: { xs: 16, sm: 20 } }} />
                           </Avatar>
                         </Stack>
                       </CardContent>

@@ -447,14 +447,24 @@ export const DetailedReport: React.FC = () => {
 
   return (
     <Layout>
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
-          <Stack direction="row" spacing={2}>
+      <Container maxWidth="xl" sx={{ mt: { xs: 2, sm: 4 }, mb: { xs: 2, sm: 4 } }}>
+        <Stack 
+          direction={{ xs: 'column', sm: 'row' }} 
+          justifyContent="space-between" 
+          alignItems={{ xs: 'stretch', sm: 'center' }} 
+          sx={{ mb: { xs: 2, sm: 4 } }}
+          spacing={{ xs: 2, sm: 0 }}
+        >
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <Button
               startIcon={<DownloadIcon />}
               onClick={handleExport}
               variant="outlined"
               size="small"
+              sx={{
+                fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                px: { xs: 1, sm: 1.5 }
+              }}
             >
               Excel'e Aktar
             </Button>
@@ -463,20 +473,29 @@ export const DetailedReport: React.FC = () => {
               onClick={handlePrint}
               variant="outlined"
               size="small"
+              sx={{
+                fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                px: { xs: 1, sm: 1.5 }
+              }}
             >
               Yazdır
             </Button>
           </Stack>
         </Stack>
 
-        <Paper sx={{ mb: 3, p: 2 }}>
-          <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+        <Paper sx={{ mb: 3, p: { xs: 1.5, sm: 2 } }}>
+          <Stack 
+            direction={{ xs: 'column', sm: 'row' }} 
+            spacing={2} 
+            alignItems={{ xs: 'stretch', sm: 'center' }} 
+            flexWrap="wrap"
+          >
             <TextField
               placeholder="Müşteri adı, araç markası/modeli veya plaka ile ara..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               size="small"
-              sx={{ minWidth: 300 }}
+              sx={{ minWidth: { xs: 'auto', sm: 300 }, width: { xs: '100%', sm: 'auto' } }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">

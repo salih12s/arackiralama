@@ -150,13 +150,33 @@ export default function Layout({ children, title }: LayoutProps) {
   return (
     <Box sx={{ flexGrow: 1, minHeight: '100vh', backgroundColor: 'background.default' }}>
       <AppBar position="static" elevation={2}>
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            {title || 'Araç Kiralama Admin Paneli'}
+        <Toolbar sx={{ px: { xs: 1, sm: 2 } }}>
+          {/* Mobile Menu Button */}
+          {isMobile && (
+            <IconButton
+              color="inherit"
+              aria-label="open drawer"
+              edge="start"
+              onClick={handleDrawerToggle}
+              sx={{ mr: 2 }}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
+          
+          <Typography variant="h6" component="div" sx={{ 
+            flexGrow: 1,
+            fontSize: { xs: '1rem', sm: '1.25rem' }
+          }}>
+            {isMobile ? 'Admin Panel' : (title || 'Araç Kiralama Admin Paneli')}
           </Typography>
           
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" sx={{ mr: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 } }}>
+            <Typography variant="body2" sx={{ 
+              mr: { xs: 1, sm: 2 },
+              fontSize: { xs: '0.75rem', sm: '0.875rem' },
+              display: { xs: 'none', sm: 'block' }
+            }}>
               {dayjs().format('DD.MM.YYYY')}
             </Typography>
             
@@ -167,8 +187,9 @@ export default function Layout({ children, title }: LayoutProps) {
               aria-haspopup="true"
               onClick={handleMenu}
               color="inherit"
+              sx={{ p: { xs: 1, sm: 1.5 } }}
             >
-              <AccountCircle />
+              <AccountCircle sx={{ fontSize: { xs: 20, sm: 24 } }} />
             </IconButton>
             
             <Menu
@@ -187,7 +208,10 @@ export default function Layout({ children, title }: LayoutProps) {
               onClose={handleClose}
             >
               <MenuItem onClick={handleClose}>
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                <Typography variant="body2" sx={{ 
+                  fontWeight: 500,
+                  fontSize: { xs: '0.875rem', sm: '0.875rem' }
+                }}>
                   {user?.email}
                 </Typography>
               </MenuItem>
@@ -197,8 +221,67 @@ export default function Layout({ children, title }: LayoutProps) {
         </Toolbar>
       </AppBar>
 
-      {/* Navigation */}
-      <Box sx={{ backgroundColor: 'white', borderBottom: '1px solid #e0e0e0' }}>
+      {/* Mobile Navigation Drawer */}
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={handleDrawerToggle}
+        ModalProps={{
+          keepMounted: true, // Better open performance on mobile.
+        }}
+        sx={{
+          display: { xs: 'block', sm: 'none' },
+          '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 280 },
+        }}
+      >
+        <Box sx={{ p: 2 }}>
+          <Typography variant="h6" sx={{ mb: 2, color: 'primary.main', fontWeight: 600 }}>
+            Admin Panel
+          </Typography>
+          <List>
+            {navigationItems.map((item) => (
+              <ListItem key={item.path} disablePadding>
+                <ListItemButton 
+                  selected={location.pathname === item.path}
+                  onClick={() => {
+                    handleNavigation(item.path);
+                    handleDrawerToggle(); // Close drawer after navigation
+                  }}
+                  sx={{
+                    borderRadius: 2,
+                    mb: 0.5,
+                    '&.Mui-selected': {
+                      bgcolor: 'primary.light',
+                      '&:hover': {
+                        bgcolor: 'primary.light',
+                      },
+                    },
+                  }}
+                >
+                  <ListItemIcon sx={{ color: location.pathname === item.path ? 'primary.main' : 'inherit' }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={item.label}
+                    primaryTypographyProps={{
+                      fontSize: '0.875rem',
+                      fontWeight: location.pathname === item.path ? 600 : 400,
+                      color: location.pathname === item.path ? 'primary.main' : 'inherit'
+                    }}
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+      </Drawer>
+
+      {/* Desktop Navigation */}
+      <Box sx={{ 
+        backgroundColor: 'white', 
+        borderBottom: '1px solid #e0e0e0',
+        display: { xs: 'none', sm: 'block' }
+      }}>
         <Container maxWidth="xl">
           <Box sx={{ display: 'flex', gap: 1 }}>
             {navigationItems.map((item) => (
@@ -226,7 +309,7 @@ export default function Layout({ children, title }: LayoutProps) {
       </Box>
 
       {/* Main Content */}
-      <Container maxWidth="xl" sx={{ py: 3 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2, sm: 3 }, px: { xs: 1, sm: 2 } }}>
         {children}
       </Container>
     </Box>

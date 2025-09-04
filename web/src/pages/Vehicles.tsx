@@ -125,12 +125,22 @@ export default function Tanimalar() {
   return (
     <Layout title="Tanımalar">
 
-      <Grid container spacing={3}>
+      <Grid container spacing={{ xs: 2, sm: 3 }}>
         {/* Sol Taraf - Araçlar */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          <Paper sx={{ p: { xs: 2, sm: 3 } }}>
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              mb: { xs: 2, sm: 3 },
+              flexDirection: { xs: 'column', sm: 'row' },
+              gap: { xs: 1, sm: 0 }
+            }}>
+              <Typography variant="h6" sx={{ 
+                fontWeight: 600,
+                fontSize: { xs: '1rem', sm: '1.25rem' }
+              }}>
                 Araçlar
               </Typography>
               <Button
@@ -138,6 +148,10 @@ export default function Tanimalar() {
                 startIcon={<AddIcon />}
                 onClick={() => setNewVehicleOpen(true)}
                 size="small"
+                sx={{
+                  fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                  px: { xs: 1, sm: 1.5 }
+                }}
               >
                 Araç Ekle
               </Button>
@@ -186,9 +200,19 @@ export default function Tanimalar() {
 
         {/* Sağ Taraf - Müşteriler */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          <Paper sx={{ p: { xs: 2, sm: 3 } }}>
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              mb: { xs: 2, sm: 3 },
+              flexDirection: { xs: 'column', sm: 'row' },
+              gap: { xs: 1, sm: 0 }
+            }}>
+              <Typography variant="h6" sx={{ 
+                fontWeight: 600,
+                fontSize: { xs: '1rem', sm: '1.25rem' }
+              }}>
                 Müşteriler
               </Typography>
               <Button
@@ -196,6 +220,10 @@ export default function Tanimalar() {
                 startIcon={<AddIcon />}
                 onClick={() => setNewCustomerOpen(true)}
                 size="small"
+                sx={{
+                  fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                  px: { xs: 1, sm: 1.5 }
+                }}
               >
                 Müşteri Ekle
               </Button>

@@ -149,32 +149,48 @@ export default function Rentals() {
   return (
     <Layout title="Kiralama İşlemleri">
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'stretch', sm: 'center' },
+        mb: 4,
+        flexDirection: { xs: 'column', sm: 'row' },
+        gap: { xs: 2, sm: 0 }
+      }}>
         <Box>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 0.5 }}>
+          <Typography variant="h4" component="h1" sx={{ 
+            fontWeight: 700, 
+            mb: 0.5,
+            fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' }
+          }}>
             Kiralama İşlemleri
             {isLoading && (
               <Chip 
                 label="Yükleniyor..." 
                 size="small" 
                 color="info" 
-                sx={{ ml: 2, fontSize: '0.7rem' }}
+                sx={{ ml: 2, fontSize: { xs: '0.6rem', sm: '0.7rem' } }}
               />
             )}
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="text.secondary" sx={{
+            fontSize: { xs: '0.875rem', sm: '1rem' }
+          }}>
             Tüm kiralama işlemlerini görüntüleyin ve yönetin
           </Typography>
         </Box>
         
-        <Stack direction="row" spacing={1.5}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ width: { xs: '100%', sm: 'auto' } }}>
           <IconButton
             onClick={handleRefresh}
             disabled={isLoading}
             sx={{ 
               bgcolor: 'grey.100', 
               '&:hover': { bgcolor: 'grey.200' },
-              borderRadius: 2 
+              borderRadius: 2,
+              width: { xs: 40, sm: 'auto' },
+              height: { xs: 40, sm: 'auto' },
+              alignSelf: { xs: 'flex-end', sm: 'auto' }
             }}
             title="Verileri Yenile"
           >

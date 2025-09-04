@@ -280,15 +280,21 @@ export default function Reports() {
       {/* Header */}
 
       {/* Filter Controls */}
-      <Paper sx={{ p: 3, mb: 4 }}>
-        <Grid container spacing={3} alignItems="center">
+      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 4 }}>
+        <Grid container spacing={{ xs: 2, sm: 3 }} alignItems="center">
           <Grid item xs={12} sm={6} md={3}>
             <FormControl fullWidth>
-              <InputLabel>Yıl Seçiniz</InputLabel>
+              <InputLabel sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Yıl Seçiniz</InputLabel>
               <Select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
                 label="Yıl Seçiniz"
+                sx={{ 
+                  '& .MuiSelect-select': { 
+                    fontSize: { xs: '0.875rem', sm: '1rem' },
+                    py: { xs: 1.5, sm: 2 }
+                  }
+                }}
               >
                 <MenuItem value={2024}>2024</MenuItem>
                 <MenuItem value={2025}>2025</MenuItem>
@@ -299,11 +305,17 @@ export default function Reports() {
           
           <Grid item xs={12} sm={6} md={3}>
             <FormControl fullWidth>
-              <InputLabel>Ay</InputLabel>
+              <InputLabel sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Ay</InputLabel>
               <Select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
                 label="Ay"
+                sx={{ 
+                  '& .MuiSelect-select': { 
+                    fontSize: { xs: '0.875rem', sm: '1rem' },
+                    py: { xs: 1.5, sm: 2 }
+                  }
+                }}
               >
                 <MenuItem value="Tüm Aylar">Tüm Aylar</MenuItem>
                 {monthNames.map((month, index) => (
@@ -318,24 +330,38 @@ export default function Reports() {
       </Paper>
 
       {/* Monthly Total Revenue Chart */}
-      <Paper sx={{ p: 3, mb: 4 }}>
-        <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>
+      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 4 }}>
+        <Typography variant="h6" gutterBottom sx={{ 
+          fontWeight: 600, 
+          mb: 3,
+          fontSize: { xs: '1rem', sm: '1.25rem' }
+        }}>
           📅 Aylık Toplam Gelir Analizi ({selectedYear})
         </Typography>
         
         {monthlyTotalChartData.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 8 }}>
-            <Typography variant="h6" color="text.secondary">
+            <Typography variant="h6" color="text.secondary" sx={{
+              fontSize: { xs: '1rem', sm: '1.25rem' }
+            }}>
               {selectedYear} yılı için veri bulunamadı
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ 
+              mt: 1,
+              fontSize: { xs: '0.875rem', sm: '0.875rem' }
+            }}>
               Seçilen yılda kiralama verisi bulunmuyor.
             </Typography>
           </Box>
         ) : (
-          <Box sx={{ width: '100%', height: 400 }}>
+          <Box sx={{ width: '100%', height: { xs: 250, sm: 300, md: 400 } }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyTotalChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <BarChart data={monthlyTotalChartData} margin={{ 
+                top: 20, 
+                right: { xs: 10, sm: 30 }, 
+                left: { xs: 10, sm: 20 }, 
+                bottom: 5 
+              }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis 
