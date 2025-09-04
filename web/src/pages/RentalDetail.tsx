@@ -144,7 +144,7 @@ export default function RentalDetail() {
   }
 
   return (
-    <Layout title={`Kiralama Detayı - ${rental.vehicle.plate}`}>
+    <Layout title={`Kiralama Detayı${rental.vehicle?.plate ? ` - ${rental.vehicle?.plate}` : ''}`}>
       {/* Header */}
       <Box sx={{ 
         display: 'flex', 
@@ -173,12 +173,12 @@ export default function RentalDetail() {
               fontWeight: 700,
               fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' }
             }}>
-              {rental.vehicle.plate}
+              {rental.vehicle?.plate || 'Araç Plakası Yok'}
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{
               fontSize: { xs: '0.875rem', sm: '1rem' }
             }}>
-              {rental.vehicle.name || 'Araç Adı Yok'}
+              {rental.vehicle?.name || 'Araç Adı Yok'}
             </Typography>
           </Box>
         </Box>
@@ -242,11 +242,11 @@ export default function RentalDetail() {
                   Ad Soyad
                 </Typography>
                 <Typography variant="h6">
-                  {rental.customer.fullName}
+                  {rental.customer?.fullName || 'Müşteri Adı Yok'}
                 </Typography>
               </Box>
               
-              {rental.customer.phone && (
+              {rental.customer?.phone && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
                     Telefon
