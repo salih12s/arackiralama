@@ -23,7 +23,9 @@ import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
 
-import { vehiclesApi, rentalsApi, customersApi, formatCurrency, Rental, Vehicle, Customer } from '../api/client';
+import { vehiclesApi, rentalsApi, customersApi, Rental, Vehicle, Customer } from '../api/client';
+import { formatCurrency } from '../utils/currency';
+import { invalidateAllRentalCaches } from '../utils/cacheInvalidation';
 
 const rentalSchema = z.object({
   vehicleId: z.string().min(1, 'Araç seçimi gereklidir'),
@@ -94,42 +96,80 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
   });
 
   // Watch form values for calculations
-  const watchedValues = watch([
-    'days',
-    'dailyPrice',
-    'kmDiff',
-    'cleaning',
-    'hgs',
-    'damage',
-    'fuel',
-    'upfront',
-    'pay1',
-    'pay2',
-    'pay3',
-    'pay4',
-  ]);
+  const watchedValues = watch();
 
-  // Calculate totals (in TRY)
-  const [days, dailyPrice, kmDiff, cleaning, hgs, damage, fuel, upfront, pay1, pay2, pay3, pay4] = watchedValues;
-  const totalDueTRY = (days || 0) * (dailyPrice || 0) + (kmDiff || 0) + (cleaning || 0) + (hgs || 0) + (damage || 0) + (fuel || 0);
+  // Fetch fresh rental data for current calculations
+  const { data: freshRentalResponse } = useQuery({
+    queryKey: ['rental', rentalId],
+    queryFn: async () => {
+      if (!rentalId || typeof rentalId !== 'string' || rentalId.length < 10) {
+        console.warn('⚠️ Invalid rental ID:', rentalId);
+        return null;
+      }
+      const response = await rentalsApi.getById(rentalId);
+      return response.data;
+    },
+    enabled: open && !!rentalId && typeof rentalId === 'string' && rentalId.length >= 10,
+    staleTime: 0,
+    gcTime: 0,
+  });
+
+  // Fresh payments data kullan
+  const { data: paymentsResponse } = useQuery({
+    queryKey: ['rental-payments', rentalId],
+    queryFn: async () => {
+      if (!rentalId || typeof rentalId !== 'string' || rentalId.length < 10) {
+        console.warn('⚠️ Invalid rental ID for payments:', rentalId);
+        return { data: [] };
+      }
+      return await rentalsApi.getPayments(rentalId);
+    },
+    enabled: open && !!rentalId && typeof rentalId === 'string' && rentalId.length >= 10,
+    staleTime: 0,
+    gcTime: 0,
+  });
+
+  const payments = paymentsResponse?.data || [];
+  const currentRental = freshRentalResponse || rental;
+
+  // Calculate totals using WATCH VALUES for real-time updates with safe fallbacks
+  const totalDueTRY = 
+    ((watchedValues?.days || 0) * (watchedValues?.dailyPrice || 0)) + 
+    (watchedValues?.kmDiff || 0) + 
+    (watchedValues?.cleaning || 0) + 
+    (watchedValues?.hgs || 0) + 
+    (watchedValues?.damage || 0) + 
+    (watchedValues?.fuel || 0);
   
-  // Toplam ödenen = Planlanan ödemeler + Ek ödemeler
-  const plannedPaidTRY = (upfront || 0) + (pay1 || 0) + (pay2 || 0) + (pay3 || 0) + (pay4 || 0);
-  const additionalPaidTRY = rental?.payments ? rental.payments.reduce((sum, p) => sum + (p.amount / 100), 0) : 0; // payments kuruş cinsinden
-  const totalPaidTRY = plannedPaidTRY + additionalPaidTRY;
+  // TL STANDARDI - Payments API'dan TL cinsinde gelir
+  const totalPaid = Array.isArray(payments) ? payments.reduce((sum, payment) => sum + payment.amount, 0) : 0; // TL
+  
+  // Planlı ödemeler WATCH VALUES'dan (real-time) with safe fallbacks
+  const paidFromRental = 
+    (watchedValues?.upfront || 0) + 
+    (watchedValues?.pay1 || 0) + 
+    (watchedValues?.pay2 || 0) + 
+    (watchedValues?.pay3 || 0) + 
+    (watchedValues?.pay4 || 0);
+  
+  const totalPaidTRY = totalPaid + paidFromRental; // TL
   const balanceTRY = totalDueTRY - totalPaidTRY;
+  
+  console.log('🔧 EditRentalDialog calculations:', {
+    totalDueTRY,
+    totalPaid,
+    paidFromRental, 
+    totalPaidTRY,
+    balanceTRY,
+    paymentsCount: payments?.length,
+    currentRentalId: currentRental?.id
+  });
   
   // Borç tamamen kapanmış mı kontrolü
   const isDebtFullyPaid = balanceTRY <= 0;
 
-  // Fetch rental details (only if we need fresh data, but we already have it)
-  const { data: rentalResponse } = useQuery({
-    queryKey: ['rental', rentalId],
-    queryFn: () => rentalsApi.getById(rentalId!),
-    enabled: false, // Disable since we already have rental data from props
-  });
-
-  const rentalData = rental || (rentalResponse?.data || rentalResponse) as Rental;
+  // Use fresh rental data if available, otherwise use prop data
+  const rentalData = currentRental || rental;
 
   // Fetch all vehicles (for changing vehicle if needed)
   const { data: vehiclesResponse } = useQuery({
@@ -155,17 +195,25 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
       setValue('startDate', startDateObj.toDate());
       setValue('endDate', endDateObj.toDate());
       setValue('days', rentalData.days);
-      setValue('dailyPrice', rentalData.dailyPrice / 100); // Convert from kuruş to TRY
-      setValue('kmDiff', rentalData.kmDiff / 100);
-      setValue('cleaning', rentalData.cleaning / 100);
-      setValue('hgs', rentalData.hgs / 100);
-      setValue('damage', rentalData.damage / 100);
-      setValue('fuel', rentalData.fuel / 100);
-      setValue('upfront', rentalData.upfront / 100);
-      setValue('pay1', rentalData.pay1 / 100);
-      setValue('pay2', rentalData.pay2 / 100);
-      setValue('pay3', rentalData.pay3 / 100);
-      setValue('pay4', rentalData.pay4 / 100);
+      
+      // Backend'den TL cinsinde geliyor, direkt kullan
+      const convertToTL = (value: number | undefined | null): number => {
+        if (!value) return 0;
+        return value; // Backend zaten TL gönderiyor
+      };
+      
+      // Günlük ücret zaten TL cinsinde geliyor
+      setValue('dailyPrice', rentalData.dailyPrice || 0);
+      setValue('kmDiff', convertToTL(rentalData.kmDiff));
+      setValue('cleaning', convertToTL(rentalData.cleaning));
+      setValue('hgs', convertToTL(rentalData.hgs));
+      setValue('damage', convertToTL(rentalData.damage));
+      setValue('fuel', convertToTL(rentalData.fuel));
+      setValue('upfront', convertToTL(rentalData.upfront));
+      setValue('pay1', convertToTL(rentalData.pay1));
+      setValue('pay2', convertToTL(rentalData.pay2));
+      setValue('pay3', convertToTL(rentalData.pay3));
+      setValue('pay4', convertToTL(rentalData.pay4));
       setValue('note', rentalData.note || '');
     }
   }, [rentalData, setValue, rental]);
@@ -212,43 +260,25 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
 
   const updateRentalMutation = useMutation({
     mutationFn: (data: RentalFormData) => {
-      // Convert TRY to kuruş for currency fields
+      // Backend zaten TL değerleri alıp kuruş'a çeviriyor, 
+      // burada ekstra çevirim yapmıyoruz
       const payload = {
         ...data,
-        dailyPrice: Math.round(data.dailyPrice * 100),
-        kmDiff: Math.round((data.kmDiff || 0) * 100),
-        cleaning: Math.round((data.cleaning || 0) * 100),
-        hgs: Math.round((data.hgs || 0) * 100),
-        damage: Math.round((data.damage || 0) * 100),
-        fuel: Math.round((data.fuel || 0) * 100),
-        upfront: Math.round((data.upfront || 0) * 100),
-        pay1: Math.round((data.pay1 || 0) * 100),
-        pay2: Math.round((data.pay2 || 0) * 100),
-        pay3: Math.round((data.pay3 || 0) * 100),
-        pay4: Math.round((data.pay4 || 0) * 100),
         startDate: dayjs(data.startDate).toISOString(),
         endDate: dayjs(data.endDate).toISOString(),
       };
+      
+      console.log('🚀 Update Payload Debug (TL values):', {
+        dailyPrice: payload.dailyPrice,
+        cleaning: payload.cleaning,
+        hgs: payload.hgs
+      });
+      
       return rentalsApi.update(rentalId!, payload);
     },
     onSuccess: () => {
-      // Tüm ilgili cache'leri agresif şekilde yenile
-      queryClient.invalidateQueries({ queryKey: ['rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['active-rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['completed-rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['vehicles'] });
-      queryClient.invalidateQueries({ queryKey: ['idle-vehicles'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['debtors'] });
-      queryClient.invalidateQueries({ queryKey: ['monthly-report'] });
-      queryClient.invalidateQueries({ queryKey: ['rental', rentalId] });
-      
-      // Veriler güncellensin diye kısa bir gecikme ekle
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ['rentals'] });
-        queryClient.refetchQueries({ queryKey: ['dashboard-stats'] });
-        queryClient.refetchQueries({ queryKey: ['vehicles'] });
-      }, 100);
+      // Standart cache invalidation - tüm sayfalar senkronize çalışsın
+      invalidateAllRentalCaches(queryClient);
       
       onClose();
     },
@@ -558,29 +588,29 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                 <Grid container spacing={2} sx={{ mb: 2 }}>
                   <Grid item xs={4}>
                     <Typography variant="body2">
-                      <strong>Toplam Ödenecek: {formatCurrency(Math.round(totalDueTRY * 100))}</strong>
+                      <strong>Toplam Ödenecek: {formatCurrency(totalDueTRY)}</strong>
                     </Typography>
                   </Grid>
                   <Grid item xs={4}>
                     <Typography variant="body2">
-                      Toplam Ödenen: {formatCurrency(Math.round(totalPaidTRY * 100))}
+                      Toplam Ödenen: {formatCurrency(totalPaidTRY)}
                     </Typography>
                   </Grid>
                   <Grid item xs={4}>
                     <Typography variant="body2" sx={{ color: balanceTRY > 0 ? 'error.main' : 'success.main' }}>
-                      <strong>Kalan Bakiye: {formatCurrency(Math.round(balanceTRY * 100))}</strong>
+                      <strong>Kalan Bakiye: {formatCurrency(balanceTRY)}</strong>
                     </Typography>
                   </Grid>
                 </Grid>
 
                 {/* Ek Ödemeler (Ara Ödemeler) */}
-                {rental?.payments && rental.payments.length > 0 && (
+                {payments && payments.length > 0 && (
                   <Box sx={{ mt: 2, p: 2, bgcolor: 'info.50', borderRadius: 1, border: '1px solid', borderColor: 'info.200' }}>
                     <Typography variant="subtitle2" gutterBottom sx={{ color: 'info.main', fontWeight: 600 }}>
-                      Ek Ödemeler ({rental.payments.length} adet)
+                      Ek Ödemeler ({payments.length} adet)
                     </Typography>
                     <Grid container spacing={1}>
-                      {rental.payments.map((payment, index) => (
+                      {payments.map((payment, index) => (
                         <Grid item xs={12} sm={6} md={4} key={payment.id}>
                           <Box sx={{ 
                             p: 1, 
@@ -606,7 +636,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                       ))}
                     </Grid>
                     <Typography variant="body2" sx={{ mt: 1, fontWeight: 600, color: 'info.dark' }}>
-                      Ek Ödemeler Toplamı: {formatCurrency(rental.payments.reduce((sum, p) => sum + p.amount, 0))}
+                      Ek Ödemeler Toplamı: {formatCurrency(totalPaid)}
                     </Typography>
                   </Box>
                 )}

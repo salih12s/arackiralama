@@ -21,6 +21,17 @@ export interface MonthlyReportItem {
   outstanding: number;
 }
 
+export interface DebtorCustomer {
+  customerId: string;
+  customerName: string;
+  totalDebt: number;
+}
+
+export interface VehicleRevenue {
+  licensePlate: string;
+  totalRevenue: number;
+}
+
 export const reportsApi = {
   getDashboardStats: async (month?: number, year?: number): Promise<DashboardStats> => {
     const params = new URLSearchParams();
@@ -33,6 +44,16 @@ export const reportsApi = {
 
   getMonthlyReport: async (year: number): Promise<MonthlyReportItem[]> => {
     const response = await api.get(`/reports/monthly?year=${year}`);
+    return response.data;
+  },
+
+  getDebtors: async (): Promise<DebtorCustomer[]> => {
+    const response = await api.get('/reports/debtors');
+    return response.data;
+  },
+
+  getVehicleRevenue: async (): Promise<VehicleRevenue[]> => {
+    const response = await api.get('/reports/vehicle-revenue');
     return response.data;
   },
 };

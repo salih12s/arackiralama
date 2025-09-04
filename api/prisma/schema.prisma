@@ -28,6 +28,11 @@ enum RentalStatus {
   CANCELLED
 }
 
+enum RentalType {
+  NEW
+  EXTENSION
+}
+
 enum PaymentMethod {
   CASH
   TRANSFER
@@ -45,14 +50,17 @@ model User {
 }
 
 model Vehicle {
-  id        String        @id @default(cuid())
-  plate     String        @unique
-  name      String?
-  active    Boolean       @default(true)
-  status    VehicleStatus @default(IDLE)
-  createdAt DateTime      @default(now()) @map("created_at")
+  id           String        @id @default(cuid())
+  plate        String        @unique
+  name         String?
+  active       Boolean       @default(true)
+  status       VehicleStatus @default(IDLE)
+  isConsignment Boolean      @default(false) @map("is_consignment")
+  createdAt    DateTime      @default(now()) @map("created_at")
 
-  rentals Rental[]
+  rentals               Rental[]
+  consignmentDeductions ConsignmentDeduction[]
+  reservations          Reservation[]
 
   @@map("vehicles")
 }
@@ -62,18 +70,21 @@ model Customer {
   fullName String @map("full_name")
   phone    String?
 
-  rentals Rental[]
+  rentals          Rental[]
+  externalPayments ExternalPayment[]
+  reservations     Reservation[]
 
   @@map("customers")
 }
 
 model Rental {
-  id         String       @id @default(cuid())
-  vehicleId  String       @map("vehicle_id")
-  customerId String       @map("customer_id")
-  startDate  DateTime     @map("start_date")
-  endDate    DateTime     @map("end_date")
-  days       Int
+  id          String       @id @default(cuid())
+  vehicleId   String       @map("vehicle_id")
+  customerId  String       @map("customer_id")
+  rentalType  RentalType   @default(NEW) @map("rental_type")
+  startDate   DateTime     @map("start_date")
+  endDate     DateTime     @map("end_date")
+  days        Int
   dailyPrice Int          @map("daily_price") // in kuruş (cents)
   kmDiff     Int          @default(0) @map("km_diff") // in kuruş
   cleaning   Int          @default(0) // in kuruş
@@ -111,4 +122,70 @@ model Payment {
   rental Rental @relation(fields: [rentalId], references: [id])
 
   @@map("payments")
+}
+
+model ConsignmentRental {
+  id          String   @id @default(cuid())
+  generalNote String?  @map("general_note")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  consignmentDeductions ConsignmentDeduction[]
+  externalPayments      ExternalPayment[]
+
+  @@map("consignment_rentals")
+}
+
+model ConsignmentDeduction {
+  id                   String            @id @default(cuid())
+  consignmentRentalId  String            @map("consignment_rental_id")
+  vehicleId            String            @map("vehicle_id")
+  amount               Int // in kuruş
+  description          String?
+  createdAt            DateTime          @default(now()) @map("created_at")
+
+  consignmentRental ConsignmentRental @relation(fields: [consignmentRentalId], references: [id])
+  vehicle           Vehicle           @relation(fields: [vehicleId], references: [id])
+
+  @@map("consignment_deductions")
+}
+
+model ExternalPayment {
+  id                  String            @id @default(cuid())
+  consignmentRentalId String            @map("consignment_rental_id")
+  customerId          String            @map("customer_id")
+  amount              Int // in kuruş
+  description         String?
+  createdAt           DateTime          @default(now()) @map("created_at")
+
+  consignmentRental ConsignmentRental @relation(fields: [consignmentRentalId], references: [id])
+  customer          Customer          @relation(fields: [customerId], references: [id])
+
+  @@map("external_payments")
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model Reservation {
+  id          String            @id @default(cuid())
+  customerId  String            @map("customer_id")
+  vehicleId   String            @map("vehicle_id")
+  customerName String           @map("customer_name")
+  licensePlate String           @map("license_plate")
+  reservationDate DateTime      @map("reservation_date")
+  reservationTime String        @map("reservation_time")
+  rentalDuration  Int           @map("rental_duration") // gün cinsinden
+  note        String?
+  status      ReservationStatus @default(PENDING)
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  customer    Customer          @relation(fields: [customerId], references: [id])
+  vehicle     Vehicle           @relation(fields: [vehicleId], references: [id])
+
+  @@map("reservations")
 }

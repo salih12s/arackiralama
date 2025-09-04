@@ -38,7 +38,8 @@ import {
   PictureAsPdf as PdfIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { backupApi, formatDate, vehiclesApi, rentalsApi, formatCurrency } from '../api/client';
+import { backupApi, formatDate, vehiclesApi, rentalsApi } from '../api/client';
+import { formatCurrency } from '../utils/currency';
 import Layout from '../components/Layout';
 
 export default function Backup() {

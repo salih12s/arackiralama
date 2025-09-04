@@ -25,8 +25,9 @@ export interface RentalWithPayments extends Rental {
 }
 
 /**
- * Calculate total due amount
- * totalDue = days * dailyPrice + kmDiff + cleaning + hgs + damage + fuel
+ * Calculate total due amount in KURUŞ
+ * ALL fields are in TL except payments which are already in kuruş
+ * Convert TL fields to kuruş for consistency
  */
 export function calculateTotalDue(input: RentalInput): number {
   const {
@@ -39,16 +40,19 @@ export function calculateTotalDue(input: RentalInput): number {
     fuel = 0
   } = input;
 
-  return days * dailyPrice + kmDiff + cleaning + hgs + damage + fuel;
+  // dailyPrice, kmDiff, cleaning, hgs, damage, fuel are in TL
+  // Convert to kuruş: TL * 100
+  const totalTL = days * dailyPrice + kmDiff + cleaning + hgs + damage + fuel;
+  return Math.round(totalTL * 100); // Return in kuruş
 }
 
 /**
- * Calculate balance amount
+ * Calculate balance amount in KURUŞ
  * balance = totalDue - (upfront + pay1 + pay2 + pay3 + pay4 + sum(payments.amount))
- * If overpaid, balance will be 0 (not negative)
+ * All values are in kuruş, upfront/pay1-4 need conversion from TL
  */
 export function calculateBalance(
-  totalDue: number,
+  totalDue: number, // Already in kuruş
   rental: RentalInput,
   payments: Payment[] = []
 ): number {
@@ -60,9 +64,9 @@ export function calculateBalance(
     pay4 = 0
   } = rental;
 
-  const paymentSum = payments.reduce((sum, payment) => sum + payment.amount, 0);
-  const manualPayments = upfront + pay1 + pay2 + pay3 + pay4;
-  const totalPaid = manualPayments + paymentSum;
+  const paymentSum = payments.reduce((sum, payment) => sum + payment.amount, 0); // Already in kuruş
+  const manualPaymentsKurus = (upfront + pay1 + pay2 + pay3 + pay4) * 100; // Convert TL to kuruş
+  const totalPaid = manualPaymentsKurus + paymentSum;
   
   // Balance cannot be negative - if overpaid, balance is 0
   const calculatedBalance = totalDue - totalPaid;

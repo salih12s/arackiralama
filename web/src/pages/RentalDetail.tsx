@@ -31,7 +31,8 @@ import dayjs from 'dayjs';
 
 import Layout from '../components/Layout';
 import AddPaymentDialog from '../components/AddPaymentDialog';
-import { rentalsApi, formatCurrency } from '../api/client';
+import { rentalsApi } from '../api/client';
+import { formatCurrency } from '../utils/currency';
 
 export default function RentalDetail() {
   const { id } = useParams<{ id: string }>();
@@ -323,7 +324,7 @@ export default function RentalDetail() {
                       Toplam Tutar
                     </Typography>
                     <Typography variant="h6" color="success.main">
-                      {formatCurrency(rental.totalDue)}
+                      {formatCurrency(rental.totalDue / 100)}
                     </Typography>
                   </Box>
                 </Grid>
@@ -334,7 +335,10 @@ export default function RentalDetail() {
                       Toplam Ödenen
                     </Typography>
                     <Typography variant="h6" color="info.main">
-                      {formatCurrency((rental.upfront || 0) + (rental.pay1 || 0) + (rental.pay2 || 0) + (rental.pay3 || 0) + (rental.pay4 || 0) + (rental.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0))}
+                      {formatCurrency(
+                        ((rental.upfront || 0) + (rental.pay1 || 0) + (rental.pay2 || 0) + (rental.pay3 || 0) + (rental.pay4 || 0)) / 100 + 
+                        (rental.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0)
+                      )}
                     </Typography>
                   </Box>
                 </Grid>
@@ -345,7 +349,7 @@ export default function RentalDetail() {
                       Kalan Bakiye
                     </Typography>
                     <Typography variant="h6" color={rental.balance > 0 ? 'error.main' : 'success.main'}>
-                      {formatCurrency(rental.balance)}
+                      {formatCurrency(rental.balance / 100)}
                     </Typography>
                   </Box>
                 </Grid>

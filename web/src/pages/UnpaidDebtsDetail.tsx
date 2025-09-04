@@ -39,14 +39,6 @@ import { vehiclesApi } from '../api/vehicles';
 import { customersApi } from '../api/client';
 import { formatCurrency } from '../utils/currency';
 
-// Compact date formatting (DD.MM)
-// const formatCompactDate = (dateString: string) => {
-//   const date = new Date(dateString);
-//   const day = date.getDate().toString().padStart(2, '0');
-//   const month = (date.getMonth() + 1).toString().padStart(2, '0');
-//   return `${day}.${month}`;
-// };
-
 interface RentalData {
   id: string;
   startDate: string;
@@ -84,11 +76,13 @@ interface RentalData {
   payment4: number;
   // Yakıt bedeli ayrı
   actualFuelCost: number;
+  // Ek ödemeler (taksit dışı)
+  extraPayments: number;
   // Açıklama alanı
   description?: string;
 }
 
-export const DetailedReport: React.FC = () => {
+export const UnpaidDebtsDetail: React.FC = () => {
   const [rentals, setRentals] = useState<RentalData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,7 +110,8 @@ export const DetailedReport: React.FC = () => {
     payment2: 0,
     payment3: 0,
     payment4: 0,
-    rentalType: 'NEW' as 'NEW' | 'EXTENSION'
+    rentalType: 'NEW' as 'NEW' | 'EXTENSION',
+    description: ''
   });
 
   // Data for dropdowns
@@ -164,8 +159,8 @@ export const DetailedReport: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Sadece borcu bitmiş müşterileri filtrele (balance = 0)
-    let filtered = rentals.filter(rental => rental.balance <= 0);
+    // Sadece borçlu müşterileri filtrele (balance > 0)
+    let filtered = rentals.filter(rental => rental.balance > 0);
     
     // Araç filtresi uygula
     if (selectedVehicle) {
@@ -222,36 +217,40 @@ export const DetailedReport: React.FC = () => {
           console.log('Found vehicle:', vehicle); // Debug için
           console.log('Customer data:', rental.customer); // Debug için
           
-          // API'dan TL cinsinden geliyor, direkt kullan
+          // Calculate values - API'dan TL cinsinde geliyor, display için kuruşa çevir
           const days = rental.days || 0;
-          const dailyPrice = rental.dailyPrice || 0;  // TL cinsinden
+          const dailyPrice = rental.dailyPrice || 0;  // TL cinsinde
           const totalPrice = days * dailyPrice;
           
-          // KM bilgileri - TL cinsinden
-          const kmDiff = rental.kmDiff || 0;
+          // KM bilgileri - Schema'da kmDiff var, bu KM ücreti 
+          const kmDiff = rental.kmDiff || 0; 
           
-          const hgsFee = rental.hgs || 0;        // TL cinsinden
-          const cleaningFee = rental.cleaning || 0; // TL cinsinden
+          const hgsFee = rental.hgs || 0;     
+          const cleaningFee = rental.cleaning || 0; 
           
-          // Kaza ve yakıt ücretleri - TL cinsinden
-          const damageFee = rental.damage || 0;
-          const fuelCost = rental.fuel || 0;
-          const otherFees = 0;
+          // Kaza ve yakıt ücretleri ayrı tutulacak
+          const damageFee = rental.damage || 0;  
+          const fuelCost = rental.fuel || 0;     
+          const otherFees = 0; // Diğer ücretler
           
           const totalAmount = totalPrice + kmDiff + hgsFee + cleaningFee + damageFee + fuelCost + otherFees;
-          const advancePayment = rental.upfront || 0; // TL cinsinden
+          const advancePayment = rental.upfront || 0; 
           
-          // Ödemeler - TL cinsinden
-          const pay1 = rental.pay1 || 0;
-          const pay2 = rental.pay2 || 0;
-          const pay3 = rental.pay3 || 0;
-          const pay4 = rental.pay4 || 0;
+          // Calculate total paid from payments and installments
+          const pay1 = rental.pay1 || 0;  
+          const pay2 = rental.pay2 || 0;  
+          const pay3 = rental.pay3 || 0;  
+          const pay4 = rental.pay4 || 0;  
           
           const totalPaid = (rental.payments || []).reduce((sum: number, payment: any) => 
-            sum + (payment.amount || 0), 0  // Ödemeler de TL cinsinden
+            sum + (payment.amount || 0), 0  // payment.amount zaten kuruş cinsinde
           ) + advancePayment + pay1 + pay2 + pay3 + pay4;
           
           const balance = totalAmount - totalPaid;
+
+          // Ek ödemeleri hesapla (taksit ödemeleri dışındaki ödemeler)
+          const installmentPayments = advancePayment + pay1 + pay2 + pay3 + pay4;
+          const extraPayments = Math.max(0, totalPaid - installmentPayments);
 
           return {
             id: rental.id,
@@ -272,7 +271,7 @@ export const DetailedReport: React.FC = () => {
             dailyPrice,
             totalPrice,
             kmPrice: kmDiff, // KM ücreti (para değeri)
-            kmTotal: kmDiff, // KM ücreti (TL)
+            kmTotal: kmDiff, // KM ücreti (kuruş)
             hgsFee,
             damageFee, // Sadece kaza ücreti
             fuelCost: cleaningFee, // Temizlik ücreti fuel sütununda gösteriliyor
@@ -283,15 +282,17 @@ export const DetailedReport: React.FC = () => {
             balance,
             status: rental.status,
             rentalType: rental.rentalType || 'NEW',
-            // Ödemeler - TL cinsinden
+            // Ödemeler - kuruş cinsinden
             payment1: pay1,
             payment2: pay2,
             payment3: pay3,
             payment4: pay4,
             // Yakıt bedeli ayrı - kuruş cinsinden
             actualFuelCost: fuelCost, // Gerçek yakıt ücreti
+            // Ek ödemeler (taksit dışı)
+            extraPayments: extraPayments,
             // Açıklama alanı
-            description: rental.description || ''
+            description: rental.note || ''
           };
         });
 
@@ -345,29 +346,28 @@ export const DetailedReport: React.FC = () => {
     if (rental) {
       console.log('Edit rental data:', rental); // Debug için
       setEditingRental(rental);
-      // Tablodaki hesaplanmış değerleri kullan - API'dan gelen ham değerleri değil
-      const newEditForm = {
+      // Veriler artık API'dan TL cinsinde geliyor, direkt kullan (100'e bölme!)
+      setEditForm({
         startDate: rental.startDate,
         endDate: rental.endDate,
         customerId: rental.customerId,
         vehicleId: rental.vehicleId,
         days: rental.days,
-        dailyPrice: rental.dailyPrice,              // Tablodaki günlük fiyat
-        kmPrice: rental.kmPrice,                    // Tablodaki KM ücreti
-        hgsFee: rental.hgsFee,                      // Tablodaki HGS ücreti  
-        damageFee: rental.damageFee,                // Tablodaki kaza ücreti
-        actualFuelCost: rental.actualFuelCost,      // Tablodaki yakıt ücreti
-        fuelCost: rental.fuelCost,                  // Tablodaki temizlik ücreti
-        advancePayment: rental.advancePayment,      // Tablodaki peşin ödeme
-        payment1: rental.payment1,                  // Tablodaki 1. ödeme
-        payment2: rental.payment2,                  // Tablodaki 2. ödeme  
-        payment3: rental.payment3,                  // Tablodaki 3. ödeme
-        payment4: rental.payment4,                  // Tablodaki 4. ödeme
-        rentalType: (rental.rentalType || 'NEW') as 'NEW' | 'EXTENSION'
-      };
-      
-      console.log('Setting editForm with values:', newEditForm); // Debug için
-      setEditForm(newEditForm);
+        dailyPrice: rental.dailyPrice,      // TL cinsinden direkt kullan
+        kmPrice: rental.kmPrice,            // TL cinsinden direkt kullan
+        hgsFee: rental.hgsFee,              // TL cinsinden direkt kullan
+        damageFee: rental.damageFee,        // TL cinsinden direkt kullan
+        actualFuelCost: rental.actualFuelCost, // TL cinsinden direkt kullan
+        fuelCost: rental.fuelCost,          // TL cinsinden direkt kullan
+        advancePayment: rental.advancePayment, // TL cinsinden direkt kullan
+        payment1: rental.payment1,          // TL cinsinden direkt kullan
+        payment2: rental.payment2,          // TL cinsinden direkt kullan
+        payment3: rental.payment3,          // TL cinsinden direkt kullan
+        payment4: rental.payment4,          // TL cinsinden direkt kullan
+        rentalType: (rental.rentalType || 'NEW') as 'NEW' | 'EXTENSION',
+        description: rental.description || ''
+      });
+      console.log('Edit form set:', editForm); // Debug için
       setEditModalOpen(true);
     }
   };
@@ -396,7 +396,8 @@ export const DetailedReport: React.FC = () => {
         pay2: editForm.payment2,                // TL cinsinden direkt gönder
         pay3: editForm.payment3,                // TL cinsinden direkt gönder
         pay4: editForm.payment4,                // TL cinsinden direkt gönder
-        rentalType: editForm.rentalType
+        rentalType: editForm.rentalType,
+        note: editForm.description              // Açıklama alanı
       };
 
       console.log('Updating rental with data:', updatedData);
@@ -510,7 +511,7 @@ export const DetailedReport: React.FC = () => {
               </Button>
             )}
             <Typography variant="body2" color="text.secondary">
-              Toplam {filteredRentals.length} kiralama
+              Toplam {filteredRentals.length} borçlu kiralama
             </Typography>
           </Stack>
         </Paper>
@@ -644,10 +645,38 @@ export const DetailedReport: React.FC = () => {
                     align="right" 
                     sx={{ 
                       fontWeight: 600,
-                      color: rental.balance > 0 ? 'error.main' : 'success.main'
+                      color: (() => {
+                        // Gerçek zamanlı bakiye hesaplaması
+                        const totalDue = (rental.dailyPrice * rental.days) + 
+                          (rental.kmPrice || 0) + (rental.hgsFee || 0) + (rental.damageFee || 0) + 
+                          (rental.actualFuelCost || 0) + (rental.fuelCost || 0);
+                        
+                        // Taksitler + peşin + ek ödemeler
+                        const totalPaid = (rental.advancePayment || 0) + (rental.payment1 || 0) + 
+                          (rental.payment2 || 0) + (rental.payment3 || 0) + (rental.payment4 || 0) +
+                          (rental.totalPaid - ((rental.advancePayment || 0) + (rental.payment1 || 0) + 
+                          (rental.payment2 || 0) + (rental.payment3 || 0) + (rental.payment4 || 0)));
+                        
+                        const balance = totalDue - totalPaid;
+                        return balance > 0 ? 'error.main' : 'success.main';
+                      })()
                     }}
                   >
-                    {formatCurrency(rental.balance)}
+                    {(() => {
+                      // Gerçek zamanlı bakiye hesaplaması - 1,2,3,4. ödemeler + ek ödemeler dahil
+                      const totalDue = (rental.dailyPrice * rental.days) + 
+                        (rental.kmPrice || 0) + (rental.hgsFee || 0) + (rental.damageFee || 0) + 
+                        (rental.actualFuelCost || 0) + (rental.fuelCost || 0);
+                      
+                      // Taksitler + peşin + ek ödemeler
+                      const totalPaid = (rental.advancePayment || 0) + (rental.payment1 || 0) + 
+                        (rental.payment2 || 0) + (rental.payment3 || 0) + (rental.payment4 || 0) +
+                        (rental.totalPaid - ((rental.advancePayment || 0) + (rental.payment1 || 0) + 
+                        (rental.payment2 || 0) + (rental.payment3 || 0) + (rental.payment4 || 0)));
+                      
+                      const balance = totalDue - totalPaid;
+                      return formatCurrency(balance);
+                    })()}
                   </TableCell>
                   <TableCell align="center">
                     <Chip
@@ -690,7 +719,7 @@ export const DetailedReport: React.FC = () => {
         {filteredRentals.length === 0 && (
           <Box sx={{ textAlign: 'center', py: 4 }}>
             <Typography variant="body1" color="text.secondary">
-              Herhangi bir kiralama bulunamadı
+              {searchTerm ? 'Arama kriterinize uygun borçlu kiralama bulunamadı' : 'Herhangi bir borçlu kiralama bulunamadı'}
             </Typography>
           </Box>
         )}
@@ -989,17 +1018,67 @@ export const DetailedReport: React.FC = () => {
                 />
               </Grid>
 
+              {/* Açıklama Alanı */}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Açıklama/Not"
+                  multiline
+                  rows={3}
+                  value={editForm.description || ''}
+                  onChange={(e) => handleEditFormChange('description', e.target.value)}
+                  placeholder="Kiralama ile ilgili notlar..."
+                />
+              </Grid>
+
+              {/* Ek Ödemeler Bölümü */}
+              {editingRental && editingRental.extraPayments > 0 && (
+                <Grid item xs={12}>
+                  <Box sx={{ mt: 2, p: 2, bgcolor: 'info.50', borderRadius: 1, border: '1px solid', borderColor: 'info.200' }}>
+                    <Typography variant="h6" color="info.main" sx={{ mb: 2 }}>
+                      Ek Ödemeler
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Taksit Ödemeleri: {formatCurrency(
+                            (editingRental.advancePayment || 0) + 
+                            (editingRental.payment1 || 0) + 
+                            (editingRental.payment2 || 0) + 
+                            (editingRental.payment3 || 0) + 
+                            (editingRental.payment4 || 0)
+                          )}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Typography variant="body2" color="success.main" fontWeight="bold">
+                          Ek Ödemeler: {formatCurrency(editingRental.extraPayments)}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Typography variant="body2" color="primary.main" fontWeight="bold">
+                          Toplam Ödenen: {formatCurrency(editingRental.totalPaid)}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      * Ek ödemeler taksit ödemeleri dışında yapılan ödemelerdir ve otomatik hesaplanır.
+                    </Typography>
+                  </Box>
+                </Grid>
+              )}
+
               {/* Calculated Totals */}
               <Grid item xs={12}>
                 <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Grid container spacing={2}>
                     <Grid item xs={4}>
                       <Typography variant="body2" color="text.secondary">
-                        <strong>Toplam Ödenecek: {formatCurrency(
-                          ((editForm.days || 0) * (editForm.dailyPrice || 0)) + 
-                          (editForm.kmPrice || 0) + (editForm.hgsFee || 0) + (editForm.damageFee || 0) + 
-                          (editForm.actualFuelCost || 0) + (editForm.fuelCost || 0)
-                        )}</strong>
+                        Toplam Tutar: {formatCurrency(
+                          ((editForm.days || 0) * editForm.dailyPrice) + 
+                          editForm.kmPrice + editForm.hgsFee + editForm.damageFee + 
+                          editForm.actualFuelCost + editForm.fuelCost
+                        )}
                       </Typography>
                     </Grid>
                     <Grid item xs={4}>
@@ -1008,10 +1087,10 @@ export const DetailedReport: React.FC = () => {
                           (() => {
                             // Taksit ödemelerini hesapla
                             const installmentPayments = (editForm.advancePayment || 0) + 
-                                                       (editForm.payment1 || 0) + 
-                                                       (editForm.payment2 || 0) + 
-                                                       (editForm.payment3 || 0) + 
-                                                       (editForm.payment4 || 0);
+                                                       editForm.payment1 + 
+                                                       editForm.payment2 + 
+                                                       editForm.payment3 + 
+                                                       editForm.payment4;
                             
                             // Ek ödemeleri hesapla (editingRental'dan)
                             const extraPayments = editingRental && editingRental.totalPaid ? 
@@ -1029,54 +1108,20 @@ export const DetailedReport: React.FC = () => {
                       </Typography>
                     </Grid>
                     <Grid item xs={4}>
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
-                          fontWeight: 'bold',
-                          color: (
-                            (() => {
-                              // Toplam tutar
-                              const totalDue = ((editForm.days || 0) * (editForm.dailyPrice || 0)) + 
-                                             (editForm.kmPrice || 0) + (editForm.hgsFee || 0) + (editForm.damageFee || 0) + 
-                                             (editForm.actualFuelCost || 0) + (editForm.fuelCost || 0);
-                              
-                              // Taksit ödemelerini hesapla
-                              const installmentPayments = (editForm.advancePayment || 0) + 
-                                                         (editForm.payment1 || 0) + 
-                                                         (editForm.payment2 || 0) + 
-                                                         (editForm.payment3 || 0) + 
-                                                         (editForm.payment4 || 0);
-                              
-                              // Ek ödemeleri hesapla (editingRental'dan)
-                              const extraPayments = editingRental && editingRental.totalPaid ? 
-                                editingRental.totalPaid - (
-                                  (editingRental.advancePayment || 0) + 
-                                  (editingRental.payment1 || 0) + 
-                                  (editingRental.payment2 || 0) + 
-                                  (editingRental.payment3 || 0) + 
-                                  (editingRental.payment4 || 0)
-                                ) : 0;
-                              
-                              const totalPaid = installmentPayments + (extraPayments > 0 ? extraPayments : 0);
-                              
-                              return totalDue - totalPaid;
-                            })()
-                          ) > 0 ? 'error.main' : 'success.main'
-                        }}
-                      >
-                        Kalan Bakiye: {formatCurrency(
+                      <Typography variant="body2" color="text.secondary" fontWeight="bold">
+                        Bakiye: {formatCurrency(
                           (() => {
                             // Toplam tutar
-                            const totalDue = ((editForm.days || 0) * (editForm.dailyPrice || 0)) + 
-                                           (editForm.kmPrice || 0) + (editForm.hgsFee || 0) + (editForm.damageFee || 0) + 
-                                           (editForm.actualFuelCost || 0) + (editForm.fuelCost || 0);
+                            const totalDue = ((editForm.days || 0) * editForm.dailyPrice) + 
+                                           editForm.kmPrice + editForm.hgsFee + editForm.damageFee + 
+                                           editForm.actualFuelCost + editForm.fuelCost;
                             
                             // Taksit ödemelerini hesapla
                             const installmentPayments = (editForm.advancePayment || 0) + 
-                                                       (editForm.payment1 || 0) + 
-                                                       (editForm.payment2 || 0) + 
-                                                       (editForm.payment3 || 0) + 
-                                                       (editForm.payment4 || 0);
+                                                       editForm.payment1 + 
+                                                       editForm.payment2 + 
+                                                       editForm.payment3 + 
+                                                       editForm.payment4;
                             
                             // Ek ödemeleri hesapla (editingRental'dan)
                             const extraPayments = editingRental && editingRental.totalPaid ? 
@@ -1111,3 +1156,5 @@ export const DetailedReport: React.FC = () => {
     </Layout>
   );
 };
+
+export default UnpaidDebtsDetail;

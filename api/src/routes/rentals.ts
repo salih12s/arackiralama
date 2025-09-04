@@ -1,4 +1,4 @@
-import express from 'express';
+import * as express from 'express';
 import { z } from 'zod';
 import { prisma } from '../db/prisma';
 import { authenticateToken } from '../middleware/auth';
@@ -34,6 +34,7 @@ const createRentalSchema = z.object({
   pay2: z.number().int().default(0),
   pay3: z.number().int().default(0),
   pay4: z.number().int().default(0),
+  rentalType: z.enum(['NEW', 'EXTENSION']).default('NEW'),
   note: z.string().optional()
 });
 
@@ -105,8 +106,30 @@ router.get('/', async (req, res) => {
       prisma.rental.count({ where })
     ]);
 
+    // Convert amounts from kuruş to TL for frontend
+    const rentalsInTL = rentals.map(rental => ({
+      ...rental,
+      dailyPrice: rental.dailyPrice / 100,
+      kmDiff: rental.kmDiff / 100,
+      hgs: rental.hgs / 100,
+      damage: rental.damage / 100,
+      fuel: rental.fuel / 100,
+      cleaning: rental.cleaning / 100,
+      upfront: rental.upfront / 100,
+      pay1: rental.pay1 / 100,
+      pay2: rental.pay2 / 100,
+      pay3: rental.pay3 / 100,
+      pay4: rental.pay4 / 100,
+      totalDue: rental.totalDue / 100,  // TL'ye çevir
+      balance: rental.balance / 100,    // TL'ye çevir
+      payments: rental.payments.map(payment => ({
+        ...payment,
+        amount: payment.amount / 100    // Payment'ları da TL'ye çevir
+      }))
+    }));
+
     res.json({
-      data: rentals,
+      data: rentalsInTL,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -116,36 +139,6 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Get rentals error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// GET /api/rentals/:id - Get single rental
-router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const rental = await prisma.rental.findFirst({
-      where: { 
-        id, 
-        deleted: false 
-      },
-      include: {
-        vehicle: true,
-        customer: true,
-        payments: {
-          orderBy: { paidAt: 'desc' }
-        }
-      }
-    });
-
-    if (!rental) {
-      return res.status(404).json({ error: 'Rental not found' });
-    }
-
-    res.json(rental);
-  } catch (error) {
-    console.error('Get rental error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -204,14 +197,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Determine vehicle status based on dates
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    // Always set to RENTED when creating a new rental
-    // RESERVED status should only be set manually by the user
-    const newVehicleStatus = 'RENTED';
-
-    // Create rental and update vehicle status in transaction
+    // Create rental and update vehicle status to RENTED
     const result = await prisma.$transaction(async (tx: any) => {
       const rental = await tx.rental.create({
         data: {
@@ -242,9 +228,10 @@ router.post('/', async (req, res) => {
         }
       });
 
+      // Kiralama oluşturulunca araç durumunu RENTED yap
       await tx.vehicle.update({
         where: { id: data.vehicleId },
-        data: { status: newVehicleStatus }
+        data: { status: 'RENTED' }
       });
 
       return rental;
@@ -261,136 +248,50 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PATCH /api/rentals/:id
-router.patch('/:id', async (req, res) => {
+// GET /api/rentals/:id - Get single rental by ID
+router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const data = createRentalSchema.parse(req.body);
-
-    const existingRental = await prisma.rental.findUnique({
+    
+    const rental = await prisma.rental.findUnique({
       where: { id },
-      include: { vehicle: true }
+      include: {
+        vehicle: true,
+        customer: true,
+        payments: true
+      }
     });
 
-    if (!existingRental) {
+    if (!rental) {
       return res.status(404).json({ error: 'Rental not found' });
     }
 
-    // Check if vehicle exists and is available (if vehicle is changing)
-    if (data.vehicleId !== existingRental.vehicleId) {
-      const newVehicle = await prisma.vehicle.findUnique({
-        where: { id: data.vehicleId }
-      });
+    // Convert amounts from kuruş to TL for frontend (same as in getAll)
+    const rentalInTL = {
+      ...rental,
+      dailyPrice: rental.dailyPrice / 100,
+      kmDiff: rental.kmDiff / 100,
+      hgs: rental.hgs / 100,
+      damage: rental.damage / 100,
+      fuel: rental.fuel / 100,
+      cleaning: rental.cleaning / 100,
+      upfront: rental.upfront / 100,
+      pay1: rental.pay1 / 100,
+      pay2: rental.pay2 / 100,
+      pay3: rental.pay3 / 100,
+      pay4: rental.pay4 / 100,
+      totalDue: rental.totalDue / 100,  // TL'ye çevir
+      balance: rental.balance / 100,    // TL'ye çevir
+      payments: rental.payments.map(payment => ({
+        ...payment,
+        amount: payment.amount / 100    // Payment'ları da TL'ye çevir
+      }))
+    };
 
-      if (!newVehicle) {
-        return res.status(404).json({ error: 'New vehicle not found' });
-      }
-
-      if (!newVehicle.active) {
-        return res.status(400).json({ error: 'New vehicle is not active' });
-      }
-
-      if (newVehicle.status !== 'IDLE') {
-        return res.status(400).json({ error: 'New vehicle is not available' });
-      }
-    }
-
-    // Find or create customer
-    let customer = await prisma.customer.findFirst({
-      where: { fullName: data.customerName }
-    });
-
-    if (!customer) {
-      customer = await prisma.customer.create({
-        data: {
-          fullName: data.customerName,
-          phone: data.customerPhone || null
-        }
-      });
-    } else if (data.customerPhone && customer.phone !== data.customerPhone) {
-      // Update customer phone if different
-      customer = await prisma.customer.update({
-        where: { id: customer.id },
-        data: {
-          phone: data.customerPhone
-        }
-      });
-    }
-
-    // Calculate amounts
-    const startDate = new Date(data.startDate);
-    const endDate = new Date(data.endDate);
-    const days = data.days || calculateDaysBetween(startDate, endDate);
-    
-    const totalDue = data.dailyPrice * days + (data.kmDiff || 0) + 
-                     (data.cleaning || 0) + (data.hgs || 0) + (data.damage || 0) + (data.fuel || 0);
-    const totalPaid = (data.upfront || 0) + (data.pay1 || 0) + (data.pay2 || 0) + (data.pay3 || 0) + (data.pay4 || 0);
-    const balance = totalDue - totalPaid;
-
-    const result = await prisma.$transaction(async (tx) => {
-      // If vehicle is changing, update vehicle statuses
-      if (data.vehicleId !== existingRental.vehicleId) {
-        // Set old vehicle to IDLE
-        await tx.vehicle.update({
-          where: { id: existingRental.vehicleId },
-          data: { status: 'IDLE' }
-        });
-
-        // Set new vehicle to RENTED
-        await tx.vehicle.update({
-          where: { id: data.vehicleId },
-          data: { status: 'RENTED' }
-        });
-      }
-
-      // Update rental
-      const rental = await tx.rental.update({
-        where: { id },
-        data: {
-          vehicleId: data.vehicleId,
-          customerId: customer!.id,
-          startDate,
-          endDate,
-          days,
-          dailyPrice: data.dailyPrice,
-          kmDiff: data.kmDiff || 0,
-          cleaning: data.cleaning || 0,
-          hgs: data.hgs || 0,
-          damage: data.damage || 0,
-          fuel: data.fuel || 0,
-          upfront: data.upfront || 0,
-          pay1: data.pay1 || 0,
-          pay2: data.pay2 || 0,
-          pay3: data.pay3 || 0,
-          pay4: data.pay4 || 0,
-          totalDue,
-          balance,
-          note: data.note || null
-        },
-        include: {
-          vehicle: true,
-          customer: true,
-          payments: true
-        }
-      });
-
-      return rental;
-    });
-
-    res.json(result);
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Invalid input', details: error.errors });
-    }
-    
-    console.error('Update rental error:', error);
-    console.error('Error details:', {
-      message: error?.message,
-      stack: error?.stack,
-      rentalId: req.params.id,
-      requestBody: req.body
-    });
-    res.status(500).json({ error: 'Internal server error', details: error?.message });
+    res.json(rentalInTL);
+  } catch (error) {
+    console.error('Get rental by ID error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -550,8 +451,7 @@ router.post('/:id/add-payment', async (req, res) => {
 
       // Recalculate balance with all payments including the new one
       const totalPayments = updatedRental!.payments.reduce((sum, p) => sum + p.amount, 0);
-      const manualPayments = updatedRental!.upfront + updatedRental!.pay1 + updatedRental!.pay2 + updatedRental!.pay3 + updatedRental!.pay4;
-      const balance = Math.max(0, updatedRental!.totalDue - manualPayments - totalPayments);
+      const balance = updatedRental!.totalDue - totalPayments;
 
       // Update rental balance
       const finalRental = await tx.rental.update({
@@ -598,8 +498,13 @@ router.get('/:id/payments', async (req, res) => {
 
     console.log('Found payments:', payments.length, 'for rental:', id);
 
-    // Amount'ları kuruş cinsinden döndür (artık TL'ye çevirme)
-    res.json(payments);
+    // Payments kuruş cinsinde saklanıyor, TL'ye çevir
+    const paymentsInTL = payments.map(payment => ({
+      ...payment,
+      amount: payment.amount / 100 // kuruş → TL
+    }));
+    
+    res.json(paymentsInTL);
   } catch (error) {
     console.error('Error fetching payments:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -632,11 +537,11 @@ router.post('/:id/payments', async (req, res) => {
       }
 
       // Create payment record
-      const amountKurus = Math.round(Number(amount) * 100); // TL → kuruş (tek kere)
+      // Frontend TL gönderiyor, kuruş'a çevir
       const payment = await tx.payment.create({
         data: {
           rentalId: id,
-          amount: amountKurus,
+          amount: Math.round(Number(amount) * 100), // TL'yi kuruş'a çevir
           paidAt: new Date(paidAt),
           method: method || 'CASH'
         }
@@ -654,8 +559,7 @@ router.post('/:id/payments', async (req, res) => {
 
       // Recalculate balance with all payments including the new one
       const totalPayments = updatedRental!.payments.reduce((sum, p) => sum + p.amount, 0);
-      const manualPayments = updatedRental!.upfront + updatedRental!.pay1 + updatedRental!.pay2 + updatedRental!.pay3 + updatedRental!.pay4;
-      const balance = Math.max(0, updatedRental!.totalDue - manualPayments - totalPayments);
+      const balance = updatedRental!.totalDue - totalPayments;
 
       // Update rental balance
       const finalRental = await tx.rental.update({
@@ -674,6 +578,123 @@ router.post('/:id/payments', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Add payment error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/rentals/:id - Update rental
+router.patch('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+
+    console.log('Updating rental:', id, data);
+
+    // Find existing rental
+    const existingRental = await prisma.rental.findUnique({
+      where: { id },
+      include: { customer: true, vehicle: true }
+    });
+
+    if (!existingRental) {
+      return res.status(404).json({ error: 'Rental not found' });
+    }
+
+    // Prepare update data - convert TL to kuruş if needed
+    const updateData: any = {};
+
+    // Handle customer update
+    if (data.customerId) {
+      updateData.customerId = data.customerId;
+    }
+
+    // Handle vehicle update  
+    if (data.vehicleId) {
+      updateData.vehicleId = data.vehicleId;
+    }
+
+    // Handle dates
+    if (data.startDate) updateData.startDate = new Date(data.startDate);
+    if (data.endDate) updateData.endDate = new Date(data.endDate);
+    if (data.days !== undefined) updateData.days = data.days;
+
+    // Handle prices - convert TL to kuruş (multiply by 100)
+    if (data.dailyPrice !== undefined) updateData.dailyPrice = Math.round(data.dailyPrice * 100);
+    if (data.kmDiff !== undefined) updateData.kmDiff = Math.round(data.kmDiff * 100);
+    if (data.hgs !== undefined) updateData.hgs = Math.round(data.hgs * 100);
+    if (data.damage !== undefined) updateData.damage = Math.round(data.damage * 100);
+    if (data.fuel !== undefined) updateData.fuel = Math.round(data.fuel * 100);
+    if (data.cleaning !== undefined) updateData.cleaning = Math.round(data.cleaning * 100);
+    if (data.upfront !== undefined) updateData.upfront = Math.round(data.upfront * 100);
+    if (data.pay1 !== undefined) updateData.pay1 = Math.round(data.pay1 * 100);
+    if (data.pay2 !== undefined) updateData.pay2 = Math.round(data.pay2 * 100);
+    if (data.pay3 !== undefined) updateData.pay3 = Math.round(data.pay3 * 100);
+    if (data.pay4 !== undefined) updateData.pay4 = Math.round(data.pay4 * 100);
+
+    // Handle rental type
+    if (data.rentalType) updateData.rentalType = data.rentalType;
+
+    // Handle note/description
+    if (data.note !== undefined) updateData.note = data.note;
+
+    // Update rental
+    const updatedRental = await prisma.rental.update({
+      where: { id },
+      data: updateData,
+      include: {
+        customer: true,
+        vehicle: true,
+        payments: true
+      }
+    });
+
+    // Recalculate totalDue and balance after update
+    const newTotalDue = (updatedRental.days * updatedRental.dailyPrice) + 
+                       updatedRental.kmDiff + updatedRental.cleaning + 
+                       updatedRental.hgs + updatedRental.damage + updatedRental.fuel;
+    
+    const totalPayments = updatedRental.payments.reduce((sum, p) => sum + p.amount, 0);
+    const newBalance = newTotalDue - totalPayments;
+
+    // Update totalDue and balance
+    const finalRental = await prisma.rental.update({
+      where: { id },
+      data: { 
+        totalDue: newTotalDue,
+        balance: newBalance 
+      },
+      include: {
+        customer: true,
+        vehicle: true,
+        payments: true
+      }
+    });
+
+    // Convert amounts back to TL for response
+    const responseRental = {
+      ...finalRental,
+      dailyPrice: finalRental.dailyPrice / 100,
+      kmDiff: finalRental.kmDiff / 100,
+      hgs: finalRental.hgs / 100,
+      damage: finalRental.damage / 100,
+      fuel: finalRental.fuel / 100,
+      cleaning: finalRental.cleaning / 100,
+      upfront: finalRental.upfront / 100,
+      pay1: finalRental.pay1 / 100,
+      pay2: finalRental.pay2 / 100,
+      pay3: finalRental.pay3 / 100,
+      pay4: finalRental.pay4 / 100,
+      totalDue: finalRental.totalDue / 100,
+      balance: finalRental.balance / 100,
+      payments: finalRental.payments.map(p => ({
+        ...p,
+        amount: p.amount / 100
+      }))
+    };
+
+    res.json({ success: true, data: responseRental });
+  } catch (error) {
+    console.error('Update rental error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -716,6 +737,300 @@ router.delete('/:id', async (req, res) => {
     res.json({ success: true, message: 'Rental deleted successfully' });
   } catch (error) {
     console.error('Soft delete rental error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// === CONSIGNMENT RENTAL ENDPOINTS ===
+
+const consignmentRentalSchema = z.object({
+  consignmentDeductions: z.array(z.object({
+    vehicleId: z.string().cuid(),
+    amount: z.number().positive(),
+    description: z.string().optional()
+  })),
+  externalPayments: z.array(z.object({
+    customerId: z.string().cuid(),
+    amount: z.number().positive(),
+    description: z.string().optional()
+  })),
+  generalNote: z.string().optional()
+});
+
+// GET /api/rentals/consignment
+router.get('/consignment', async (req, res) => {
+  try {
+    console.log('🔍 Consignment endpoint accessed');
+    
+    // Gerçek veritabanından konsinye kayıtlarını getir
+    try {
+      const consignmentRentals = await prisma.consignmentRental.findMany({
+        include: {
+          consignmentDeductions: {
+            include: {
+              vehicle: true
+            }
+          },
+          externalPayments: {
+            include: {
+              customer: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      console.log('📋 Found consignment rentals:', consignmentRentals.length);
+
+      // Transform data for frontend
+      const transformedData = consignmentRentals.map(rental => ({
+        id: rental.id,
+        createdAt: rental.createdAt,
+        generalNote: rental.generalNote,
+        consignmentDeductions: rental.consignmentDeductions.map(d => ({
+          id: d.id,
+          vehiclePlate: d.vehicle.plate,
+          amount: d.amount,
+          description: d.description
+        })),
+        externalPayments: rental.externalPayments.map(p => ({
+          id: p.id,
+          customerName: p.customer.fullName,
+          amount: p.amount,
+          description: p.description
+        }))
+      }));
+
+      res.json({
+        data: transformedData
+      });
+    } catch (prismaError) {
+      console.log('� Prisma error, returning empty data:', prismaError);
+      // If database error, return empty array
+      res.json({ data: [] });
+    }
+    
+  } catch (error) {
+    console.error('Get consignment rentals error:', error);
+    res.status(500).json({ error: 'Failed to fetch consignment rentals' });
+  }
+});
+
+// POST /api/rentals/consignment
+router.post('/consignment', async (req, res) => {
+  try {
+    const data = consignmentRentalSchema.parse(req.body);
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Create consignment rental record
+      const consignmentRental = await tx.consignmentRental.create({
+        data: {
+          generalNote: data.generalNote
+        }
+      });
+
+      // Create consignment deductions
+      if (data.consignmentDeductions.length > 0) {
+        await tx.consignmentDeduction.createMany({
+          data: data.consignmentDeductions.map(d => ({
+            consignmentRentalId: consignmentRental.id,
+            vehicleId: d.vehicleId,
+            amount: Math.round(d.amount * 100), // Convert to kuruş
+            description: d.description
+          }))
+        });
+      }
+
+      // Create external payments
+      if (data.externalPayments.length > 0) {
+        await tx.externalPayment.createMany({
+          data: data.externalPayments.map(p => ({
+            consignmentRentalId: consignmentRental.id,
+            customerId: p.customerId,
+            amount: Math.round(p.amount * 100), // Convert to kuruş
+            description: p.description
+          }))
+        });
+      }
+
+      return consignmentRental;
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid input', details: error.errors });
+    }
+
+    console.error('Create consignment rental error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/rentals/consignment/:id
+router.put('/consignment/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = consignmentRentalSchema.parse(req.body);
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Update consignment rental record
+      const consignmentRental = await tx.consignmentRental.update({
+        where: { id },
+        data: {
+          generalNote: data.generalNote
+        }
+      });
+
+      // Delete existing deductions and payments
+      await tx.consignmentDeduction.deleteMany({
+        where: { consignmentRentalId: id }
+      });
+      await tx.externalPayment.deleteMany({
+        where: { consignmentRentalId: id }
+      });
+
+      // Create new consignment deductions
+      if (data.consignmentDeductions.length > 0) {
+        await tx.consignmentDeduction.createMany({
+          data: data.consignmentDeductions.map(d => ({
+            consignmentRentalId: id,
+            vehicleId: d.vehicleId,
+            amount: Math.round(d.amount * 100), // Convert to kuruş
+            description: d.description
+          }))
+        });
+      }
+
+      // Create new external payments
+      if (data.externalPayments.length > 0) {
+        await tx.externalPayment.createMany({
+          data: data.externalPayments.map(p => ({
+            consignmentRentalId: id,
+            customerId: p.customerId,
+            amount: Math.round(p.amount * 100), // Convert to kuruş
+            description: p.description
+          }))
+        });
+      }
+
+      return consignmentRental;
+    });
+
+    res.json(result);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid input', details: error.errors });
+    }
+
+    console.error('Update consignment rental error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/rentals/consignment/:id
+router.delete('/consignment/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.$transaction(async (tx) => {
+      // Delete related records first
+      await tx.consignmentDeduction.deleteMany({
+        where: { consignmentRentalId: id }
+      });
+      await tx.externalPayment.deleteMany({
+        where: { consignmentRentalId: id }
+      });
+
+      // Delete consignment rental
+      await tx.consignmentRental.delete({
+        where: { id }
+      });
+    });
+
+    res.json({ message: 'Consignment rental deleted successfully' });
+  } catch (error) {
+    console.error('Delete consignment rental error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Individual item DELETE endpoints
+router.delete('/consignment-deduction/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await prisma.consignmentDeduction.delete({
+      where: { id }
+    });
+
+    res.json({ message: 'Consignment deduction deleted successfully' });
+  } catch (error) {
+    console.error('Delete consignment deduction error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.delete('/external-payment/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await prisma.externalPayment.delete({
+      where: { id }
+    });
+
+    res.json({ message: 'External payment deleted successfully' });
+  } catch (error) {
+    console.error('Delete external payment error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Individual item UPDATE endpoints
+router.put('/consignment-deduction/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { vehicleId, amount, description } = req.body;
+    
+    const updated = await prisma.consignmentDeduction.update({
+      where: { id },
+      data: {
+        vehicleId,
+        amount: Math.round(amount * 100), // Convert to kuruş
+        description
+      },
+      include: {
+        vehicle: true
+      }
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Update consignment deduction error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/external-payment/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { customerId, amount, description } = req.body;
+    
+    const updated = await prisma.externalPayment.update({
+      where: { id },
+      data: {
+        customerId,
+        amount: Math.round(amount * 100), // Convert to kuruş
+        description
+      },
+      include: {
+        customer: true
+      }
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Update external payment error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

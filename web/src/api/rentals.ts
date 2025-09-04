@@ -16,10 +16,10 @@ export interface Rental {
   startDate: string;
   endDate: string;
   days: number;
-  dailyPrice: number;
+  dailyPrice: number; // Already in TL from backend
   totalDue: number;
   status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
-  kmDiff: number;
+  kmDiff: number; // Already in TL from backend  
   cleaning: number;
   hgs: number;
   damage: number;
@@ -29,9 +29,12 @@ export interface Rental {
   pay2: number;
   pay3: number;
   pay4: number;
+  kmPrice?: number; // Added this field
   note?: string;
   createdAt: string;
   updatedAt: string;
+  totalPaid?: number; // Toplam ödenen miktar (taksitler + ek ödemeler)
+  balance?: number; // Kalan bakiye
   vehicle: {
     id: string;
     plate: string;
@@ -39,10 +42,11 @@ export interface Rental {
     model: string;
   };
   customer: Customer;
-  payments: Array<{
+  payments?: Array<{
     id: string;
     amount: number;
     method: string;
+    note?: string;
     createdAt: string;
   }>;
 }
@@ -59,7 +63,7 @@ export interface RentalFilters {
 }
 
 export const rentalsApi = {
-  getAll: async (filters?: RentalFilters): Promise<{ data: Rental[]; total: number; page: number; limit: number }> => {
+  getAll: async (filters?: RentalFilters): Promise<{ data: Rental[]; pagination: { total: number; page: number; limit: number; pages: number } }> => {
     const response = await api.get('/rentals', { params: filters });
     return response.data;
   },

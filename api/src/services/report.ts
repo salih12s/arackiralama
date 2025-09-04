@@ -29,6 +29,11 @@ export interface VehicleIncomeReport {
   outstanding: number;
 }
 
+export interface VehicleRevenue {
+  licensePlate: string;
+  totalRevenue: number;
+}
+
 export interface DebtorReport {
   rentalId: string;
   plate: string;
@@ -143,10 +148,10 @@ export async function getDashboardStats(month?: number, year?: number): Promise<
     idle: statusCounts.IDLE || 0,
     reserved: statusCounts.RESERVED || 0,
     service: statusCounts.SERVICE || 0,
-    monthBilled,
-    monthCollected,
-    monthOutstanding,
-    monthVehicleProfit
+    monthBilled: monthBilled / 100, // Kuruş'tan TL'ye çevir
+    monthCollected: monthCollected / 100, // Kuruş'tan TL'ye çevir
+    monthOutstanding: monthOutstanding / 100, // Kuruş'tan TL'ye çevir
+    monthVehicleProfit: monthVehicleProfit / 100 // Kuruş'tan TL'ye çevir
   };
 }
 
@@ -274,16 +279,46 @@ export async function getVehicleIncomeReport(): Promise<VehicleIncomeReport[]> {
     });
 
     return {
-      plate: vehicle.plate,
-      vehicleId: vehicle.id,
-      billed,
-      collected,
-      outstanding
+      licensePlate: vehicle.plate,
+      totalRevenue: collected / 100 // Kuruş'tan TL'ye çevir
     };
   });
 }
 
-export async function getDebtorReport(): Promise<DebtorReport[]> {
+export async function getVehicleRevenueReport(): Promise<VehicleRevenue[]> {
+  const vehicles = await prisma.vehicle.findMany({
+    where: { active: true },
+    include: {
+      rentals: {
+        where: { deleted: false }, // Sadece silinmemiş kiralamalar
+        include: {
+          payments: true
+        }
+      }
+    }
+  });
+
+  return vehicles.map((vehicle: any) => {
+    let totalRevenue = 0;
+
+    vehicle.rentals.forEach((rental: any) => {
+      // Araç geliri = Kiralama ücreti + KM farkı (sadece araçla ilgili gelir)
+      const dailyRate = rental.dailyPrice || 0;
+      const days = rental.days || 0;
+      const kmDiff = rental.kmDiff || 0;
+      
+      const vehicleIncome = (days * dailyRate) + kmDiff;
+      totalRevenue += vehicleIncome;
+    });
+
+    return {
+      licensePlate: vehicle.plate,
+      totalRevenue: totalRevenue / 100 // Kuruş'tan TL'ye çevir
+    };
+  }); // Tüm araçları göster (geliri 0 olanlar da dahil)
+}
+
+export async function getDebtorReport(): Promise<{ customerId: string; customerName: string; totalDebt: number }[]> {
   const rentals = await prisma.rental.findMany({
     where: {
       deleted: false // Sadece silinmemiş kiralamalarda borç takibi
@@ -295,51 +330,41 @@ export async function getDebtorReport(): Promise<DebtorReport[]> {
     }
   });
 
-  // Her kiralama için gerçek balance hesapla
-  const debtors = rentals
-    .map((rental: any) => {
-      // Toplam ödenen = kiralama içindeki ödemeler + ayrı ödemeler
-      const paidFromRental = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
-      const paidFromPayments = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
-      const totalPaid = paidFromRental + paidFromPayments;
-      
-      // Gerçek kalan borç hesapla
-      const actualBalance = rental.totalDue - totalPaid;
-      
-      // Debug log
-      if (rental.customer.fullName.includes('Hüseyin') || rental.customer.fullName.includes('salih')) {
-        console.log('\n=== BACKEND DEBTORS DEBUG ===');
-        console.log('Rental ID:', rental.id);
-        console.log('Müşteri:', rental.customer.fullName);
-        console.log('Toplam Tutar (totalDue):', rental.totalDue, '→', rental.totalDue / 100, 'TL');
-        console.log('Payments array:', rental.payments);
-        console.log('Payments toplamı:', paidFromPayments, '→', paidFromPayments / 100, 'TL');
-        console.log('Kiralama ödemeleri:');
-        console.log('  - upfront:', rental.upfront, '→', rental.upfront / 100, 'TL');
-        console.log('  - pay1:', rental.pay1, '→', rental.pay1 / 100, 'TL');
-        console.log('  - pay2:', rental.pay2, '→', rental.pay2 / 100, 'TL');
-        console.log('  - pay3:', rental.pay3, '→', rental.pay3 / 100, 'TL');
-        console.log('  - pay4:', rental.pay4, '→', rental.pay4 / 100, 'TL');
-        console.log('Kiralama ödemeleri toplamı:', paidFromRental, '→', paidFromRental / 100, 'TL');
-        console.log('TOPLAM ÖDENEN:', totalPaid, '→', totalPaid / 100, 'TL');
-        console.log('HESAPLANAN BORÇ:', actualBalance, '→', actualBalance / 100, 'TL');
-        console.log('ESKİ BORÇ (rental.balance):', rental.balance, '→', rental.balance / 100, 'TL');
-        console.log('=============================\n');
-      }
-      
-      return {
-        rentalId: rental.id,
-        plate: rental.vehicle.plate,
-        customerName: rental.customer.fullName,
-        startDate: rental.startDate,
-        endDate: rental.endDate,
-        balance: actualBalance, // Gerçek hesaplanmış balance
-        days: rental.days
-      };
-    })
-    .filter(rental => rental.balance > 0); // Sadece borcu olanları al
+  // Müşteri bazında borç toplamı
+  const customerDebtMap = new Map<string, { customerName: string; totalDebt: number }>();
 
-  return debtors;
+  rentals.forEach((rental: any) => {
+    // Toplam ödenen = kiralama içindeki ödemeler + ayrı ödemeler
+    const paidFromRental = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
+    const paidFromPayments = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
+    const totalPaid = paidFromRental + paidFromPayments;
+    
+    // Gerçek kalan borç hesapla
+    const actualBalance = rental.totalDue - totalPaid;
+    
+    if (actualBalance > 0) {
+      const customerId = rental.customer.id;
+      const customerName = rental.customer.fullName;
+      
+      if (customerDebtMap.has(customerId)) {
+        const existing = customerDebtMap.get(customerId)!;
+        existing.totalDebt += actualBalance;
+      } else {
+        customerDebtMap.set(customerId, {
+          customerName,
+          totalDebt: actualBalance
+        });
+      }
+    }
+  });
+
+  const debtorList = Array.from(customerDebtMap.entries()).map(([customerId, data]) => ({
+    customerId,
+    customerName: data.customerName,
+    totalDebt: data.totalDebt / 100 // Kuruş'tan TL'ye çevir
+  }));
+
+  return debtorList.sort((a, b) => b.totalDebt - a.totalDebt); // Borcu fazla olandan aza sırala
 }
 
 // Financial Dashboard fonksiyonu

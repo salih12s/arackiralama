@@ -30,9 +30,10 @@ type VehicleFormData = z.infer<typeof vehicleSchema>;
 interface NewVehicleDialogProps {
   open: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
-export default function NewVehicleDialog({ open, onClose }: NewVehicleDialogProps) {
+export default function NewVehicleDialog({ open, onClose, onSuccess }: NewVehicleDialogProps) {
   const queryClient = useQueryClient();
 
   const {

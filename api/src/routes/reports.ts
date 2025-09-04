@@ -6,7 +6,8 @@ import {
   getVehicleIncomeReport,
   getDebtorReport,
   getFinancialDashboard,
-  getOverallVehiclePerformance
+  getOverallVehiclePerformance,
+  getVehicleRevenueReport
 } from '../services/report';
 
 const router = express.Router();
@@ -58,13 +59,24 @@ router.get('/vehicle-income', async (req, res) => {
   }
 });
 
-// GET /api/debtors
+// GET /api/reports/debtors
 router.get('/debtors', async (req, res) => {
   try {
     const debtors = await getDebtorReport();
     res.json(debtors);
   } catch (error) {
     console.error('Get debtors report error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/reports/vehicle-revenue
+router.get('/vehicle-revenue', async (req, res) => {
+  try {
+    const vehicleRevenue = await getVehicleRevenueReport();
+    res.json(vehicleRevenue);
+  } catch (error) {
+    console.error('Get vehicle revenue error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

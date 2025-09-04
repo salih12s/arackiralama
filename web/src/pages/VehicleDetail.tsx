@@ -32,7 +32,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 
 import Layout from '../components/Layout';
-import { vehiclesApi, reportsApi, formatCurrency } from '../api/client';
+import { vehiclesApi, reportsApi } from '../api/client';
+import { formatCurrency } from '../utils/currency';
 
 export default function VehicleDetail() {
   const { id } = useParams<{ id: string }>();
@@ -93,7 +94,7 @@ export default function VehicleDetail() {
   const activeRentals = rentals.filter((r: any) => r.status === 'ACTIVE').length;
   const outstandingAmount = vehicleIncome.outstanding || 0;
   
-  // Calculate total revenue (everything included)
+  // Calculate total revenue (everything included) - TL cinsinden hesapla
   const totalRevenue = rentals.reduce((total: number, rental: any) => {
     const rentalPrice = (rental.dailyPrice || 0) * (rental.days || 0);
     const kmDiff = rental.kmDiff || 0;
@@ -105,14 +106,14 @@ export default function VehicleDetail() {
     return total + rentalPrice + kmDiff + hgsFee + damageFee + fuelCost + otherFees;
   }, 0);
   
-  // Calculate vehicle profit (only rental price + km difference)
+  // Calculate vehicle profit (only rental price + km difference) - TL cinsinden hesapla
   const vehicleProfit = rentals.reduce((total: number, rental: any) => {
     const rentalPrice = (rental.dailyPrice || 0) * (rental.days || 0);
     const kmDiff = rental.kmDiff || 0;
     return total + rentalPrice + kmDiff;
   }, 0);
 
-  // Calculate detailed breakdown for display
+  // Calculate detailed breakdown for display - convert to kuruş
   const rentalBreakdown = rentals.reduce((acc: any, rental: any) => {
     const rentalPrice = (rental.dailyPrice || 0) * (rental.days || 0);
     const kmDiff = rental.kmDiff || 0;
@@ -128,12 +129,17 @@ export default function VehicleDetail() {
     totalIncome: 0
   });
 
+  // Convert breakdown to kuruş for display
+  rentalBreakdown.totalRentalPrice = rentalBreakdown.totalRentalPrice;
+  rentalBreakdown.totalKmDiff = rentalBreakdown.totalKmDiff;
+  rentalBreakdown.totalIncome = rentalBreakdown.totalIncome;
+
   // Get status info
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'IDLE': return 'success';
       case 'RENTED': return 'primary';
-      case 'RESERVED': return 'warning';
+      case 'RESERVED': return 'warning';  
       case 'SERVICE': return 'error';
       default: return 'default';
     }
@@ -379,14 +385,14 @@ export default function VehicleDetail() {
               </TableHead>
               <TableBody>
                 {rentals.map((rental: any) => {
-                  // Calculate detailed breakdown
-                  const rentalPrice = (rental.dailyPrice || 0) * (rental.days || 0);
+                  // Calculate detailed breakdown - convert to kuruş for display
+                  const rentalPrice = (rental.dailyPrice || 0 * (rental.days || 0));
                   const kmDiff = rental.kmDiff || 0;
                   const totalIncome = rentalPrice + kmDiff;
                   const hgsAmount = rental.hgsAmount || 0;
                   const damageAmount = rental.damageAmount || 0;
                   const fuelAmount = rental.fuelAmount || 0;
-                  const totalPaid = rental.totalDue - rental.balance;
+                  const totalPaid = rental.totalDue - rental.balance; // Already in kuruş
                   const advancePayment = rental.advancePayment || 0;
                   const remainingPayment = totalPaid - advancePayment;
 

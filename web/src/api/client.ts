@@ -82,6 +82,23 @@ export interface Customer {
   rentalCount?: number;
 }
 
+export interface Reservation {
+  id: string;
+  customerId: string;
+  vehicleId: string;
+  customerName: string;
+  licensePlate: string;
+  reservationDate: string;
+  reservationTime: string;
+  rentalDuration: number;
+  note?: string;
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
+  createdAt: string;
+  updatedAt: string;
+  customer: Customer;
+  vehicle: Vehicle;
+}
+
 export interface Rental {
   customerName: any;
   customerPhone: any;
@@ -329,14 +346,37 @@ export const backupApi = {
   }>(`/backup/${filename}`),
 };
 
-// Utility functions
-export const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('tr-TR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount / 100) + ' TL'; // Convert from kuruş to TRY and add TL suffix
+// Rezervasyon API
+export const reservationsApi = {
+  getAll: () => api.get<Reservation[]>('/reservations'),
+  getById: (id: string) => api.get<Reservation>(`/reservations/${id}`),
+  create: (data: {
+    customerId: string;
+    vehicleId: string;
+    customerName: string;
+    licensePlate: string;
+    reservationDate: string;
+    reservationTime: string;
+    rentalDuration: number;
+    note?: string;
+  }) => api.post<Reservation>('/reservations', data),
+  update: (id: string, data: {
+    customerId?: string;
+    vehicleId?: string;
+    customerName?: string;
+    licensePlate?: string;
+    reservationDate?: string;
+    reservationTime?: string;
+    rentalDuration?: number;
+    note?: string;
+    status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
+  }) => api.put<Reservation>(`/reservations/${id}`, data),
+  delete: (id: string) => api.delete<{ message: string }>(`/reservations/${id}`),
+  confirm: (id: string) => api.post<Reservation>(`/reservations/${id}/confirm`),
+  cancel: (id: string) => api.post<Reservation>(`/reservations/${id}/cancel`),
 };
 
+// Utility functions
 export const formatDate = (date: string): string => {
   return new Intl.DateTimeFormat('tr-TR', {
     day: '2-digit',

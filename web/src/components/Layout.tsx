@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,6 +11,16 @@ import {
   MenuItem,
   Toolbar,
   Typography,
+  Drawer,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  ListItemButton,
+  useMediaQuery,
+  useTheme,
+  Divider,
+  Chip,
 } from '@mui/material';
 import {
   AccountCircle,
@@ -20,8 +30,11 @@ import {
   Assessment,
   Backup,
   Person,
+  TrendingUp,
+  Warning,
+  Menu as MenuIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
-import { useState } from 'react';
 import dayjs from 'dayjs';
 
 import { useAuth } from '../hooks/useAuth.tsx';
@@ -33,10 +46,18 @@ interface LayoutProps {
 
 export default function Layout({ children, title }: LayoutProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  // Mobile drawer toggle
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
 
   // Sayfa görünür olduğunda verileri yenile
   useEffect(() => {
@@ -104,19 +125,26 @@ export default function Layout({ children, title }: LayoutProps) {
         queryClient.invalidateQueries({ queryKey: ['all-rentals-debt-analysis'] });
         queryClient.invalidateQueries({ queryKey: ['current-debtors'] });
         break;
+      case '/all-rentals':
+        queryClient.invalidateQueries({ queryKey: ['rentals'] });
+        queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+        queryClient.invalidateQueries({ queryKey: ['customers'] });
+        break;
     }
     navigate(path);
   };
 
   const navigationItems = [
-    { path: '/', label: 'Ana Sayfa', icon: <DashboardIcon /> },
-    { path: '/rentals', label: 'Kiralama', icon: <Receipt /> },
-    { path: '/vehicles', label: 'Araçlar', icon: <DirectionsCar /> },
-    { path: '/customers', label: 'Müşteriler', icon: <Person /> },
-    { path: '/reports', label: 'Raporlar', icon: <Assessment /> },
-    { path: '/detailed-report', label: 'Detaylı Rapor', icon: <Assessment /> },
-    { path: '/debtor-details', label: 'Borçlu Detay', icon: <Person /> },
-    { path: '/backup', label: 'Yedekleme', icon: <Backup /> },
+    { path: '/', label: 'Ana Sayfa', icon: <DashboardIcon fontSize="small" /> },
+    { path: '/rentals', label: 'Kiralama', icon: <Receipt fontSize="small" /> },
+    { path: '/vehicles', label: 'Tanımlamalar', icon: <DirectionsCar fontSize="small" /> },
+    { path: '/reports', label: 'Raporlar', icon: <Assessment fontSize="small" /> },
+    { path: '/detailed-report', label: 'Kiralama Girişi', icon: <Assessment fontSize="small" /> },
+    { path: '/debtor-details', label: 'Borçlu Kişiler', icon: <Person fontSize="small" /> },
+    { path: '/unpaid-debts', label: 'Ödenmeyen Borçlar Detay', icon: <Warning fontSize="small" /> },
+    { path: '/vehicle-revenue', label: 'Araç Bazlı Gelir', icon: <TrendingUp fontSize="small" /> },
+    { path: '/all-rentals', label: 'Kiralama Geçmişi', icon: <Receipt fontSize="small" /> },
+    { path: '/backup', label: 'Yedekleme', icon: <Backup fontSize="small" /> },
   ];
 
   return (

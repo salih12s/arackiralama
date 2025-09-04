@@ -1,15 +1,14 @@
 import { Card, CardContent, Typography, Box } from '@mui/material';
-import { formatCurrency } from '../api/client';
+import { formatCurrency } from '../utils/currency';
 
 interface KpiCardProps {
   title: string;
   value: number | string;
   isCurrency?: boolean;
   color?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info';
-  icon?: string;
 }
 
-export default function KpiCard({ title, value, isCurrency = false, color = 'primary', icon }: KpiCardProps) {
+export default function KpiCard({ title, value, isCurrency = false, color = 'primary' }: KpiCardProps) {
   const displayValue = isCurrency && typeof value === 'number' 
     ? formatCurrency(value) 
     : value;
@@ -25,14 +24,9 @@ export default function KpiCard({ title, value, isCurrency = false, color = 'pri
 
   return (
     <Card sx={{ height: '100%' }}>
-      <CardContent>
+      <CardContent sx={{ py: 2, px: 2, '&:last-child': { pb: 2 } }}>
         <Box display="flex" flexDirection="column" alignItems="center" textAlign="center">
-          {icon && (
-            <Typography variant="h3" sx={{ mb: 1 }}>
-              {icon}
-            </Typography>
-          )}
-          <Typography variant="h4" component="div" sx={{ color: colorMap[color], fontWeight: 'bold', mb: 1 }}>
+          <Typography variant="h5" component="div" sx={{ color: colorMap[color], fontWeight: 'bold', mb: 0.5 }}>
             {displayValue}
           </Typography>
           <Typography variant="body2" color="text.secondary">

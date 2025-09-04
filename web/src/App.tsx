@@ -17,9 +17,12 @@ import Vehicles from './pages/Vehicles';
 import Customers from './pages/Customers';
 import Reports from './pages/Reports';
 import DebtorDetails from './pages/DebtorDetails';
+import VehicleRevenue from './pages/VehicleRevenue';
+import UnpaidDebtsDetail from './pages/UnpaidDebtsDetail';
 import VehicleDetail from './pages/VehicleDetail';
 import Backup from './pages/Backup';
 import { DetailedReport } from './pages/DetailedReport';
+import AllRentals from './pages/AllRentals';
 
 // Set dayjs locale
 dayjs.locale('tr');
@@ -155,10 +158,34 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/vehicle-revenue"
+        element={
+          <ProtectedRoute>
+            <VehicleRevenue />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/unpaid-debts"
+        element={
+          <ProtectedRoute>
+            <UnpaidDebtsDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/backup"
         element={
           <ProtectedRoute>
             <Backup />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/all-rentals"
+        element={
+          <ProtectedRoute>
+            <AllRentals />
           </ProtectedRoute>
         }
       />

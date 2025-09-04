@@ -13,7 +13,8 @@ const vehicleStatusSchema = z.enum(['IDLE', 'RENTED', 'RESERVED', 'SERVICE']);
 
 const createVehicleSchema = z.object({
   plate: z.string().min(1),
-  name: z.string().optional()
+  name: z.string().optional(),
+  isConsignment: z.boolean().optional()
 });
 
 const updateVehicleSchema = z.object({
@@ -25,11 +26,16 @@ const updateVehicleSchema = z.object({
 // GET /api/vehicles
 router.get('/', async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, consignment } = req.query;
     
     const where: any = {};
     if (status && vehicleStatusSchema.safeParse(status).success) {
       where.status = status;
+    }
+    
+    // Konsinye araç filtrelemesi
+    if (consignment !== undefined) {
+      where.isConsignment = consignment === 'true';
     }
 
     const vehicles = await prisma.vehicle.findMany({
@@ -115,12 +121,13 @@ router.get('/', async (req, res) => {
 // POST /api/vehicles
 router.post('/', async (req, res) => {
   try {
-    const { plate, name } = createVehicleSchema.parse(req.body);
+    const { plate, name, isConsignment } = createVehicleSchema.parse(req.body);
 
     const vehicle = await prisma.vehicle.create({
       data: {
         plate: plate.toUpperCase(),
-        name
+        name,
+        isConsignment: isConsignment || false
       }
     });
 
@@ -214,37 +221,17 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Araç bulunamadı' });
     }
 
-    // Debug logging
-    console.log('Vehicle delete attempt:', {
-      vehicleId: id,
-      vehicleStatus: vehicle.status,
-      activeRentalsCount: vehicle.rentals.length,
-      activeRentals: vehicle.rentals.map(r => ({
-        id: r.id,
-        deleted: r.deleted,
-        status: r.status,
-        customerId: r.customerId
-      }))
-    });
-
     // Check if vehicle has active rentals
     if (vehicle.rentals.length > 0) {
       return res.status(400).json({ 
-        error: 'Bu araçta aktif kiralamalar var. Önce kiralamaları sonlandırın.',
-        details: {
-          activeRentalsCount: vehicle.rentals.length,
-          rentals: vehicle.rentals.map(r => ({ id: r.id, status: r.status }))
-        }
+        error: 'Bu araçta aktif kiralamalar var. Önce kiralamaları sonlandırın.' 
       });
     }
 
-    // Only allow deletion if vehicle is IDLE or has no active rentals
-    // Remove strict IDLE requirement - if no active rentals, allow deletion
-    if (vehicle.rentals.length === 0 && vehicle.status !== 'IDLE') {
-      // If no active rentals but status is not IDLE, update status first
-      await prisma.vehicle.update({
-        where: { id },
-        data: { status: 'IDLE' }
+    // Only allow deletion if vehicle is IDLE
+    if (vehicle.status !== 'IDLE') {
+      return res.status(400).json({ 
+        error: 'Sadece boşta olan araçlar silinebilir.' 
       });
     }
 

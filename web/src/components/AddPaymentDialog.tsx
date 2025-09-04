@@ -22,7 +22,9 @@ import {
 } from '@mui/material';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { rentalsApi, formatCurrency, Rental, Payment } from '../api/client';
+import { rentalsApi, Rental, Payment } from '../api/client';
+import { formatCurrency } from '../utils/currency';
+import { invalidateAllRentalCaches } from '../utils/cacheInvalidation';
 
 interface AddPaymentDialogProps {
   open: boolean;
@@ -49,6 +51,46 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
 
   const queryClient = useQueryClient();
 
+  // Fresh rental data getir - prop'taki rental eski olabilir
+  const { data: freshRentalResponse } = useQuery({
+    queryKey: ['rental', rental?.id],
+    queryFn: async () => {
+      if (!rental) return null;
+      const response = await rentalsApi.getById(rental.id);
+      console.log('🔄 Fresh rental data loaded:', response.data || response);
+      return response;
+    },
+    enabled: open && !!rental,
+    staleTime: 0, // Her açılışta fresh data
+    gcTime: 0,
+  });
+
+  // Fresh rental data kullan, yoksa prop'taki rental'ı kullan
+  const currentRental = freshRentalResponse?.data || rental;
+  
+  console.log('💰 AddPaymentDialog rental comparison:', {
+    propRental: rental ? {
+      id: rental.id,
+      totalDue: rental.totalDue,
+      balance: rental.balance,
+      upfront: rental.upfront,
+      pay1: rental.pay1,
+      pay2: rental.pay2,
+      pay3: rental.pay3,
+      pay4: rental.pay4
+    } : null,
+    freshRental: currentRental ? {
+      id: currentRental.id,
+      totalDue: currentRental.totalDue,
+      balance: currentRental.balance,
+      upfront: currentRental.upfront,
+      pay1: currentRental.pay1,
+      pay2: currentRental.pay2,
+      pay3: currentRental.pay3,
+      pay4: currentRental.pay4
+    } : null
+  });
+
   // Ödeme geçmişini getir
   const { data: paymentsResponse } = useQuery({
     queryKey: ['rental-payments', rental?.id],
@@ -57,81 +99,78 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
       return await rentalsApi.getPayments(rental.id);
     },
     enabled: open && !!rental,
+    staleTime: 0, // Hemen stale olsun, her açılışta fresh data getirsin
+    gcTime: 0, // Cache'de tutma, her seferinde yeniden fetch et
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   const payments: Payment[] = paymentsResponse?.data || [];
 
-  // Debug için detaylı log
-  if (rental && payments.length > 0) {
-    console.log('� BORÇ HESAPLAMA DEBUG:');
-    console.log('📋 Kiralama Bilgileri:', {
-      id: rental.id,
-      customer: rental.customer?.fullName,
-      totalDue_kurus: rental.totalDue,
-      totalDue_TL: (rental.totalDue / 100).toFixed(2) + ' TL'
-    });
-    console.log('💸 Ödemeler:');
-    payments.forEach((payment, index) => {
-      console.log(`  ${index + 1}. ${formatCurrency(payment.amount)} (${payment.method}) - ${new Date(payment.paidAt).toLocaleString('tr-TR', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      })}`);
-    });
-    
-    const totalPaidKurus = payments.reduce((sum, payment) => sum + payment.amount, 0);
-    const remainingKurus = rental.totalDue - totalPaidKurus;
-    
-    console.log('📊 Hesaplama:');
-    console.log(`  Toplam Ödenen: ${totalPaidKurus} kuruş = ${(totalPaidKurus / 100).toFixed(2)} TL`);
-    console.log(`  Kalan Borç: ${remainingKurus} kuruş = ${(remainingKurus / 100).toFixed(2)} TL`);
-    console.log('─'.repeat(50));
-  }
-
-  // Kalan borç hesapla (her ikisi de kuruş cinsinden)
-  const totalPaid = Array.isArray(payments) ? payments.reduce((sum, payment) => sum + payment.amount, 0) : 0;
+  // DOĞRU HESAPLAMA MANTIĞI - Dashboard ile aynı
+  // Toplam = (Günlük × Gün) + KM + Temizlik + HGS + Kaza + Yakıt
+  const totalDueCalculated = currentRental ? 
+    (currentRental.days * currentRental.dailyPrice) + 
+    (currentRental.kmDiff || 0) + 
+    (currentRental.cleaning || 0) + 
+    (currentRental.hgs || 0) + 
+    (currentRental.damage || 0) + 
+    (currentRental.fuel || 0) : 0;
   
-  // Kiralama içindeki ödemeleri de dahil et (upfront, pay1, pay2, pay3, pay4)
-  const paidFromRental = rental ? (rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4) : 0;
-  const totalAllPaid = totalPaid + paidFromRental;
+  // TL STANDARDI - Her şey TL cinsinde hesaplanır
+  const totalPaid = Array.isArray(payments) ? payments.reduce((sum, payment) => sum + payment.amount, 0) : 0; // TL
   
-  const remainingBalance = rental ? Math.max(0, rental.totalDue - totalAllPaid) : 0; // Balance cannot be negative
-  const remainingAmountTL = remainingBalance / 100; // Convert to TL
+  // Planlı ödemeler API'dan TL cinsinde gelir
+  const paidFromRental = currentRental ? ((currentRental.upfront || 0) + (currentRental.pay1 || 0) + (currentRental.pay2 || 0) + (currentRental.pay3 || 0) + (currentRental.pay4 || 0)) : 0;
+  const totalAllPaid = totalPaid + paidFromRental; // TL
+  
+  // Doğru totalDue kullan ve floating point hatasını önle
+  const remainingBalance = Math.max(0, Math.round((totalDueCalculated - totalAllPaid) * 100) / 100); // TL
 
-  // Araç geliri hesaplaması: Temel gelir (gün × günlük ücret) + KM farkı
-  const vehicleRevenue = rental ? 
-    (rental.days * rental.dailyPrice) + (rental.kmDiff || 0)
-    : 0;
+  console.log('💰 AddPaymentDialog calculations:', {
+    totalDueCalculated,
+    totalPaid,
+    paidFromRental, 
+    totalAllPaid,
+    remainingBalance,
+    paymentsCount: payments?.length
+  });
+
+  console.log('🔍 Current rental details:', {
+    id: currentRental?.id,
+    upfront: currentRental?.upfront,
+    pay1: currentRental?.pay1,
+    pay2: currentRental?.pay2,
+    pay3: currentRental?.pay3,
+    pay4: currentRental?.pay4,
+    days: currentRental?.days,
+    dailyPrice: currentRental?.dailyPrice,
+    kmDiff: currentRental?.kmDiff,
+    cleaning: currentRental?.cleaning,
+    hgs: currentRental?.hgs,
+    damage: currentRental?.damage,
+    fuel: currentRental?.fuel
+  });
+
+  console.log('💵 Payments data:', payments);
+
+  // Araç geliri: sadece gün × fiyat + KM (TL cinsinde)
+  const vehicleRevenue = currentRental ? (currentRental.days * currentRental.dailyPrice) + (currentRental.kmDiff || 0) : 0;
 
   // Real-time hesaplama için input amount'u parse et
   const currentInputAmount = formData.amount ? parseFloat(formData.amount.replace(',', '.')) || 0 : 0;
-  const inputAmountKurus = Math.round(currentInputAmount * 100);
-  const balanceAfterPayment = Math.max(0, remainingBalance - inputAmountKurus);
+  const inputAmount = currentInputAmount;
+  const balanceAfterPayment = Math.max(0, Math.round((remainingBalance - inputAmount) * 100) / 100); // TL cinsinden hesapla, floating point hatasını önle
 
   const addPaymentMutation = useMutation({
     mutationFn: (data: { amount: number; method: 'CASH' | 'CARD' | 'TRANSFER'; paidAt: string }) => 
-      rentalsApi.addPayment(rental!.id, data),
-    onSuccess: () => {
-      // Tüm ilgili cache'leri agresif şekilde yenile
-      queryClient.invalidateQueries({ queryKey: ['rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['rental', rental?.id] }); // Detay sayfası için
-      queryClient.invalidateQueries({ queryKey: ['active-rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['completed-rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['debtors'] });
-      queryClient.invalidateQueries({ queryKey: ['rental-payments', rental?.id] });
-      queryClient.invalidateQueries({ queryKey: ['vehicles'] });
-      queryClient.invalidateQueries({ queryKey: ['idle-vehicles'] });
-      queryClient.invalidateQueries({ queryKey: ['monthly-report'] });
+      rentalsApi.addPayment(currentRental!.id, data),
+    onSuccess: async () => {
+      // Önce payments query'sini anında yenile
+      await queryClient.refetchQueries({ queryKey: ['rental-payments', currentRental!.id] });
       
-      // Veriler güncellensin diye kısa bir gecikme ekle
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ['rentals'] });
-        queryClient.refetchQueries({ queryKey: ['rental', rental?.id] }); // Detay sayfasını da refetch et
-        queryClient.refetchQueries({ queryKey: ['dashboard-stats'] });
-      }, 100);
+      // Sonra tüm cache'leri invalidate et
+      invalidateAllRentalCaches(queryClient);
       
       onClose();
       resetForm();
@@ -155,8 +194,8 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    // Eğer kiralama tamamen ödenmişse ödeme yapılamaz
-    if (remainingAmountTL <= 0) {
+    // Eğer kiralama tamamen ödenmişse ödeme yapılamaz  
+    if (remainingBalance <= 0) {
       newErrors.amount = 'Bu kiralama zaten tamamen ödenmiş. Ek ödeme yapılamaz.';
       setErrors(newErrors);
       return false;
@@ -172,7 +211,7 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
       
       if (isNaN(amount) || amount <= 0) {
         newErrors.amount = 'Geçerli bir tutar giriniz';
-      } else if (amount > remainingAmountTL) {
+      } else if (amount > remainingBalance) { // remainingBalance TL cinsinden
         newErrors.amount = `Maksimum ödeme tutarı: ${formatCurrency(remainingBalance)}`;
       }
     }
@@ -195,10 +234,10 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
     try {
       // Handle Turkish decimal separator (replace comma with dot)
       const normalizedAmount = formData.amount.replace(',', '.');
-      const amount = parseFloat(normalizedAmount);
+      const amountTL = parseFloat(normalizedAmount);
       
       await addPaymentMutation.mutateAsync({
-        amount, // TL olarak gönder (örn. 5000)
+        amount: amountTL, // TL olarak gönder
         method: formData.method,
         paidAt: new Date(`${formData.paidAt}T${formData.paidTime}:00`).toISOString(),
       });
@@ -241,7 +280,7 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
   };
 
   // Check if debt is fully paid
-  const isDebtFullyPaid = remainingAmountTL <= 0;
+  const isDebtFullyPaid = remainingBalance <= 0;
 
   return (
     <Dialog 
@@ -282,7 +321,7 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
                         Toplam Ödenecek
                       </Typography>
                       <Typography variant="h6" color="success.dark" sx={{ fontWeight: 700 }}>
-                        {formatCurrency(rental.totalDue)}
+                        {formatCurrency(totalDueCalculated)}
                       </Typography>
                     </Box>
                   </Grid>
@@ -312,7 +351,7 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
                         Kapora
                       </Typography>
                       <Typography variant="h6" color="primary.dark" sx={{ fontWeight: 700 }}>
-                        {formatCurrency(rental.upfront || 0)}
+                        {formatCurrency((currentRental?.upfront || 0))}
                       </Typography>
                     </Box>
                   </Grid>
@@ -329,26 +368,26 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
                 </Grid>
 
                 {/* Ek Maliyetler */}
-                {(rental.kmDiff > 0 || rental.cleaning > 0 || rental.hgs > 0 || rental.damage > 0 || rental.fuel > 0) && (
+                {((currentRental?.kmDiff || 0) > 0 || (currentRental?.cleaning || 0) > 0 || (currentRental?.hgs || 0) > 0 || (currentRental?.damage || 0) > 0 || (currentRental?.fuel || 0) > 0) && (
                   <Box sx={{ mb: 2 }}>
                     <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
                       Ek Maliyetler
                     </Typography>
                     <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                      {rental.kmDiff > 0 && (
-                        <Chip label={`KM Farkı: ${formatCurrency(rental.kmDiff)}`} size="small" variant="outlined" />
+                      {(currentRental?.kmDiff || 0) > 0 && (
+                        <Chip label={`KM Farkı: ${formatCurrency(currentRental?.kmDiff || 0)}`} size="small" variant="outlined" />
                       )}
-                      {rental.cleaning > 0 && (
-                        <Chip label={`Temizlik: ${formatCurrency(rental.cleaning)}`} size="small" variant="outlined" />
+                      {(currentRental?.cleaning || 0) > 0 && (
+                        <Chip label={`Temizlik: ${formatCurrency(currentRental?.cleaning || 0)}`} size="small" variant="outlined" />
                       )}
-                      {rental.hgs > 0 && (
-                        <Chip label={`HGS: ${formatCurrency(rental.hgs)}`} size="small" variant="outlined" />
+                      {(currentRental?.hgs || 0) > 0 && (
+                        <Chip label={`HGS: ${formatCurrency(currentRental?.hgs || 0)}`} size="small" variant="outlined" />
                       )}
-                      {rental.damage > 0 && (
-                        <Chip label={`Hasar: ${formatCurrency(rental.damage)}`} size="small" variant="outlined" />
+                      {(currentRental?.damage || 0) > 0 && (
+                        <Chip label={`Hasar: ${formatCurrency(currentRental?.damage || 0)}`} size="small" variant="outlined" />
                       )}
-                      {rental.fuel > 0 && (
-                        <Chip label={`Yakıt: ${formatCurrency(rental.fuel)}`} size="small" variant="outlined" />
+                      {(currentRental?.fuel || 0) > 0 && (
+                        <Chip label={`Yakıt: ${formatCurrency(currentRental?.fuel || 0)}`} size="small" variant="outlined" />
                       )}
                     </Stack>
                   </Box>
@@ -398,7 +437,7 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
                         Toplam Tutar
                       </Typography>
                       <Typography variant="body1" color="success.main" sx={{ fontWeight: 600 }}>
-                        {formatCurrency(rental.totalDue)}
+                        {formatCurrency(totalDueCalculated)}
                       </Typography>
                     </Box>
                   </Grid>
@@ -418,7 +457,7 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
                         Kapora
                       </Typography>
                       <Typography variant="body1" color="primary.main" sx={{ fontWeight: 600 }}>
-                        {formatCurrency(rental.upfront || 0)}
+                        {formatCurrency((rental.upfront || 0))}
                       </Typography>
                     </Box>
                   </Grid>

@@ -38,12 +38,17 @@ import dayjs from 'dayjs';
 import Layout from '../components/Layout';
 import NewRentalDialog from '../components/NewRentalDialog';
 import AddPaymentDialog from '../components/AddPaymentDialog';
-import { rentalsApi, formatCurrency, formatDate, Rental } from '../api/client';
+import EditRentalDialog from '../components/EditRentalDialog';
+import { rentalsApi, formatDate } from '../api/client';
+import { Rental } from '../api/rentals';
+import { formatCurrency } from '../utils/currency';
+import { invalidateAllRentalCaches } from '../utils/cacheInvalidation';
 
 export default function Rentals() {
   const navigate = useNavigate();
   const [newRentalOpen, setNewRentalOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [editRentalOpen, setEditRentalOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -66,21 +71,8 @@ export default function Rentals() {
   const returnRentalMutation = useMutation({
     mutationFn: (id: string) => rentalsApi.returnRental(id),
     onSuccess: () => {
-      // Tüm ilgili cache'leri agresif şekilde yenile
-      queryClient.invalidateQueries({ queryKey: ['rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['active-rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['completed-rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['vehicles'] });
-      queryClient.invalidateQueries({ queryKey: ['idle-vehicles'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['debtors'] });
-      
-      // Veriler güncellensin diye kısa bir gecikme ekle
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ['rentals'] });
-        queryClient.refetchQueries({ queryKey: ['dashboard-stats'] });
-        queryClient.refetchQueries({ queryKey: ['vehicles'] });
-      }, 100);
+      // Standart cache invalidation - tüm sayfalar senkronize çalışsın
+      invalidateAllRentalCaches(queryClient);
       
       setAnchorEl(null);
     },
@@ -93,7 +85,7 @@ export default function Rentals() {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
-    setSelectedRental(null);
+    // selectedRental'ı null yapma, dialog'da kullanılacak
   };
 
   const handleReturnRental = () => {
@@ -382,81 +374,122 @@ export default function Rentals() {
 
                         <TableCell align="right" sx={{ padding: '4px 8px' }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
-                            {formatCurrency(rental.kmDiff || 0)}
+                            {formatCurrency((rental.kmDiff || 0))}
                           </Typography>
                         </TableCell>
 
                         <TableCell align="right" sx={{ padding: '4px 8px' }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
-                            {formatCurrency(rental.hgs || 0)}
+                            {formatCurrency((rental.hgs || 0))}
                           </Typography>
                         </TableCell>
 
                         <TableCell align="right" sx={{ padding: '4px 8px' }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
-                            {formatCurrency(rental.cleaning || 0)}
+                            {formatCurrency((rental.cleaning || 0))}
                           </Typography>
                         </TableCell>
 
                         <TableCell align="right" sx={{ padding: '4px 8px' }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
-                            {formatCurrency(rental.damage || 0)}
+                            {formatCurrency((rental.damage || 0))}
                           </Typography>
                         </TableCell>
 
                         <TableCell align="right" sx={{ padding: '4px 8px' }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
-                            {formatCurrency(rental.fuel || 0)}
+                            {formatCurrency((rental.fuel || 0))}
                           </Typography>
                         </TableCell>
 
                         <TableCell align="right" sx={{ padding: '4px 8px' }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
-                            {formatCurrency(rental.upfront || 0)}
+                            {formatCurrency((rental.upfront || 0))}
                           </Typography>
                         </TableCell>
 
                         <TableCell align="right" sx={{ padding: '4px 8px' }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
-                            {formatCurrency(rental.pay1 || 0)}
+                            {formatCurrency((rental.pay1 || 0))}
                           </Typography>
                         </TableCell>
 
                         <TableCell align="right" sx={{ padding: '4px 8px' }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
-                            {formatCurrency(rental.pay2 || 0)}
+                            {formatCurrency((rental.pay2 || 0))}
                           </Typography>
                         </TableCell>
 
                         <TableCell align="right" sx={{ padding: '4px 8px' }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
-                            {formatCurrency(rental.pay3 || 0)}
+                            {formatCurrency((rental.pay3 || 0))}
                           </Typography>
                         </TableCell>
 
                         <TableCell align="right" sx={{ padding: '4px 8px' }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
-                            {formatCurrency(rental.pay4 || 0)}
+                            {formatCurrency((rental.pay4 || 0))}
                           </Typography>
                         </TableCell>
                         
                         <TableCell align="right" sx={{ padding: '4px 8px' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main', fontSize: '0.75rem' }}>
-                            {formatCurrency(rental.totalDue)}
-                          </Typography>
+                          {(() => {
+                            // Toplam Ödenecek = (günlük kira × gün) + km farkı + hgs + temizlik + hasar + yakıt
+                            const totalDue = (rental.dailyPrice * rental.days) + 
+                                           (rental.kmDiff || 0) + 
+                                           (rental.hgs || 0) + 
+                                           (rental.cleaning || 0) + 
+                                           (rental.damage || 0) + 
+                                           (rental.fuel || 0);
+                            
+                            return (
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main', fontSize: '0.75rem' }}>
+                                {formatCurrency(totalDue)}
+                              </Typography>
+                            );
+                          })()}
                         </TableCell>
                         
                         <TableCell align="right" sx={{ padding: '4px 8px' }}>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
-                              fontWeight: 600,
-                              fontSize: '0.75rem',
-                              color: rental.balance > 0 ? 'error.main' : 'success.main'
-                            }}
-                          >
-                            {formatCurrency(rental.balance)}
-                          </Typography>
+                          {(() => {
+                            // Toplam Ödenecek hesapla (günlük kira × gün + ek maliyetler)
+                            const totalDue = (rental.dailyPrice * rental.days) + 
+                                           (rental.kmDiff || 0) + 
+                                           (rental.hgs || 0) + 
+                                           (rental.cleaning || 0) + 
+                                           (rental.damage || 0) + 
+                                           (rental.fuel || 0);
+                            
+                            // Taksit ödemelerini hesapla
+                            const installmentPayments = (rental.upfront || 0) + 
+                                                       (rental.pay1 || 0) + 
+                                                       (rental.pay2 || 0) + 
+                                                       (rental.pay3 || 0) + 
+                                                       (rental.pay4 || 0);
+                            
+                            // Ek ödemeleri hesapla (payments array'inden)
+                            const extraPayments = rental.payments ? 
+                              rental.payments.reduce((total, payment) => total + payment.amount, 0) : 0;
+                            
+                            // Toplam ödenen = taksitler + ek ödemeler
+                            const totalPaid = installmentPayments + extraPayments;
+                            
+                            // Kalan Bakiye = Toplam Ödenecek - Toplam Ödenen
+                            const remainingBalance = totalDue - totalPaid;
+                            
+                            return (
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  fontWeight: 600,
+                                  fontSize: '0.75rem',
+                                  color: remainingBalance > 0 ? 'error.main' : 'success.main'
+                                }}
+                              >
+                                {formatCurrency(remainingBalance)}
+                              </Typography>
+                            );
+                          })()}
                         </TableCell>
                         
                         <TableCell sx={{ padding: '4px 8px' }}>
@@ -530,7 +563,10 @@ export default function Rentals() {
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={() => console.log('Edit rental')}>
+        <MenuItem onClick={() => {
+          setEditRentalOpen(true);
+          handleMenuClose();
+        }}>
           <ListItemIcon>
             <EditIcon fontSize="small" />
           </ListItemIcon>
@@ -565,6 +601,16 @@ export default function Rentals() {
       <AddPaymentDialog
         open={paymentDialogOpen}
         onClose={() => setPaymentDialogOpen(false)}
+        rental={selectedRental}
+      />
+
+      {/* Edit Rental Dialog */}
+      <EditRentalDialog
+        open={editRentalOpen}
+        onClose={() => {
+          setEditRentalOpen(false);
+          setSelectedRental(null);
+        }}
         rental={selectedRental}
       />
     </Layout>

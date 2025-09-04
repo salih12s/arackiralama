@@ -16,8 +16,32 @@ async function resetData() {
       console.log('ℹ️  Payment tablosu bulunamadı veya boş');
     }
     
+    // Delete external payments (if exists)
+    try {
+      await prisma.externalPayment.deleteMany();
+      console.log('✅ Tüm harici ödemeler silindi');
+    } catch (e) {
+      console.log('ℹ️  ExternalPayment tablosu bulunamadı veya boş');
+    }
+    
+    // Delete consignment deductions (if exists)
+    try {
+      await prisma.consignmentDeduction.deleteMany();
+      console.log('✅ Tüm konsinye kesintiler silindi');
+    } catch (e) {
+      console.log('ℹ️  ConsignmentDeduction tablosu bulunamadı veya boş');
+    }
+    
     await prisma.rental.deleteMany();
     console.log('✅ Tüm kiralamalar silindi');
+    
+    // Delete reservations before customers
+    try {
+      await prisma.reservation.deleteMany();
+      console.log('✅ Tüm rezervasyonlar silindi');
+    } catch (e) {
+      console.log('ℹ️  Reservation tablosu bulunamadı veya boş');
+    }
     
     await prisma.customer.deleteMany();
     console.log('✅ Tüm müşteriler silindi');

@@ -23,7 +23,9 @@ import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
 
-import { vehiclesApi, rentalsApi, customersApi, formatCurrency, Customer } from '../api/client';
+import { vehiclesApi, rentalsApi, customersApi, Customer } from '../api/client';
+import { formatCurrency } from '../utils/currency';
+import { invalidateAllRentalCaches } from '../utils/cacheInvalidation';
 
 const rentalSchema = z.object({
   vehicleId: z.string().min(1, 'Araç seçimi gereklidir'),
@@ -201,7 +203,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
 
   const createRentalMutation = useMutation({
     mutationFn: (data: RentalFormData) => {
-      // Convert TRY to kuruş for currency fields
+      // TL values - no conversion needed
       const payload = {
         ...data,
         dailyPrice: Math.round(data.dailyPrice * 100),
@@ -225,22 +227,8 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
       return rentalsApi.create(payload);
     },
     onSuccess: () => {
-      // Tüm ilgili cache'leri agresif şekilde yenile
-      queryClient.invalidateQueries({ queryKey: ['rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['active-rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['completed-rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['vehicles'] });
-      queryClient.invalidateQueries({ queryKey: ['idle-vehicles'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['debtors'] });
-      queryClient.invalidateQueries({ queryKey: ['monthly-report'] });
-      
-      // Veriler güncellensin diye kısa bir gecikme ekle
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ['rentals'] });
-        queryClient.refetchQueries({ queryKey: ['dashboard-stats'] });
-        queryClient.refetchQueries({ queryKey: ['vehicles'] });
-      }, 100);
+      // Standart cache invalidation - tüm sayfalar senkronize çalışsın
+      invalidateAllRentalCaches(queryClient);
       
       reset();
       setStartDate(dayjs());
@@ -581,17 +569,17 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                 <Grid container spacing={2}>
                   <Grid item xs={4}>
                     <Typography variant="body2">
-                      <strong>Toplam Ödenecek: {formatCurrency(Math.round(totalDueTRY * 100))}</strong>
+                      <strong>Toplam Ödenecek: {formatCurrency(Math.round(totalDueTRY))}</strong>
                     </Typography>
                   </Grid>
                   <Grid item xs={4}>
                     <Typography variant="body2">
-                      Toplam Ödenen: {formatCurrency(Math.round(totalPaidTRY * 100))}
+                      Toplam Ödenen: {formatCurrency(Math.round(totalPaidTRY))}
                     </Typography>
                   </Grid>
                   <Grid item xs={4}>
                     <Typography variant="body2" sx={{ color: balanceTRY > 0 ? 'error.main' : 'success.main' }}>
-                      <strong>Kalan Bakiye: {formatCurrency(Math.round(balanceTRY * 100))}</strong>
+                      <strong>Kalan Bakiye: {formatCurrency(Math.round(balanceTRY))}</strong>
                     </Typography>
                   </Grid>
                 </Grid>

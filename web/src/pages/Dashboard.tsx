@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { format } from 'date-fns';
 import dayjs from 'dayjs';
 import {
   Box,
@@ -39,16 +38,20 @@ import {
   Select,
   FormControl,
   InputLabel,
+  Autocomplete,
+  CircularProgress,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   DirectionsCar,
   Schedule,
   Build,
-  Warning as WarningIcon,
   Add,
   Visibility,
   Timeline,
   CheckCircle,
+  Edit,
   MoreVert,
   Assignment,
   Payment,
@@ -65,6 +68,11 @@ import {
   MonetizationOn as MoneyIcon,
   Phone as PhoneIcon,
   Edit as EditIcon,
+  DriveEta as DriveEtaIcon,
+  CarRental as CarRentalIcon,
+  AccountBalanceWallet as WalletIcon,
+  TrendingDown as TrendingDownIcon,
+  People as PeopleIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -72,15 +80,16 @@ import {
   reportsApi,
   rentalsApi,
   vehiclesApi,
-  formatCurrency,
+  reservationsApi,
   DashboardStats,
-  DebtorReport,
   Rental,
   Vehicle,
+  Reservation,
 } from '../api/client';
-import { apiClient } from '../services/api';
+import ReservationDialog from '../components/ReservationDialog';
+import { formatCurrency } from '../utils/currency';
+import client from '../api/client';
 import Layout from '../components/Layout';
-import KpiCard from '../components/KpiCard';
 import NewRentalDialog from '../components/NewRentalDialog';
 import AddPaymentDialog from '../components/AddPaymentDialog';
 import EditRentalDialog from '../components/EditRentalDialog';
@@ -88,6 +97,8 @@ import EditRentalDialog from '../components/EditRentalDialog';
 export default function Dashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [newRentalOpen, setNewRentalOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(dayjs().month() + 1); // 1-12
   const [selectedYear, setSelectedYear] = useState(dayjs().year());
@@ -125,6 +136,17 @@ export default function Dashboard() {
     open: false,
     rental: null
   });
+  
+  // Reservation states
+  const [reservationDialog, setReservationDialog] = useState<{
+    open: boolean; 
+    reservation: Reservation | null;
+  }>({
+    open: false,
+    reservation: null
+  });
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [editRentalDialogOpen, setEditRentalDialogOpen] = useState(false);
 
   // Vehicle detail data when modal is open
   const { data: vehicleDetailData, isLoading: vehicleDetailLoading } = useQuery({
@@ -144,10 +166,75 @@ export default function Dashboard() {
     rental: null
   });
 
+  // Detaylı kiralama tablosu için state'ler
+  // const [detailedRentalsFilter, setDetailedRentalsFilter] = useState('');
+  
+  // Status helper functions
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ACTIVE': return 'success';
+      case 'RETURNED': return 'info';
+      case 'COMPLETED': return 'primary';
+      case 'CANCELLED': return 'error';
+      default: return 'default';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'ACTIVE': return 'Aktif';
+      case 'RETURNED': return 'Teslim Edildi';
+      case 'COMPLETED': return 'Tamamlandı';
+      case 'CANCELLED': return 'İptal Edildi';
+      default: return status;
+    }
+  };
+
+  const formatDate = (date: string) => {
+    return dayjs(date).format('DD.MM.YYYY');
+  };
+
+  // Reservation status helpers
+  const getReservationStatusColor = (status: string) => {
+    switch (status) {
+      case 'PENDING': return 'warning';
+      case 'CONFIRMED': return 'success';
+      case 'CANCELLED': return 'error';
+      case 'COMPLETED': return 'primary';
+      default: return 'default';
+    }
+  };
+
+  const getReservationStatusText = (status: string) => {
+    switch (status) {
+      case 'PENDING': return 'Beklemede';
+      case 'CONFIRMED': return 'Onaylandı';
+      case 'CANCELLED': return 'İptal Edildi';
+      case 'COMPLETED': return 'Tamamlandı';
+      default: return status;
+    }
+  };
+
+  // Confirmation modal states
+  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState({
+    open: false,
+    type: '', // 'deduction', 'payment', 'note', 'status'
+    id: '',
+    title: '',
+    message: '',
+    statusData: null as { vehicleId: string; status: 'IDLE' | 'RENTED' | 'RESERVED' | 'SERVICE' } | null
+  });
+
+  // Error/Success modal states
+  const [notificationDialog, setNotificationDialog] = useState({
+    open: false,
+    type: 'success', // 'success' | 'error'
+    title: '',
+    message: ''
+  });
+
   // Filtreleme state'leri
   const [activeRentalsFilter, setActiveRentalsFilter] = useState('');
-  const [completedRentalsFilter, setCompletedRentalsFilter] = useState('');
-  const [debtorsFilter, setDebtorsFilter] = useState('');
   const [vehiclesFilter, setVehiclesFilter] = useState('');
 
   // === DATA FETCH ===
@@ -157,32 +244,6 @@ export default function Dashboard() {
     staleTime: 30 * 1000, // 30 saniye fresh tut
     gcTime: 2 * 60 * 1000, // 2 dakika cache'de sakla
   });
-
-  const { data: debtorsRes } = useQuery({
-    queryKey: ['debtors'],
-    queryFn: reportsApi.getDebtors,
-    staleTime: 30 * 1000, // 30 saniye fresh tut
-    gcTime: 2 * 60 * 1000, // 2 dakika cache'de sakla
-  });
-
-  // Financial dashboard verisini getir (en çok/az kazanan araçlar için)
-  const { data: overallPerformance } = useQuery({
-    queryKey: ['overall-vehicle-performance'],
-    queryFn: () => apiClient.get('/reports/overall-vehicle-performance')
-      .then((res: any) => res.data),
-    staleTime: 5 * 60 * 1000, // 5 dakika
-    gcTime: 10 * 60 * 1000, // 10 dakika
-  });
-
-  // Borç bilgileri için aylık financial dashboard'u da kullanalım
-  const { data: monthlyFinancialData } = useQuery({
-    queryKey: ['monthly-financial-dashboard', selectedMonth, selectedYear],
-    queryFn: () => apiClient.get(`/reports/financial-dashboard?month=${selectedMonth}&year=${selectedYear}`)
-      .then((res: any) => res.data),
-    staleTime: 30 * 1000,
-    gcTime: 2 * 60 * 1000,
-  });
-
 
   // Boşta olan araçları getir
   const { data: idleVehiclesRes, isFetching: idleLoading } = useQuery({
@@ -200,10 +261,26 @@ export default function Dashboard() {
     gcTime: 3 * 60 * 1000,
   });
 
+  // Rezervasyonları getir  
+  const { data: reservationsRes, isFetching: reservationsLoading } = useQuery({
+    queryKey: ['reservations'],
+    queryFn: () => reservationsApi.getAll(),
+    staleTime: 30 * 1000,
+    gcTime: 2 * 60 * 1000,
+  });
+
   // Serviste olan araçları getir
   const { data: serviceVehiclesRes } = useQuery({
     queryKey: ['service-vehicles'],
     queryFn: () => vehiclesApi.getAll('SERVICE'),
+    staleTime: 45 * 1000,
+    gcTime: 3 * 60 * 1000,
+  });
+
+  // Tüm araçları getir (rezervasyon dialog için)
+  const { data: allVehiclesRes } = useQuery({
+    queryKey: ['all-vehicles'],
+    queryFn: () => vehiclesApi.getAll(),
     staleTime: 45 * 1000,
     gcTime: 3 * 60 * 1000,
   });
@@ -222,18 +299,47 @@ export default function Dashboard() {
     gcTime: 1 * 60 * 1000, // 1 dakika cache'de sakla
   });
 
-  // Geçmiş kiralamaları getir
-  const { data: completedRentalsRes } = useQuery({
-    queryKey: ['completed-rentals'],
+  // Tüm kiralamaları getir (detaylı tablo için)
+  const { data: allRentalsRes, isFetching: allRentalsLoading } = useQuery({
+    queryKey: ['all-rentals'],
     queryFn: async () => {
-      console.log('🔄 Fetching completed rentals...');
-      const result = await rentalsApi.getAll({ limit: 50 });
-      console.log('📋 Completed rentals API response:', result);
-      console.log('📋 Completed rentals data structure:', result.data);
+      console.log('🔄 Fetching all rentals...');
+      const result = await rentalsApi.getAll({ limit: 200 });
+      console.log('📋 All rentals API response:', result);
       return result;
     },
-    staleTime: 2 * 60 * 1000, // 2 dakika fresh tut (daha az değişken)
-    gcTime: 5 * 60 * 1000, // 5 dakika cache'de sakla
+    staleTime: 10 * 1000,
+    gcTime: 2 * 60 * 1000,
+  });
+
+  // Customers query for dropdown  
+  const { data: customersRes } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const response = await client.get('/customers');
+      return response.data;
+    },
+    staleTime: 60 * 1000,
+  });
+
+  // Aylık rapor verilerini getir (reports sayfasından)
+  const { data: monthlyReportRes } = useQuery({
+    queryKey: ['monthly-report', selectedYear],
+    queryFn: async () => {
+      const response = await client.get(`/reports/monthly?year=${selectedYear}`);
+      return response.data;
+    },
+    staleTime: 60 * 1000,
+  });
+
+  // Borçlu kişiler verilerini getir (UnpaidDebtsDetail sayfasından)
+  const { data: debtorsRes } = useQuery({
+    queryKey: ['debtors-report'],
+    queryFn: async () => {
+      const response = await client.get('/reports/debtors');
+      return response.data;
+    },
+    staleTime: 30 * 1000,
   });
 
   // Borç ödeme mutation'ı
@@ -256,7 +362,6 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['active-rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['completed-rentals'] });
       queryClient.invalidateQueries({ queryKey: ['idle-vehicles'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setCompleteDialog({ open: false, rental: null });
@@ -273,7 +378,6 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['active-rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['completed-rentals'] });
       queryClient.invalidateQueries({ queryKey: ['idle-vehicles'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setDeleteDialog({ open: false, rental: null });
@@ -288,12 +392,23 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ['idle-vehicles'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setVehicleDeleteDialog({ open: false, vehicle: null });
+      setNotificationDialog({
+        open: true,
+        type: 'success',
+        title: 'Başarılı',
+        message: 'Araç başarıyla silindi'
+      });
     },
     onError: (error: any) => {
       console.error('Vehicle delete error:', error);
       console.error('Error response:', error.response?.data);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Araç silme hatası';
-      alert(errorMessage);
+      setNotificationDialog({
+        open: true,
+        type: 'error',
+        title: 'Araç Silme Hatası',
+        message: errorMessage
+      });
     },
   });
 
@@ -307,12 +422,210 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ['reserved-vehicles'] });
       queryClient.invalidateQueries({ queryKey: ['service-vehicles'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      setNotificationDialog({
+        open: true,
+        type: 'success',
+        title: 'Başarılı',
+        message: 'Araç durumu başarıyla değiştirildi'
+      });
     },
     onError: (error: any) => {
       console.error('Vehicle status change error:', error);
-      alert('Araç durumu değiştirme hatası');
+      setNotificationDialog({
+        open: true,
+        type: 'error',
+        title: 'Durum Değiştirme Hatası',
+        message: error.response?.data?.message || error.message || 'Araç durumu değiştirme hatası'
+      });
     },
   });
+
+  // === RESERVATION HANDLERS ===
+  const createReservationMutation = useMutation({
+    mutationFn: async (data: {
+      customerName: string;
+      licensePlate: string;
+      reservationDate: string;
+      reservationTime: string;
+      rentalDuration: number;
+      note?: string;
+    }) => {
+      const customer = customers.find(c => (c.fullName || c.name) === data.customerName);
+      if (!customer) {
+        throw new Error('Müşteri bulunamadı');
+      }
+      
+      const reservationDateTime = dayjs(`${data.reservationDate} ${data.reservationTime}`, 'YYYY-MM-DD HH:mm').toISOString();
+      
+      const payload = {
+        customerId: customer.id,
+        vehicleId: '', // Vehicle ID boş bırakılıyor
+        customerName: data.customerName,
+        licensePlate: data.licensePlate,
+        reservationDate: reservationDateTime,
+        reservationTime: data.reservationTime,
+        rentalDuration: data.rentalDuration,
+        note: data.note || ''
+      };
+      
+      return reservationsApi.create(payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      setReservationDialog({ open: false, reservation: null });
+      setNotificationDialog({
+        open: true,
+        type: 'success',
+        title: 'Başarılı',
+        message: 'Rezervasyon başarıyla oluşturuldu'
+      });
+    },
+    onError: (error: any) => {
+      console.error('Reservation creation error:', error);
+      setNotificationDialog({
+        open: true,
+        type: 'error',
+        title: 'Hata',
+        message: error.response?.data?.message || error.message || 'Rezervasyon oluşturma hatası'
+      });
+    },
+  });
+
+  const updateReservationMutation = useMutation({
+    mutationFn: async (data: {
+      id: string;
+      customerName: string;
+      licensePlate: string;
+      reservationDate: string;
+      reservationTime: string;
+      rentalDuration: number;
+      note?: string;
+    }) => {
+      const customer = customers.find(c => (c.fullName || c.name) === data.customerName);
+      if (!customer) {
+        throw new Error('Müşteri bulunamadı');
+      }
+      
+      const reservationDateTime = dayjs(`${data.reservationDate} ${data.reservationTime}`, 'YYYY-MM-DD HH:mm').toISOString();
+      
+      const payload = {
+        customerId: customer.id,
+        vehicleId: '', // Vehicle ID boş bırakılıyor
+        customerName: data.customerName,
+        licensePlate: data.licensePlate,
+        reservationDate: reservationDateTime,
+        reservationTime: data.reservationTime,
+        rentalDuration: data.rentalDuration,
+        note: data.note || ''
+      };
+      
+      return reservationsApi.update(data.id, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      setReservationDialog({ open: false, reservation: null });
+      setNotificationDialog({
+        open: true,
+        type: 'success',
+        title: 'Başarılı',
+        message: 'Rezervasyon başarıyla güncellendi'
+      });
+    },
+    onError: (error: any) => {
+      console.error('Reservation update error:', error);
+      setNotificationDialog({
+        open: true,
+        type: 'error',
+        title: 'Hata',
+        message: error.response?.data?.message || error.message || 'Rezervasyon güncelleme hatası'
+      });
+    },
+  });
+
+  const deleteReservationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return reservationsApi.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      setNotificationDialog({
+        open: true,
+        type: 'success',
+        title: 'Başarılı',
+        message: 'Rezervasyon başarıyla silindi'
+      });
+    },
+    onError: (error: any) => {
+      console.error('Reservation deletion error:', error);
+      setNotificationDialog({
+        open: true,
+        type: 'error',
+        title: 'Hata',
+        message: error.response?.data?.message || error.message || 'Rezervasyon silme hatası'
+      });
+    },
+  });
+
+  const confirmReservationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return reservationsApi.confirm(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['reserved-vehicles'] });
+      setNotificationDialog({
+        open: true,
+        type: 'success',
+        title: 'Başarılı',
+        message: 'Rezervasyon onaylandı'
+      });
+    },
+    onError: (error: any) => {
+      console.error('Reservation confirmation error:', error);
+      setNotificationDialog({
+        open: true,
+        type: 'error',
+        title: 'Hata',
+        message: error.response?.data?.message || error.message || 'Rezervasyon onaylama hatası'
+      });
+    },
+  });
+
+  const cancelReservationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return reservationsApi.cancel(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['reserved-vehicles'] });
+      setNotificationDialog({
+        open: true,
+        type: 'success',
+        title: 'Başarılı',
+        message: 'Rezervasyon iptal edildi'
+      });
+    },
+    onError: (error: any) => {
+      console.error('Reservation cancellation error:', error);
+      setNotificationDialog({
+        open: true,
+        type: 'error',
+        title: 'Hata',
+        message: error.response?.data?.message || error.message || 'Rezervasyon iptal hatası'
+      });
+    },
+  });
+
+  // === RESERVATION BUTTON HANDLERS ===
+  const handleConfirmReservation = (id: string) => {
+    confirmReservationMutation.mutate(id);
+  };
+
+  const handleDeleteReservation = (id: string) => {
+    if (window.confirm('Bu rezervasyonu silmek istediğinizden emin misiniz?')) {
+      deleteReservationMutation.mutate(id);
+    }
+  };
 
   // === DATA PROCESSING ===
   const stats: DashboardStats = statsRes?.data ?? {
@@ -327,10 +640,68 @@ export default function Dashboard() {
     monthVehicleProfit: 0,
   };
 
-  const debtors: DebtorReport[] = debtorsRes?.data ?? [];
   const idleVehicles: Vehicle[] = idleVehiclesRes?.data ?? [];
   const reservedVehicles: Vehicle[] = reservedVehiclesRes?.data ?? [];
   const serviceVehicles: Vehicle[] = serviceVehiclesRes?.data ?? [];
+  const allVehicles: Vehicle[] = allVehiclesRes?.data ?? [];
+
+  // Tüm kiralamalar (detaylı tablo için)
+  const allRentals: Rental[] = allRentalsRes?.data?.data ?? [];
+  // Removed unused detailed rentals filtering
+
+  // Extract vehicles and customers for dropdowns
+  const vehicles: Vehicle[] = [
+    ...idleVehicles,
+    ...reservedVehicles,
+    ...serviceVehicles,
+    ...(activeRentalsRes?.data?.data || []).map((rental: any) => rental.vehicle).filter(Boolean)
+  ].filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i); // Remove duplicates
+  
+  const customers: any[] = Array.isArray(customersRes?.data?.data) ? customersRes.data.data : 
+                           Array.isArray(customersRes?.data) ? customersRes.data : 
+                           Array.isArray(customersRes) ? customersRes : [];
+
+  // Aylık kazanç hesaplaması (reports sayfasındaki mantıkla)
+  const currentMonthRevenue = useMemo(() => {
+    if (!allRentalsRes?.data?.data) return 0;
+    
+    const rentals = allRentalsRes.data.data;
+    const targetMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+    
+    let monthlyRevenue = 0;
+    
+    rentals.forEach((rental: any) => {
+      if (!rental.startDate || !rental.endDate) return;
+      
+      const startDate = new Date(rental.startDate);
+      const endDate = new Date(rental.endDate);
+      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      
+      // Günlük gelir hesaplaması (kira ücreti + km farkı)
+      const dailyPrice = rental.dailyPrice || 0; // TL cinsinden
+      const kmPrice = rental.kmDiff || 0; // TL cinsinden
+      const totalRevenue = (dailyPrice * totalDays) + kmPrice;
+      const dailyRevenue = totalRevenue / totalDays;
+      
+      // Bu aya düşen günleri hesapla
+      let currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        const dateMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+        if (dateMonth === targetMonth) {
+          monthlyRevenue += dailyRevenue;
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    });
+    
+    return monthlyRevenue;
+  }, [allRentalsRes?.data?.data, selectedMonth, selectedYear]);
+
+  // Toplam alacak hesaplaması (borçlu kişiler listesinden toplam)
+  const totalDebt = useMemo(() => {
+    if (!debtorsRes || !Array.isArray(debtorsRes)) return 0;
+    return debtorsRes.reduce((sum: number, debtor: any) => sum + (debtor.totalDebt || 0), 0);
+  }, [debtorsRes]);
 
   // Helper function to get month name
   const getMonthName = (month: number): string => {
@@ -357,7 +728,17 @@ export default function Dashboard() {
   };
 
   const handleVehicleStatusChange = (vehicleId: string, newStatus: 'IDLE' | 'RENTED' | 'RESERVED' | 'SERVICE') => {
-    changeVehicleStatusMutation.mutate({ vehicleId, status: newStatus });
+    const vehicle = idleVehicles.find(v => v.id === vehicleId);
+    const statusText = newStatus === 'IDLE' ? 'Boş' : newStatus === 'RENTED' ? 'Kirada' : newStatus === 'RESERVED' ? 'Rezerve' : 'Serviste';
+    
+    setDeleteConfirmDialog({
+      open: true,
+      type: 'status',
+      id: vehicleId,
+      title: 'Araç Durumu Değiştirme',
+      message: `${vehicle?.plate} plakası araç durumunu "${statusText}" olarak değiştirmek istediğinizden emin misiniz?`,
+      statusData: { vehicleId, status: newStatus }
+    });
   };
 
   const exportToExcel = () => {
@@ -386,10 +767,10 @@ export default function Dashboard() {
         'Başlangıç': dayjs(rental.startDate).format('DD.MM.YYYY'),
         'Bitiş': dayjs(rental.endDate).format('DD.MM.YYYY'),
         'Gün': rental.days,
-        'Günlük Fiyat': rental.dailyPrice / 100,
-        'Toplam Tutar': rental.totalDue / 100,
-        'Ödenen': (paidFromRental + paidFromPayments) / 100,
-        'Kalan': actualBalance / 100,
+        'Günlük Fiyat': rental.dailyPrice,
+        'Toplam Tutar': rental.totalDue,
+        'Ödenen': (paidFromRental + paidFromPayments),
+        'Kalan': actualBalance,
         'Durum': rental.status === 'ACTIVE' ? 'Aktif' : rental.status,
         'Not': rental.note || '',
       };
@@ -450,152 +831,6 @@ export default function Dashboard() {
     doc.save(`aktif-kiralamalar-${dayjs().format('DD-MM-YYYY')}.pdf`);
   };
 
-  // Geçmiş Kiralamalar Export Fonksiyonları
-  const exportCompletedToExcel = () => {
-    const completedRentals: Rental[] = (completedRentalsRes?.data.data || [])
-      .filter((rental: Rental) => rental.status === 'COMPLETED')
-      .filter((rental: Rental) => {
-        if (!completedRentalsFilter) return true;
-        const filter = completedRentalsFilter.toLowerCase();
-        return (
-          rental.vehicle?.plate?.toLowerCase().includes(filter) ||
-          rental.customer?.fullName?.toLowerCase().includes(filter)
-        );
-      });
-    
-    const data = completedRentals.map(rental => {
-      const paidFromRental = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
-      const paidFromPayments = (rental.payments || []).reduce((sum, payment) => sum + payment.amount, 0);
-      const actualBalance = rental.totalDue - (paidFromRental + paidFromPayments);
-      
-      return {
-        'Plaka': rental.vehicle?.plate || '',
-        'Müşteri': rental.customer?.fullName || '',
-        'Başlangıç': dayjs(rental.startDate).format('DD.MM.YYYY'),
-        'Bitiş': dayjs(rental.endDate).format('DD.MM.YYYY'),
-        'Gün': rental.days,
-        'Günlük Fiyat': rental.dailyPrice / 100,
-        'Toplam Tutar': rental.totalDue / 100,
-        'Ödenen': (paidFromRental + paidFromPayments) / 100,
-        'Kalan': actualBalance / 100,
-        'Durum': 'Tamamlandı',
-        'Not': rental.note || '',
-      };
-    });
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Geçmiş Kiralamalar');
-    XLSX.writeFile(wb, `gecmis-kiralamalar-${dayjs().format('DD-MM-YYYY')}.xlsx`);
-  };
-
-  const exportCompletedToPDF = () => {
-    const completedRentals: Rental[] = (completedRentalsRes?.data.data || [])
-      .filter((rental: Rental) => rental.status === 'COMPLETED')
-      .filter((rental: Rental) => {
-        if (!completedRentalsFilter) return true;
-        const filter = completedRentalsFilter.toLowerCase();
-        return (
-          rental.vehicle?.plate?.toLowerCase().includes(filter) ||
-          rental.customer?.fullName?.toLowerCase().includes(filter)
-        );
-      });
-    
-    const doc = new jsPDF();
-    
-    doc.setFontSize(16);
-    doc.text('Geçmiş Kiralamalar', 14, 15);
-    doc.setFontSize(10);
-    doc.text(`Tarih: ${dayjs().format('DD.MM.YYYY')}`, 14, 25);
-
-    const tableData = completedRentals.map(rental => {
-      const paidFromRental = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
-      const paidFromPayments = (rental.payments || []).reduce((sum, payment) => sum + payment.amount, 0);
-      const actualBalance = rental.totalDue - (paidFromRental + paidFromPayments);
-      
-      return [
-        rental.vehicle?.plate || '',
-        rental.customer?.fullName || '',
-        `${dayjs(rental.startDate).format('DD.MM.YYYY')} - ${dayjs(rental.endDate).format('DD.MM.YYYY')}`,
-        rental.days.toString(),
-        formatCurrency(rental.totalDue),
-        formatCurrency(actualBalance),
-      ];
-    });
-
-    autoTable(doc, {
-      head: [['Plaka', 'Müşteri', 'Tarih Aralığı', 'Gün', 'Tutar', 'Kalan Borç']],
-      body: tableData,
-      startY: 35,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [13, 50, 130] },
-    });
-
-    doc.save(`gecmis-kiralamalar-${dayjs().format('DD-MM-YYYY')}.pdf`);
-  };
-
-  // Borçlu Müşteriler Export Fonksiyonları
-  const exportDebtorsToExcel = () => {
-    const filteredDebtors = debtors.filter((debtor) => {
-      if (!debtorsFilter) return true;
-      const filter = debtorsFilter.toLowerCase();
-      return (
-        debtor.customerName?.toLowerCase().includes(filter) ||
-        debtor.plate?.toLowerCase().includes(filter)
-      );
-    });
-    
-    const data = filteredDebtors.map(debtor => ({
-      'Müşteri Adı': debtor.customerName || '',
-      'Telefon': '-',
-      'Araç Plaka': debtor.plate || '',
-      'Kiralama Tarihi': format(new Date(debtor.startDate), 'dd.MM.yyyy'),
-      'Borç Miktarı': debtor.balance / 100,
-      'Durum': 'Borçlu',
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Borçlu Müşteriler');
-    XLSX.writeFile(wb, `borclu-musteriler-${dayjs().format('DD-MM-YYYY')}.xlsx`);
-  };
-
-  const exportDebtorsToPDF = () => {
-    const filteredDebtors = debtors.filter((debtor) => {
-      if (!debtorsFilter) return true;
-      const filter = debtorsFilter.toLowerCase();
-      return (
-        debtor.customerName?.toLowerCase().includes(filter) ||
-        debtor.plate?.toLowerCase().includes(filter)
-      );
-    });
-    
-    const doc = new jsPDF();
-    
-    doc.setFontSize(16);
-    doc.text('Borçlu Müşteriler', 14, 15);
-    doc.setFontSize(10);
-    doc.text(`Tarih: ${dayjs().format('DD.MM.YYYY')}`, 14, 25);
-
-    const tableData = filteredDebtors.map(debtor => [
-      debtor.customerName || '',
-      '-',
-      debtor.plate || '',
-      format(new Date(debtor.startDate), 'dd.MM.yyyy'),
-      formatCurrency(debtor.balance),
-    ]);
-
-    autoTable(doc, {
-      head: [['Ad Soyad', 'Telefon', 'Araç', 'Kiralama Tarihi', 'Borç Miktarı']],
-      body: tableData,
-      startY: 35,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [13, 50, 130] },
-    });
-
-    doc.save(`borclu-musteriler-${dayjs().format('DD-MM-YYYY')}.pdf`);
-  };
-
   const handleQuickRental = (vehicle: Vehicle) => {
     setQuickRentalDialog({ open: true, vehicle });
   };
@@ -607,214 +842,391 @@ export default function Dashboard() {
     queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
     queryClient.invalidateQueries({ queryKey: ['active-rentals'] });
     queryClient.invalidateQueries({ queryKey: ['idle-vehicles'] });
-    queryClient.invalidateQueries({ queryKey: ['debtors'] });
     queryClient.invalidateQueries({ queryKey: ['monthly-report'] });
-    queryClient.invalidateQueries({ queryKey: ['completed-rentals'] });
   };
 
   return (
     <Layout title="Araç Kiralama - Ana Sayfa">
-      {/* HEADER */}
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-            Genel Bakış
-            {(statsLoading || activeLoading || idleLoading) && (
-              <Chip 
-                label="Güncelleniyor..." 
-                size="small" 
-                color="info" 
-                sx={{ ml: 2, fontSize: '0.7rem' }}
-              />
-            )}
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Günlük istatistikler ve aktif kiralamalar • Akıllı önbellek sistemi
-          </Typography>
+      {/* HEADER WITH COMPACT STATS - Mobile Responsive */}
+      <Box sx={{ 
+        mb: { xs: 2, sm: 3, md: 4 }, 
+        display: 'flex', 
+        flexDirection: { xs: 'column', sm: 'row' },
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'stretch', sm: 'center' },
+        gap: { xs: 2, sm: 0 }
+      }}>
+        {/* COMPACT STATS */}
+        <Box sx={{ 
+          display: 'grid',
+          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(6, 1fr)' },
+          gap: { xs: 1, sm: 2 },
+          alignItems: 'center',
+          width: { xs: '100%', sm: 'auto' }
+        }}>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 0.5,
+            p: { xs: 1, sm: 0 },
+            border: { xs: '1px solid', sm: 'none' },
+            borderColor: 'divider',
+            borderRadius: { xs: 1, sm: 0 },
+            backgroundColor: { xs: 'background.paper', sm: 'transparent' }
+          }}>
+            <CarRentalIcon sx={{ fontSize: { xs: 14, sm: 16 }, color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>
+              Kirada:
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
+              {stats.totalVehicles - stats.idle - stats.reserved - stats.service}
+            </Typography>
+          </Box>
+          
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 0.5,
+            p: { xs: 1, sm: 0 },
+            border: { xs: '1px solid', sm: 'none' },
+            borderColor: 'divider',
+            borderRadius: { xs: 1, sm: 0 },
+            backgroundColor: { xs: 'background.paper', sm: 'transparent' }
+          }}>
+            <DriveEtaIcon sx={{ fontSize: { xs: 14, sm: 16 }, color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>
+              Boş:
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
+              {stats.idle}
+            </Typography>
+          </Box>
+          
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 0.5,
+            p: { xs: 1, sm: 0 },
+            border: { xs: '1px solid', sm: 'none' },
+            borderColor: 'divider',
+            borderRadius: { xs: 1, sm: 0 },
+            backgroundColor: { xs: 'background.paper', sm: 'transparent' }
+          }}>
+            <WalletIcon sx={{ fontSize: { xs: 14, sm: 16 }, color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>
+              Aylık:
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
+              {formatCurrency(currentMonthRevenue || 0)}
+            </Typography>
+          </Box>
+          
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 0.5,
+            p: { xs: 1, sm: 0 },
+            border: { xs: '1px solid', sm: 'none' },
+            borderColor: 'divider',
+            borderRadius: { xs: 1, sm: 0 },
+            backgroundColor: { xs: 'background.paper', sm: 'transparent' }
+          }}>
+            <TrendingUpIcon sx={{ fontSize: { xs: 14, sm: 16 }, color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>
+              Araç Ort.:
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
+              {formatCurrency(stats.totalVehicles > 0 ? (currentMonthRevenue || 0) / stats.totalVehicles : 0)}
+            </Typography>
+          </Box>
+          
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 0.5,
+            p: { xs: 1, sm: 0 },
+            border: { xs: '1px solid', sm: 'none' },
+            borderColor: 'divider',
+            borderRadius: { xs: 1, sm: 0 },
+            backgroundColor: { xs: 'background.paper', sm: 'transparent' }
+          }}>
+            <PeopleIcon sx={{ fontSize: { xs: 14, sm: 16 }, color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>
+              Borçlu:
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
+              {(allRentalsRes?.data?.data || []).filter((rental: any) => {
+                const totalDue = (rental.days || 0) * (rental.dailyPrice || 0) + 
+                  (rental.kmDiff || 0) + (rental.hgs || 0) + (rental.damage || 0) + 
+                  (rental.fuel || 0) + (rental.cleaning || 0);
+                const totalPaid = (rental.payments || []).reduce((sum: number, payment: any) => sum + payment.amount, 0) +
+                  (rental.upfront || 0) + (rental.pay1 || 0) + (rental.pay2 || 0) + (rental.pay3 || 0) + (rental.pay4 || 0);
+                return totalDue > totalPaid;
+              }).length}
+            </Typography>
+          </Box>
+          
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 0.5,
+            p: { xs: 1, sm: 0 },
+            border: { xs: '1px solid', sm: 'none' },
+            borderColor: 'divider',
+            borderRadius: { xs: 1, sm: 0 },
+            backgroundColor: { xs: 'background.paper', sm: 'transparent' }
+          }}>
+            <TrendingDownIcon sx={{ fontSize: { xs: 14, sm: 16 }, color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>
+              Alacaklar:
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
+              {formatCurrency(totalDebt || 0)}
+            </Typography>
+          </Box>
+          
+          {(statsLoading || activeLoading || idleLoading) && (
+            <Chip 
+              label="Güncelleniyor..." 
+              size="small" 
+              color="info" 
+              sx={{ 
+                ml: { xs: 0, sm: 1 }, 
+                mt: { xs: 1, sm: 0 },
+                fontSize: { xs: '0.5rem', sm: '0.6rem' }, 
+                height: { xs: 18, sm: 20 },
+                gridColumn: { xs: 'span 2', sm: 'auto' }
+              }}
+            />
+          )}
         </Box>
 
-        <Stack direction="row" spacing={1.5}>
+        {/* Action Buttons - Mobile Responsive */}
+        <Box sx={{ 
+          display: 'flex',
+          flexDirection: { xs: 'row', sm: 'row' },
+          gap: { xs: 1, sm: 1.5 },
+          alignItems: 'center',
+          width: { xs: '100%', sm: 'auto' },
+          justifyContent: { xs: 'space-between', sm: 'flex-end' }
+        }}>
           <IconButton
             onClick={handleRefresh}
             disabled={statsLoading || activeLoading || idleLoading}
             sx={{ 
               bgcolor: 'grey.100', 
               '&:hover': { bgcolor: 'grey.200' },
-              borderRadius: 2 
+              borderRadius: 2,
+              width: { xs: 36, sm: 40 },
+              height: { xs: 36, sm: 40 }
             }}
             title="Verileri Yenile"
           >
-            <RefreshIcon />
+            <RefreshIcon sx={{ fontSize: { xs: 16, sm: 20 } }} />
           </IconButton>
           
           <Button
             variant="contained"
             startIcon={<Add />}
             onClick={() => setNewRentalOpen(true)}
-            sx={{ borderRadius: 2 }}
+            sx={{ 
+              borderRadius: 2,
+              fontSize: { xs: '0.75rem', sm: '0.875rem' },
+              px: { xs: 1.5, sm: 2 },
+              py: { xs: 0.75, sm: 1 }
+            }}
           >
-            Yeni Kiralama
+            {isMobile ? 'Kiralama' : 'Yeni Kiralama'}
           </Button>
           <Button
             variant="outlined"
             startIcon={<DirectionsCar />}
             onClick={() => navigate('/vehicles')}
-            sx={{ borderRadius: 2 }}
+            sx={{ 
+              borderRadius: 2,
+              fontSize: { xs: '0.75rem', sm: '0.875rem' },
+              px: { xs: 1.5, sm: 2 },
+              py: { xs: 0.75, sm: 1 }
+            }}
           >
-            Araçlar
+            {isMobile ? 'Araç' : 'Araçlar'}
           </Button>
           <Button
             variant="outlined"
             startIcon={<Timeline />}
             onClick={() => navigate('/reports')}
-            sx={{ borderRadius: 2 }}
+            sx={{ 
+              borderRadius: 2,
+              fontSize: { xs: '0.75rem', sm: '0.875rem' },
+              px: { xs: 1.5, sm: 2 },
+              py: { xs: 0.75, sm: 1 }
+            }}
           >
-            Raporlar
+            {isMobile ? 'Rapor' : 'Raporlar'}
           </Button>
-        </Stack>
+        </Box>
       </Box>
 
-      {/* MONTH/YEAR SELECTOR */}
-      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          İstatistikler:
+      {/* ANA GİRİŞ EKRANI TABLOSU - Mobile Responsive */}
+      <Paper sx={{ p: { xs: 1, sm: 2 }, mb: 3 }}>
+        <Typography 
+          variant="h6" 
+          sx={{ 
+            fontWeight: 600, 
+            mb: 2, 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1,
+            fontSize: { xs: '1rem', sm: '1.25rem' }
+          }}
+        >
+          <Assignment sx={{ color: 'primary.main', fontSize: { xs: 16, sm: 20 } }} />
+          {isMobile ? 'Giriş Ekranı' : 'Ana Giriş Ekranı'}
         </Typography>
         
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <InputLabel>Ay</InputLabel>
-          <Select
-            value={selectedMonth}
-            label="Ay"
-            onChange={(e) => setSelectedMonth(e.target.value as number)}
-          >
-            <MenuItem value={1}>Ocak</MenuItem>
-            <MenuItem value={2}>Şubat</MenuItem>
-            <MenuItem value={3}>Mart</MenuItem>
-            <MenuItem value={4}>Nisan</MenuItem>
-            <MenuItem value={5}>Mayıs</MenuItem>
-            <MenuItem value={6}>Haziran</MenuItem>
-            <MenuItem value={7}>Temmuz</MenuItem>
-            <MenuItem value={8}>Ağustos</MenuItem>
-            <MenuItem value={9}>Eylül</MenuItem>
-            <MenuItem value={10}>Ekim</MenuItem>
-            <MenuItem value={11}>Kasım</MenuItem>
-            <MenuItem value={12}>Aralık</MenuItem>
-          </Select>
-        </FormControl>
-        
-        <FormControl size="small" sx={{ minWidth: 100 }}>
-          <InputLabel>Yıl</InputLabel>
-          <Select
-            value={selectedYear}
-            label="Yıl"
-            onChange={(e) => setSelectedYear(e.target.value as number)}
-          >
-            <MenuItem value={2024}>2024</MenuItem>
-            <MenuItem value={2025}>2025</MenuItem>
-            <MenuItem value={2026}>2026</MenuItem>
-          </Select>
-        </FormControl>
-        
-        {(selectedMonth !== dayjs().month() + 1 || selectedYear !== dayjs().year()) && (
-          <Button 
-            size="small" 
-            onClick={() => {
-              setSelectedMonth(dayjs().month() + 1);
-              setSelectedYear(dayjs().year());
-            }}
-            sx={{ textTransform: 'none' }}
-          >
-            Bu Aya Dön
-          </Button>
-        )}
-      </Box>
+        <Box sx={{ overflowX: 'auto' }}>
+          <Table size="small" sx={{ 
+            minWidth: { xs: 800, sm: 'auto' },
+            '& .MuiTableCell-root': { 
+              padding: { xs: '2px 4px', sm: '4px 8px' },
+              fontSize: { xs: '0.65rem', sm: '0.75rem' },
+              borderRight: '1px solid #e0e0e0',
+              whiteSpace: 'nowrap'
+            } 
+          }}>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Tarih</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Saat</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Plaka</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Müşteri</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Gün</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Kira Ücreti</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Km Farkı</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Kira+Km</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Temizlik</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>HGS</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Kaza/Sürtme</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Yakıt</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Toplam Ödenecek</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center' }} rowSpan={2}>Kalan Bakiye</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center' }} rowSpan={2}>Açıklama</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center' }} rowSpan={2}>İşlemler</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(activeRentalsRes?.data?.data || [])
+                .filter((rental: any) => 
+                  !activeRentalsFilter || 
+                  rental.vehicle?.plate?.toLowerCase().includes(activeRentalsFilter.toLowerCase()) ||
+                  rental.customer?.fullName?.toLowerCase().includes(activeRentalsFilter.toLowerCase())
+                )
+                .slice(0, 10) // İlk 10 aktif kiralama
+                .map((rental: any) => {
+                  // Hesaplamalar - aynı mantık
+                  const totalPaid = Array.isArray(rental.payments) 
+                    ? rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0) 
+                    : 0;
+                  
+                  const totalDueTL = 
+                    (rental.days || 0) * (rental.dailyPrice || 0) + 
+                    (rental.kmDiff || 0) + 
+                    (rental.hgs || 0) + 
+                    (rental.damage || 0) + 
+                    (rental.fuel || 0) + 
+                    (rental.cleaning || 0);
 
-      {/* KPI CARDS */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {/* 1. Kiradaki Araç Sayısı */}
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard 
-            title="Kiradaki Araç" 
-            value={stats?.rentedToday ?? 0} 
-            color="success" 
-            icon="🚗"
-          />
-        </Grid>
-        
-        {/* 2. Boştaki Araç Sayısı */}
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard 
-            title="Boştaki Araç" 
-            value={stats?.idle ?? 0} 
-            color="primary" 
-            icon="🅿️"
-          />
-        </Grid>
-        
-        {/* 3. Rezerveli Araç Sayısı */}
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard 
-            title="Rezerveli Araç" 
-            value={stats?.reserved ?? 0} 
-            color="warning" 
-            icon="📅"
-          />
-        </Grid>
-        
-        {/* 4. Servisteki Araç Sayısı */}
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard 
-            title="Servisteki Araç" 
-            value={stats?.service ?? 0} 
-            color="error" 
-            icon="🔧"
-          />
-        </Grid>
-        
-        {/* 5. Güncel Kazanç */}
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard 
-            title={`${monthDisplayText} Kazanç`}
-            value={stats?.monthCollected ?? 0} 
-            isCurrency 
-            color="success"
-            icon="💰"
-          />
-        </Grid>
-        
-        {/* 7. Kazanç Ortalaması (Güncel kazanç / Araç sayısı) */}
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard 
-            title="Araç Başı Ortalama" 
-            value={stats?.totalVehicles > 0 ? Math.round((stats?.monthCollected ?? 0) / stats?.totalVehicles) : 0} 
-            isCurrency 
-            color="info"
-            icon="📊"
-          />
-        </Grid>
-        
-        {/* 8. Toplam Borç Miktarı */}
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard 
-            title={`${monthDisplayText} Borç`}
-            value={stats?.monthOutstanding ?? 0} 
-            isCurrency 
-            color="error"
-            icon="⚠️"
-          />
-        </Grid>
-        
-        {/* 9. Toplam Araç Sayısı */}
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard 
-            title="Toplam Araç" 
-            value={stats?.totalVehicles ?? 0} 
-            color="primary"
-            icon="🏢"
-          />
-        </Grid>
-      </Grid>
+                  const paidFromRental = 
+                    (rental.upfront || 0) + 
+                    (rental.pay1 || 0) + 
+                    (rental.pay2 || 0) + 
+                    (rental.pay3 || 0) + 
+                    (rental.pay4 || 0);
 
+                  const totalPaidTL = totalPaid + paidFromRental;
+                  const balanceTL = totalDueTL - totalPaidTL;
+
+                  const kiraKmToplam = (rental.days || 0) * (rental.dailyPrice || 0) + (rental.kmDiff || 0);
+                  const plannedPaymentsTotal = (rental.pay1 || 0) + (rental.pay2 || 0) + (rental.pay3 || 0) + (rental.pay4 || 0);
+
+                  return (
+                    <React.Fragment key={rental.id}>
+                      {/* GİRİŞ SATIRI */}
+                      <TableRow>
+                        <TableCell>{dayjs(rental.startDate).format('DD.MM.YY')}</TableCell>
+                        <TableCell>{dayjs(rental.startDate).format('HH:mm')}</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>{rental.vehicle?.plate}</TableCell>
+                        <TableCell>{rental.customer?.fullName}</TableCell>
+                        <TableCell sx={{ textAlign: 'center' }}>{rental.days}</TableCell>
+                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.dailyPrice || 0)}</TableCell>
+                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.kmDiff || 0)}</TableCell>
+                        <TableCell sx={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(kiraKmToplam)}</TableCell>
+                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.cleaning || 0)}</TableCell>
+                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.hgs || 0)}</TableCell>
+                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.damage || 0)}</TableCell>
+                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.fuel || 0)}</TableCell>
+                        <TableCell sx={{ textAlign: 'right', fontWeight: 600 }}>
+                          {formatCurrency(totalDueTL)}
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center', fontWeight: 600, color: balanceTL > 0 ? 'text.primary' : 'text.primary' }} rowSpan={2}>
+                          {formatCurrency(balanceTL)}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem' }} rowSpan={2}>
+                          {rental.note || '-'}
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center' }} rowSpan={2}>
+                          <Stack direction="column" spacing={0.5}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<Edit />}
+                              onClick={() => setEditRentalDialog({ open: true, rental })}
+                              sx={{ fontSize: '0.65rem', py: 0.5 }}
+                            >
+                              Düzenle
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              startIcon={<Delete />}
+                              onClick={() => setDeleteDialog({ open: true, rental })}
+                              sx={{ fontSize: '0.65rem', py: 0.5 }}
+                            >
+                              Sil
+                            </Button>
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                      
+                      {/* DÖNÜŞ SATIRI */}
+                      <TableRow>
+                        <TableCell>{dayjs(rental.endDate).format('DD.MM.YY')}</TableCell>
+                        <TableCell>{dayjs(rental.endDate).format('HH:mm')}</TableCell>
+                        <TableCell sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>Peşin</TableCell>
+                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.advance || 0)}</TableCell>
+                        <TableCell sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>1. Ödeme</TableCell>
+                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.pay1 || 0)}</TableCell>
+                        <TableCell sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>2. Ödeme</TableCell>
+                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.pay2 || 0)}</TableCell>
+                        <TableCell sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>3. Ödeme</TableCell>
+                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.pay3 || 0)}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', fontWeight: 600, color: 'success.main' }} colSpan={2}>
+                          Toplam Ödenen
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'right', fontWeight: 600, color: 'success.main' }}>
+                          {formatCurrency(totalPaidTL)}
+                        </TableCell>
+                      </TableRow>
+                    </React.Fragment>
+                  );
+                })}
+            </TableBody>
+          </Table>
+        </Box>
+      </Paper>
+
+      
       {/* ANA İÇERİK - AKTİF KİRALAMALAR TABLOSU */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -896,19 +1308,67 @@ export default function Dashboard() {
                   );
                 })
                 .map((rental: Rental) => {
-                // Calculate total paid including payments table
-                const paidFromRental = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
-                const paidFromPayments = (rental.payments || []).reduce((sum, payment) => sum + payment.amount, 0);
-                const paidAmount = paidFromRental + paidFromPayments;
+                // EditRentalDialog ile aynı hesaplama mantığı
+                // Toplam Ödenecek = (Gün × Günlük) + Ek Ücretler
+                const totalDueTL = 
+                  (rental.days * rental.dailyPrice) + 
+                  (rental.kmDiff || 0) + 
+                  (rental.cleaning || 0) + 
+                  (rental.hgs || 0) + 
+                  (rental.damage || 0) + 
+                  (rental.fuel || 0);
                 
-                // Calculate actual balance
-                const actualBalance = rental.totalDue - paidAmount;
+                // Ek Ödemeler (payments) - TL cinsinden gelir
+                const totalPaid = Array.isArray(rental.payments) ? rental.payments.reduce((sum, payment) => sum + payment.amount, 0) : 0;
+                
+                // Planlı Ödemeler (upfront + pay1-4) - sadece gösterim için
+                const paidFromRental = 
+                  (rental.upfront || 0) + 
+                  (rental.pay1 || 0) + 
+                  (rental.pay2 || 0) + 
+                  (rental.pay3 || 0) + 
+                  (rental.pay4 || 0);
+                
+                // Toplam Ödenen = Planlı Ödemeler + Ek Ödemeler
+                const totalPaidTL = totalPaid + paidFromRental;
+                
+                // Kalan Bakiye = Toplam Ödenecek - Toplam Ödenen
+                const balanceTL = totalDueTL - totalPaidTL;
+                
+                console.log(`🔍 Payment Debug for ${rental.vehicle?.plate}:`, {
+                  calculation: {
+                    dailyPrice: rental.dailyPrice,
+                    days: rental.days,
+                    dailyTotal: rental.days * rental.dailyPrice,
+                    kmDiff: rental.kmDiff,
+                    cleaning: rental.cleaning,
+                    hgs: rental.hgs,
+                    damage: rental.damage,
+                    fuel: rental.fuel,
+                    totalDueTL
+                  },
+                  payments: {
+                    upfront: rental.upfront,
+                    pay1: rental.pay1,
+                    pay2: rental.pay2,
+                    pay3: rental.pay3,
+                    pay4: rental.pay4,
+                    plannedPayments: paidFromRental,
+                    additionalPayments: totalPaid,
+                    totalPaid: totalPaidTL
+                  },
+                  result: {
+                    totalDueTL,
+                    totalPaidTL,
+                    balanceTL
+                  }
+                });
                 
                 
                 return (
                   <TableRow key={rental.id} hover>
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         {rental.vehicle?.plate}
                       </Typography>
                     </TableCell>
@@ -938,49 +1398,48 @@ export default function Dashboard() {
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <Typography variant="body2" color="warning.main">
+                      <Typography variant="body2">
                         {formatCurrency(rental.kmDiff || 0)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <Typography variant="body2" color="info.main">
+                      <Typography variant="body2">
                         {formatCurrency(rental.cleaning || 0)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <Typography variant="body2" color="secondary.main">
+                      <Typography variant="body2">
                         {formatCurrency(rental.hgs || 0)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <Typography variant="body2" color="error.main">
+                      <Typography variant="body2">
                         {formatCurrency(rental.damage || 0)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <Typography variant="body2" color="success.main">
+                      <Typography variant="body2">
                         {formatCurrency(rental.fuel || 0)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {formatCurrency(rental.totalDue)}
+                        {formatCurrency(totalDueTL)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <Typography variant="body2" color="success.main">
-                        {formatCurrency(paidAmount)}
+                      <Typography variant="body2">
+                        {formatCurrency(totalPaidTL)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
                       <Typography 
                         variant="body2" 
                         sx={{ 
-                          fontWeight: 600,
-                          color: actualBalance > 0 ? 'error.main' : 'success.main'
+                          fontWeight: 600
                         }}
                       >
-                        {formatCurrency(actualBalance)}
+                        {formatCurrency(balanceTL)}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -991,11 +1450,7 @@ export default function Dashboard() {
                           rental.status === 'CANCELLED' ? 'İptal Edildi' :
                           rental.status
                         }
-                        color={
-                          rental.status === 'ACTIVE' ? 'success' :
-                          rental.status === 'COMPLETED' ? 'info' :
-                          rental.status === 'CANCELLED' ? 'error' : 'default'
-                        }
+                        color="default"
                         size="small"
                       />
                     </TableCell>
@@ -1042,38 +1497,125 @@ export default function Dashboard() {
         )}
       </Paper>
 
+      {/* Rezervasyonlar Tablosu */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6" component="h2" sx={{ 
+            fontWeight: 600, 
+            color: 'primary.main',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1
+          }}>
+            📅 Rezervasyonlar
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => setReservationDialog({ open: true, reservation: null })}
+            sx={{ minWidth: 150 }}
+          >
+            Yeni Rezervasyon
+          </Button>
+        </Box>
+
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell><strong>Müşteri</strong></TableCell>
+                <TableCell><strong>Plaka</strong></TableCell>
+                <TableCell><strong>Tarih</strong></TableCell>
+                <TableCell><strong>Saat</strong></TableCell>
+                <TableCell><strong>Süre</strong></TableCell>
+                <TableCell><strong>Durum</strong></TableCell>
+                <TableCell><strong>Not</strong></TableCell>
+                <TableCell><strong>İşlemler</strong></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {reservationsLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center">
+                    <CircularProgress size={24} />
+                  </TableCell>
+                </TableRow>
+              ) : (reservationsRes?.data ?? []).map((reservation) => (
+                <TableRow key={reservation.id} hover>
+                  <TableCell>{reservation.customerName}</TableCell>
+                  <TableCell>{reservation.licensePlate}</TableCell>
+                  <TableCell>{dayjs(reservation.reservationDate).format('DD.MM.YYYY')}</TableCell>
+                  <TableCell>{dayjs(reservation.reservationDate).format('HH:mm')}</TableCell>
+                  <TableCell>{reservation.rentalDuration} gün</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={
+                        reservation.status === 'PENDING' ? 'Bekliyor' :
+                        reservation.status === 'CONFIRMED' ? 'Onaylandı' :
+                        reservation.status === 'CANCELLED' ? 'İptal' : 'Tamamlandı'
+                      }
+                      color={
+                        reservation.status === 'PENDING' ? 'warning' :
+                        reservation.status === 'CONFIRMED' ? 'success' :
+                        reservation.status === 'CANCELLED' ? 'error' : 'info'
+                      }
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>{reservation.note || '-'}</TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={0.5}>
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => setReservationDialog({ 
+                          open: true, 
+                          reservation
+                        })}
+                        title="Düzenle"
+                      >
+                        <Edit />
+                      </IconButton>
+                      {reservation.status === 'PENDING' && (
+                        <IconButton
+                          size="small"
+                          color="success"
+                          onClick={() => handleConfirmReservation(reservation.id)}
+                          title="Onayla"
+                        >
+                          <CheckCircle />
+                        </IconButton>
+                      )}
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => handleDeleteReservation(reservation.id)}
+                        title="Sil"
+                      >
+                        <Delete />
+                      </IconButton>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        {(reservationsRes?.data ?? []).length === 0 && (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            Henüz rezervasyon bulunmuyor.
+          </Alert>
+        )}
+      </Paper>
+
       {/* BOŞTA OLAN ARAÇLAR */}
       <Paper sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h5" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <DirectionsCar sx={{ color: 'success.main' }} />
+          <Typography variant="h5" sx={{ fontWeight: 600 }}>
             Boşta Olan Araçlar ({idleVehicles.length})
           </Typography>
         </Box>
-
-        {/* En Çok/Az Kazanan Araçlar Bilgisi */}
-        {overallPerformance && (
-          <Box sx={{ mb: 3, display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-            {overallPerformance.topEarningVehicle && (
-              <Chip
-                icon={<TrendingUpIcon />}
-                label={`En Çok Kazanan: ${overallPerformance.topEarningVehicle.plate} - ${formatCurrency(overallPerformance.topEarningVehicle.earnings)}`}
-                color="success"
-                variant="outlined"
-                sx={{ fontWeight: 'bold' }}
-              />
-            )}
-            {overallPerformance.lowestEarningVehicle && (
-              <Chip
-                icon={<TrendingUpIcon sx={{ transform: 'rotate(180deg)' }} />}
-                label={`En Az Kazanan: ${overallPerformance.lowestEarningVehicle.plate} - ${formatCurrency(overallPerformance.lowestEarningVehicle.earnings)}`}
-                color="warning"
-                variant="outlined"
-                sx={{ fontWeight: 'bold' }}
-              />
-            )}
-          </Box>
-        )}
 
         {/* Araçlar Filtreleme */}
         <TextField
@@ -1119,30 +1661,9 @@ export default function Dashboard() {
                 .map((vehicle) => (
                 <TableRow key={vehicle.id} hover>
                   <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
-                        {vehicle.plate}
-                      </Typography>
-                      {/* En Çok/Az Kazanan Bilgisi */}
-                      {overallPerformance?.topEarningVehicle?.plate === vehicle.plate && (
-                        <Chip
-                          icon={<TrendingUpIcon />}
-                          label="En Çok Kazanan"
-                          color="success"
-                          size="small"
-                          variant="outlined"
-                        />
-                      )}
-                      {overallPerformance?.lowestEarningVehicle?.plate === vehicle.plate && (
-                        <Chip
-                          icon={<TrendingUpIcon sx={{ transform: 'rotate(180deg)' }} />}
-                          label="En Az Kazanan"
-                          color="warning"
-                          size="small"
-                          variant="outlined"
-                        />
-                      )}
-                    </Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
+                      {vehicle.plate}
+                    </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
@@ -1501,315 +2022,8 @@ export default function Dashboard() {
         )}
       </Paper>
 
-      {/* GEÇMİŞ KİRALAMALAR */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h5" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Assignment sx={{ color: 'info.main' }} />
-            Geçmiş Kiralamalar
-          </Typography>
-          
-          <Stack direction="row" spacing={1}>
-            <Button
-              size="small"
-              startIcon={<GetApp />}
-              onClick={exportCompletedToExcel}
-              color="success"
-            >
-              Excel
-            </Button>
-            <Button
-              size="small"
-              startIcon={<PictureAsPdf />}
-              onClick={exportCompletedToPDF}
-              color="error"
-            >
-              PDF
-            </Button>
-          </Stack>
-        </Box>
-
-        {/* Geçmiş Kiralamalar Filtreleme */}
-        <TextField
-          size="small"
-          placeholder="Ara (plaka, müşteri adı...)"
-          value={completedRentalsFilter}
-          onChange={(e) => setCompletedRentalsFilter(e.target.value)}
-          sx={{ mb: 2, minWidth: 300 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-          }}
-        />
-
-        {/* Geçmiş Kiralamalar Tablosu */}
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell><strong>Plaka</strong></TableCell>
-                <TableCell><strong>Müşteri</strong></TableCell>
-                <TableCell><strong>Tarih Aralığı</strong></TableCell>
-                <TableCell align="center"><strong>Gün</strong></TableCell>
-                <TableCell align="right"><strong>Toplam</strong></TableCell>
-                <TableCell align="right"><strong>Kalan Borç</strong></TableCell>
-                <TableCell><strong>Durum</strong></TableCell>
-                <TableCell><strong>İşlemler</strong></TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(completedRentalsRes?.data.data || [])
-                .filter((rental: Rental) => rental.status === 'COMPLETED')
-                .filter((rental: Rental) => {
-                  if (!completedRentalsFilter) return true;
-                  const filter = completedRentalsFilter.toLowerCase();
-                  return (
-                    rental.vehicle?.plate?.toLowerCase().includes(filter) ||
-                    rental.customer?.fullName?.toLowerCase().includes(filter)
-                  );
-                })
-                .slice(0, 10)
-                .map((rental: Rental) => {
-                  // Calculate actual balance with payments
-                  const paidFromRental = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
-                  const paidFromPayments = (rental.payments || []).reduce((sum, payment) => sum + payment.amount, 0);
-                  const actualBalance = rental.totalDue - (paidFromRental + paidFromPayments);
-                  
-                  return (
-                <TableRow key={rental.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'info.main' }}>
-                      {rental.vehicle?.plate}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {rental.customer?.fullName}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {dayjs(rental.startDate).format('DD.MM.YYYY')} - {dayjs(rental.endDate).format('DD.MM.YYYY')}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="center">
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {rental.days}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {formatCurrency(rental.totalDue)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
-                        fontWeight: 600,
-                        color: actualBalance > 0 ? 'error.main' : 'success.main'
-                      }}
-                    >
-                      {formatCurrency(actualBalance)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Chip 
-                      label="Tamamlandı"
-                      color="info"
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Stack direction="row" spacing={1}>
-                      <Button 
-                        size="small" 
-                        onClick={() => setDetailDialog({ open: true, rental })}
-                      >
-                        Detay
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="primary"
-                        startIcon={<EditIcon />}
-                        onClick={() => setEditRentalDialog({ open: true, rental })}
-                      >
-                        Düzenle
-                      </Button>
-                      {rental.balance > 0 && (
-                        <Button 
-                          size="small" 
-                          variant="outlined"
-                          color="warning"
-                          onClick={() => setPaymentDialog({ open: true, rental })}
-                        >
-                          Ödeme Ekle
-                        </Button>
-                      )}
-                      <Button 
-                        size="small" 
-                        variant="outlined"
-                        color="error"
-                        startIcon={<Delete />}
-                        onClick={() => setDeleteDialog({ open: true, rental })}
-                      >
-                        Sil
-                      </Button>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-                  );
-                })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        {((completedRentalsRes?.data.data || []).filter((r: Rental) => r.status === 'COMPLETED')).length === 0 && (
-          <Alert severity="info" sx={{ mt: 2 }}>
-            Henüz tamamlanmış kiralama bulunmuyor.
-          </Alert>
-        )}
-      </Paper>
-
-      {/* Borçlu Müşteriler Tablosu */}
-      <Paper sx={{ p: 2, mt: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Box>
-            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
-              <WarningIcon sx={{ mr: 1, color: 'error.main' }} />
-              Borçlu Müşteriler
-            </Typography>
-            {/* Toplam Borç ve Kişi Sayısı */}
-            {monthlyFinancialData && (
-              <Box sx={{ mt: 1, display: 'flex', gap: 2 }}>
-                <Chip
-                  icon={<PersonIcon />}
-                  label={`Toplam ${monthlyFinancialData.debtorCount} borçlu müşteri`}
-                  color="warning"
-                  size="small"
-                  variant="outlined"
-                />
-                <Chip
-                  icon={<MoneyIcon />}
-                  label={`Toplam borç: ${formatCurrency(monthlyFinancialData.currentReceivables)}`}
-                  color="error"
-                  size="small"
-                  variant="outlined"
-                />
-              </Box>
-            )}
-          </Box>
-          
-          <Stack direction="row" spacing={1}>
-            <Button
-              size="small"
-              startIcon={<GetApp />}
-              onClick={exportDebtorsToExcel}
-              color="success"
-            >
-              Excel
-            </Button>
-            <Button
-              size="small"
-              startIcon={<PictureAsPdf />}
-              onClick={exportDebtorsToPDF}
-              color="error"
-            >
-              PDF
-            </Button>
-          </Stack>
-        </Box>
-        
-        {/* Borçlu Müşteriler Filtreleme */}
-        <TextField
-          size="small"
-          placeholder="Ara (müşteri adı, plaka...)"
-          value={debtorsFilter}
-          onChange={(e) => setDebtorsFilter(e.target.value)}
-          sx={{ mb: 2, minWidth: 300 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-          }}
-        />
-        
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Ad Soyad</TableCell>
-                <TableCell>Telefon</TableCell>
-                <TableCell>Araç</TableCell>
-                <TableCell>Kiralama Tarihi</TableCell>
-                <TableCell align="right">Borç Miktarı</TableCell>
-                <TableCell>Durum</TableCell>
-                <TableCell>İşlemler</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {debtors
-                ?.filter((debtor) => {
-                  if (!debtorsFilter) return true;
-                  const filter = debtorsFilter.toLowerCase();
-                  return (
-                    debtor.customerName?.toLowerCase().includes(filter) ||
-                    debtor.plate?.toLowerCase().includes(filter)
-                  );
-                })
-                .map((debtor) => (
-                <TableRow key={debtor.rentalId}>
-                  <TableCell>{debtor.customerName}</TableCell>
-                  <TableCell>-</TableCell>
-                  <TableCell>{debtor.plate}</TableCell>
-                  <TableCell>{format(new Date(debtor.startDate), 'dd.MM.yyyy')}</TableCell>
-                  <TableCell align="right">
-                    <Typography color="error" fontWeight="bold">
-                      {formatCurrency(debtor.balance)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Chip 
-                      label="Borçlu" 
-                      color="error" 
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color="primary"
-                      startIcon={<EditIcon />}
-                      onClick={() => {
-                        // Borçlu müşterinin rental bilgisini bulup düzenleme modalını açalım
-                        const rental = (completedRentalsRes?.data.data || []).find((r: Rental) => r.id === debtor.rentalId);
-                        if (rental) {
-                          setEditRentalDialog({ open: true, rental });
-                        }
-                      }}
-                    >
-                      Düzenle
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {!debtors?.length && (
-            <Alert severity="success" sx={{ mt: 2 }}>
-              Borçlu müşteri bulunmuyor.
-            </Alert>
-          )}
-        </TableContainer>
-      </Paper>
-
+      {/* BOŞTA OLAN ARAÇLAR */}
+     
       {/* MENU */}
       <Menu
         anchorEl={anchorEl}
@@ -1941,16 +2155,19 @@ export default function Dashboard() {
         </DialogTitle>
         <DialogContent dividers sx={{ maxHeight: '80vh', overflow: 'auto' }}>
           {detailDialog.rental && (() => {
-            // Hesaplamaları yap
+            // Hesaplamaları yap - ESKİ HALİNE GETİR (sadece totalDue ve remainingBalance düzelt)
             const totalAllPaid = (detailDialog.rental.upfront || 0) + 
                                 (detailDialog.rental.pay1 || 0) + 
                                 (detailDialog.rental.pay2 || 0) + 
                                 (detailDialog.rental.pay3 || 0) + 
                                 (detailDialog.rental.pay4 || 0) +
                                 (detailDialog.rental.payments ? detailDialog.rental.payments.reduce((sum: number, p: any) => sum + p.amount, 0) : 0);
-            const remainingBalance = detailDialog.rental.totalDue - totalAllPaid;
             
-            // Araç geliri hesaplaması: Temel gelir (gün × günlük ücret) + KM farkı
+            // Sadece totalDue ve remainingBalance için TL çevrimi
+            const totalDueTL = detailDialog.rental.totalDue / 100;
+            const remainingBalance = totalDueTL - totalAllPaid;
+            
+            // Araç geliri - ESKİ HALİNE GETİR
             const vehicleRevenue = (detailDialog.rental.days * detailDialog.rental.dailyPrice) + (detailDialog.rental.kmDiff || 0);
 
             return (
@@ -1969,7 +2186,7 @@ export default function Dashboard() {
                           Toplam Ödenecek
                         </Typography>
                         <Typography variant="h6" color="success.dark" sx={{ fontWeight: 700 }}>
-                          {formatCurrency(detailDialog.rental.totalDue)}
+                          {formatCurrency(totalDueTL)}
                         </Typography>
                       </Box>
                     </Grid>
@@ -2183,7 +2400,7 @@ export default function Dashboard() {
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                           <Typography variant="body1" sx={{ fontWeight: 700 }}>Toplam Tutar:</Typography>
                           <Typography variant="body1" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                            {formatCurrency(detailDialog.rental.totalDue)}
+                            {formatCurrency(detailDialog.rental.totalDue / 100)}
                           </Typography>
                         </Box>
                         
@@ -2755,6 +2972,81 @@ export default function Dashboard() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Notification Modal */}
+      <Dialog
+        open={notificationDialog.open}
+        onClose={() => setNotificationDialog({ open: false, type: 'success', title: '', message: '' })}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ 
+          color: notificationDialog.type === 'success' ? 'success.main' : 'error.main',
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}>
+          {notificationDialog.type === 'success' ? '✅' : '❌'} {notificationDialog.title}
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            {notificationDialog.message}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setNotificationDialog({ open: false, type: 'success', title: '', message: '' })}
+            color="primary"
+            variant="contained"
+          >
+            Tamam
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add Payment Dialog */}
+      {selectedRental && (
+        <AddPaymentDialog
+          open={paymentDialogOpen}
+          onClose={() => {
+            setPaymentDialogOpen(false);
+            setSelectedRental(null);
+          }}
+          rental={selectedRental}
+        />
+      )}
+
+      {/* Edit Rental Dialog */}
+      {selectedRental && (
+        <EditRentalDialog
+          open={editRentalDialogOpen}
+          onClose={() => {
+            setEditRentalDialogOpen(false);
+            setSelectedRental(null);
+          }}
+          rental={selectedRental}
+        />
+      )}
+      
+      {/* Reservation Dialog */}
+      <ReservationDialog
+        open={reservationDialog.open}
+        onClose={() => setReservationDialog({ open: false, reservation: null })}
+        onSubmit={(data) => {
+          if (reservationDialog.reservation) {
+            // Düzenleme modu
+            updateReservationMutation.mutate({ ...data, id: reservationDialog.reservation.id });
+          } else {
+            // Yeni rezervasyon
+            createReservationMutation.mutate(data);
+          }
+        }}
+        customers={customers}
+        vehicles={allVehicles.map(v => ({ id: v.id, licensePlate: v.plate || '' }))}
+        reservation={reservationDialog.reservation}
+        loading={createReservationMutation.isPending || updateReservationMutation.isPending}
+      />
     </Layout>
   );
 }
