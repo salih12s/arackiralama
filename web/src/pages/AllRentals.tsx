@@ -196,7 +196,7 @@ export const AllRentals: React.FC = () => {
   const calculateBalance = (rental: Rental) => {
     const paidFromRental = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
     const paidFromPayments = (rental.payments || []).reduce((sum, payment) => sum + payment.amount, 0);
-    return rental.totalDue / 100 - (paidFromRental + paidFromPayments);
+    return rental.totalDue - (paidFromRental + paidFromPayments);
   };
 
   const handlePrint = () => {
@@ -349,7 +349,7 @@ export const AllRentals: React.FC = () => {
               <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'success.50', borderRadius: 1 }}>
                 <Typography variant="caption" color="text.secondary">Toplam Gelir</Typography>
                 <Typography variant="h6" color="success.dark" sx={{ fontWeight: 700, fontSize: '1rem' }}>
-                  {formatCurrency(filteredRentals.reduce((sum, r) => sum + r.totalDue / 100, 0))}
+                  {formatCurrency(filteredRentals.reduce((sum, r) => sum + r.totalDue, 0))}
                 </Typography>
               </Box>
             </Grid>
@@ -370,7 +370,7 @@ export const AllRentals: React.FC = () => {
                 <Typography variant="caption" color="text.secondary">Kalan Borç</Typography>
                 <Typography variant="h6" color="warning.dark" sx={{ fontWeight: 700, fontSize: '1rem' }}>
                   {formatCurrency((() => {
-                    const totalRevenue = filteredRentals.reduce((sum, r) => sum + r.totalDue / 100, 0);
+                    const totalRevenue = filteredRentals.reduce((sum, r) => sum + r.totalDue, 0);
                     const totalPaid = filteredRentals.reduce((sum, r) => {
                       const paidAmount = (r.upfront + r.pay1 + r.pay2 + r.pay3 + r.pay4) + 
                                         (r.payments || []).reduce((pSum, p) => pSum + p.amount, 0);
@@ -440,7 +440,7 @@ export const AllRentals: React.FC = () => {
                 const totalPaidFromRental = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
                 const totalPaidFromPayments = (rental.payments || []).reduce((sum, payment) => sum + payment.amount, 0);
                 const totalPaid = totalPaidFromRental + totalPaidFromPayments;
-                const balance = (rental.totalDue / 100) - totalPaid;
+                const balance = rental.totalDue - totalPaid;
 
                 return (
                   <TableRow key={rental.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
