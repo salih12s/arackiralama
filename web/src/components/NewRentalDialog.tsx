@@ -203,9 +203,18 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
 
   const createRentalMutation = useMutation({
     mutationFn: (data: RentalFormData) => {
-      // TL values - no conversion needed
+      // Create payload that matches backend schema
       const payload = {
-        ...data,
+        vehicleId: data.vehicleId,
+        customerName: data.customerName,
+        customerPhone: data.customerPhone,
+        startDate: startDate && startTime ? 
+          dayjs(`${startDate.format('YYYY-MM-DD')}T${startTime}:00`).toISOString() :
+          dayjs(data.startDate).toISOString(),
+        endDate: endDate && endTime ? 
+          dayjs(`${endDate.format('YYYY-MM-DD')}T${endTime}:00`).toISOString() :
+          dayjs(data.endDate).toISOString(),
+        days: data.days,
         dailyPrice: Math.round(data.dailyPrice * 100),
         kmDiff: Math.round((data.kmDiff || 0) * 100),
         cleaning: Math.round((data.cleaning || 0) * 100),
@@ -217,12 +226,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
         pay2: Math.round((data.pay2 || 0) * 100),
         pay3: Math.round((data.pay3 || 0) * 100),
         pay4: Math.round((data.pay4 || 0) * 100),
-        startDate: startDate && startTime ? 
-          dayjs(`${startDate.format('YYYY-MM-DD')}T${startTime}:00`).toISOString() :
-          dayjs(data.startDate).toISOString(),
-        endDate: endDate && endTime ? 
-          dayjs(`${endDate.format('YYYY-MM-DD')}T${endTime}:00`).toISOString() :
-          dayjs(data.endDate).toISOString(),
+        note: data.note,
       };
       return rentalsApi.create(payload);
     },

@@ -260,13 +260,29 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
 
   const updateRentalMutation = useMutation({
     mutationFn: (data: RentalFormData) => {
-      // Backend zaten TL değerleri alıp kuruş'a çeviriyor, 
-      // burada ekstra çevirim yapmıyoruz
-      const payload = {
-        ...data,
+      // Backend'in beklediği format için uygun payload oluştur
+      const payload: Partial<any> = {
         startDate: dayjs(data.startDate).toISOString(),
         endDate: dayjs(data.endDate).toISOString(),
+        days: data.days,
+        note: data.note,
       };
+
+      // Optional fields - sadece değer varsa ekle
+      if (data.vehicleId) payload.vehicleId = data.vehicleId;
+      if (data.customerName) payload.customerName = data.customerName;
+      if (data.customerPhone) payload.customerPhone = data.customerPhone;
+      if (data.dailyPrice !== undefined) payload.dailyPrice = data.dailyPrice;
+      if (data.kmDiff !== undefined) payload.kmDiff = data.kmDiff;
+      if (data.cleaning !== undefined) payload.cleaning = data.cleaning;
+      if (data.hgs !== undefined) payload.hgs = data.hgs;
+      if (data.damage !== undefined) payload.damage = data.damage;
+      if (data.fuel !== undefined) payload.fuel = data.fuel;
+      if (data.upfront !== undefined) payload.upfront = data.upfront;
+      if (data.pay1 !== undefined) payload.pay1 = data.pay1;
+      if (data.pay2 !== undefined) payload.pay2 = data.pay2;
+      if (data.pay3 !== undefined) payload.pay3 = data.pay3;
+      if (data.pay4 !== undefined) payload.pay4 = data.pay4;
       
       console.log('🚀 Update Payload Debug (TL values):', {
         dailyPrice: payload.dailyPrice,

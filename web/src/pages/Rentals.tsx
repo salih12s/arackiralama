@@ -39,8 +39,7 @@ import Layout from '../components/Layout';
 import NewRentalDialog from '../components/NewRentalDialog';
 import AddPaymentDialog from '../components/AddPaymentDialog';
 import EditRentalDialog from '../components/EditRentalDialog';
-import { rentalsApi, formatDate } from '../api/client';
-import { Rental } from '../api/rentals';
+import { rentalsApi, formatDate, Rental } from '../api/client';
 import { formatCurrency } from '../utils/currency';
 import { invalidateAllRentalCaches } from '../utils/cacheInvalidation';
 
@@ -343,7 +342,7 @@ export default function Rentals() {
                             {rental.vehicle.plate}
                           </Typography>
                           <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                            {rental.vehicle.name || '-'}
+                            {rental.vehicle?.name || '-'}
                           </Typography>
                         </TableCell>
                         

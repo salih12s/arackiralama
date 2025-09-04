@@ -91,7 +91,7 @@ const ReservationDialog: React.FC<ReservationDialogProps> = ({
       licensePlate: formData.licensePlate,
       reservationDate: formData.reservationDate.format('YYYY-MM-DD'),
       reservationTime: formData.reservationTime.format('HH:mm'),
-      rentalDuration: formData.rentalDuration || 0, // Default 0 if empty
+      rentalDuration: parseInt(formData.rentalDuration as string) || 0, // String'den number'a çevir
       note: formData.note
     };
 

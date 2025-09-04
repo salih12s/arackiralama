@@ -19,7 +19,6 @@ import {
   ListItemButton,
   useMediaQuery,
   useTheme,
-  Divider,
   Chip,
 } from '@mui/material';
 import {
@@ -33,7 +32,6 @@ import {
   TrendingUp,
   Warning,
   Menu as MenuIcon,
-  Close as CloseIcon,
 } from '@mui/icons-material';
 import dayjs from 'dayjs';
 
@@ -44,7 +42,7 @@ interface LayoutProps {
   title?: string;
 }
 
-export default function Layout({ children, title }: LayoutProps) {
+export default function Layout({ children }: LayoutProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, logout } = useAuth();
@@ -149,8 +147,16 @@ export default function Layout({ children, title }: LayoutProps) {
 
   return (
     <Box sx={{ flexGrow: 1, minHeight: '100vh', backgroundColor: 'background.default' }}>
-      <AppBar position="static" elevation={2}>
-        <Toolbar sx={{ px: { xs: 1, sm: 2 } }}>
+      <AppBar 
+        position="static" 
+        elevation={0}
+        sx={{
+          background: 'linear-gradient(135deg, #1a237e 0%, #283593 50%, #3949ab 100%)',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          backdropFilter: 'blur(10px)',
+        }}
+      >
+        <Toolbar sx={{ px: { xs: 1, sm: 3 }, py: { xs: 0.5, sm: 1 } }}>
           {/* Mobile Menu Button */}
           {isMobile && (
             <IconButton
@@ -158,27 +164,52 @@ export default function Layout({ children, title }: LayoutProps) {
               aria-label="open drawer"
               edge="start"
               onClick={handleDrawerToggle}
-              sx={{ mr: 2 }}
+              sx={{ 
+                mr: 2,
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' },
+                borderRadius: 2
+              }}
             >
               <MenuIcon />
             </IconButton>
           )}
           
-          <Typography variant="h6" component="div" sx={{ 
-            flexGrow: 1,
-            fontSize: { xs: '1rem', sm: '1.25rem' }
-          }}>
-            {isMobile ? 'Admin Panel' : (title || 'Araç Kiralama Admin Paneli')}
-          </Typography>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 } }}>
-            <Typography variant="body2" sx={{ 
-              mr: { xs: 1, sm: 2 },
-              fontSize: { xs: '0.75rem', sm: '0.875rem' },
-              display: { xs: 'none', sm: 'block' }
-            }}>
-              {dayjs().format('DD.MM.YYYY')}
+          <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+            <DirectionsCar sx={{ 
+              mr: 1.5, 
+              fontSize: { xs: 20, sm: 24 },
+              color: '#fff'
+            }} />
+            <Typography 
+              variant="h6" 
+              component="div" 
+              sx={{ 
+                fontSize: { xs: '1rem', sm: '1.3rem' },
+                fontWeight: 700,
+                color: '#fff',
+                textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                letterSpacing: '0.5px'
+              }}
+            >
+              {isMobile ? 'Araç Kiralama' : 'Araç Kiralama - Ana Sayfa'}
             </Typography>
+          </Box>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
+            <Chip
+              label={dayjs().format('DD.MM.YYYY')}
+              size="small"
+              sx={{
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                color: '#fff',
+                fontWeight: 600,
+                fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                display: { xs: 'none', sm: 'flex' },
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.2)',
+              }}
+            />
             
             <IconButton
               size="large"
@@ -187,9 +218,15 @@ export default function Layout({ children, title }: LayoutProps) {
               aria-haspopup="true"
               onClick={handleMenu}
               color="inherit"
-              sx={{ p: { xs: 1, sm: 1.5 } }}
+              sx={{ 
+                p: { xs: 0.5, sm: 1 },
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' },
+                borderRadius: 2,
+                border: '1px solid rgba(255,255,255,0.2)',
+              }}
             >
-              <AccountCircle sx={{ fontSize: { xs: 20, sm: 24 } }} />
+              <AccountCircle sx={{ fontSize: { xs: 18, sm: 22 }, color: '#fff' }} />
             </IconButton>
             
             <Menu

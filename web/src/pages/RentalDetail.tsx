@@ -370,7 +370,7 @@ export default function RentalDetail() {
                     </Typography>
                     <Typography variant="h6" color="info.main">
                       {formatCurrency(
-                        ((rental.upfront || 0) + (rental.pay1 || 0) + (rental.pay2 || 0) + (rental.pay3 || 0) + (rental.pay4 || 0)) / 100 + 
+                        ((rental.upfront || 0) + (rental.pay1 || 0) + (rental.pay2 || 0) + (rental.pay3 || 0) + (rental.pay4 || 0)) + 
                         (rental.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0)
                       )}
                     </Typography>

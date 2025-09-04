@@ -5,10 +5,6 @@ import {
   DialogActions,
   Button,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Grid,
   Alert,
 } from '@mui/material';
@@ -21,8 +17,7 @@ import { vehiclesApi } from '../api/client';
 
 const vehicleSchema = z.object({
   plate: z.string().min(1, 'Plaka gereklidir'),
-  name: z.string().optional(),
-  status: z.enum(['IDLE', 'RENTED', 'RESERVED', 'SERVICE']).default('IDLE'),
+  name: z.string().min(1, 'Araç adı gereklidir'),
 });
 
 type VehicleFormData = z.infer<typeof vehicleSchema>;
@@ -33,7 +28,7 @@ interface NewVehicleDialogProps {
   onSuccess?: () => void;
 }
 
-export default function NewVehicleDialog({ open, onClose, onSuccess }: NewVehicleDialogProps) {
+export default function NewVehicleDialog({ open, onClose }: NewVehicleDialogProps) {
   const queryClient = useQueryClient();
 
   const {
@@ -46,12 +41,17 @@ export default function NewVehicleDialog({ open, onClose, onSuccess }: NewVehicl
     defaultValues: {
       plate: '',
       name: '',
-      status: 'IDLE',
     },
   });
 
   const createVehicleMutation = useMutation({
-    mutationFn: (data: VehicleFormData) => vehiclesApi.create(data),
+    mutationFn: (data: VehicleFormData) => {
+      const payload = {
+        plate: data.plate,
+        name: data.name || undefined, // boş string yerine undefined gönder
+      };
+      return vehiclesApi.create(payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vehicles'] });
       queryClient.invalidateQueries({ queryKey: ['all-vehicles'] });
@@ -94,24 +94,6 @@ export default function NewVehicleDialog({ open, onClose, onSuccess }: NewVehicl
               />
             </Grid>
 
-            <Grid item xs={12} sm={6}>
-              <Controller
-                name="status"
-                control={control}
-                render={({ field }) => (
-                  <FormControl fullWidth>
-                    <InputLabel>Durum</InputLabel>
-                    <Select {...field} label="Durum">
-                      <MenuItem value="IDLE">Boşta</MenuItem>
-                      <MenuItem value="RENTED">Kirada</MenuItem>
-                      <MenuItem value="RESERVED">Rezerve</MenuItem>
-                      <MenuItem value="SERVICE">Serviste</MenuItem>
-                    </Select>
-                  </FormControl>
-                )}
-              />
-            </Grid>
-
             <Grid item xs={12}>
               <Controller
                 name="name"
@@ -119,7 +101,7 @@ export default function NewVehicleDialog({ open, onClose, onSuccess }: NewVehicl
                 render={({ field }) => (
                   <TextField
                     {...field}
-                    label="Araç Adı (Opsiyonel)"
+                    label="Araç Adı"
                     fullWidth
                     placeholder="Volkswagen Passat, Honda Civic vs."
                   />

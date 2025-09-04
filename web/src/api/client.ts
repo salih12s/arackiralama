@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3005/api',
+  baseURL: 'https://arackiralama-production.up.railway.app/api',
   timeout: 30000, // Increase timeout
 });
 
@@ -236,26 +236,7 @@ export const rentalsApi = {
     pay4?: number;
     note?: string;
   }) => api.post<Rental>('/rentals', data),
-  update: (id: string, data: {
-    vehicleId: string;
-    customerName: string;
-    customerPhone?: string;
-    startDate: string;
-    endDate: string;
-    days?: number;
-    dailyPrice: number;
-    kmDiff?: number;
-    cleaning?: number;
-    hgs?: number;
-    damage?: number;
-    fuel?: number;
-    upfront?: number;
-    pay1?: number;
-    pay2?: number;
-    pay3?: number;
-    pay4?: number;
-    note?: string;
-  }) => api.patch<Rental>(`/rentals/${id}`, data),
+  update: (id: string, data: any) => api.patch<Rental>(`/rentals/${id}`, data),
   returnRental: (id: string) => api.post<Rental>(`/rentals/${id}/return`),
   complete: (id: string) => api.post<Rental>(`/rentals/${id}/complete`),
   delete: (id: string) => api.delete(`/rentals/${id}`),

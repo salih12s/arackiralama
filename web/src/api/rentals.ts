@@ -78,7 +78,7 @@ export const rentalsApi = {
     return response.data;
   },
 
-  update: async (id: string, data: Partial<Rental>): Promise<Rental> => {
+  update: async (id: string, data: any): Promise<Rental> => {
     const response = await api.patch(`/rentals/${id}`, data);
     return response.data;
   },

@@ -194,8 +194,8 @@ export const AllRentals: React.FC = () => {
   };
 
   const calculateBalance = (rental: Rental) => {
-    const paidFromRental = (rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4) / 100;
-    const paidFromPayments = (rental.payments || []).reduce((sum, payment) => sum + payment.amount / 100, 0);
+    const paidFromRental = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
+    const paidFromPayments = (rental.payments || []).reduce((sum, payment) => sum + payment.amount, 0);
     return rental.totalDue / 100 - (paidFromRental + paidFromPayments);
   };
 
@@ -349,7 +349,7 @@ export const AllRentals: React.FC = () => {
               <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'success.50', borderRadius: 1 }}>
                 <Typography variant="caption" color="text.secondary">Toplam Gelir</Typography>
                 <Typography variant="h6" color="success.dark" sx={{ fontWeight: 700, fontSize: '1rem' }}>
-                  {formatCurrency(filteredRentals.reduce((sum, r) => sum + r.totalDue, 0))}
+                  {formatCurrency(filteredRentals.reduce((sum, r) => sum + r.totalDue / 100, 0))}
                 </Typography>
               </Box>
             </Grid>
@@ -369,11 +369,15 @@ export const AllRentals: React.FC = () => {
               <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'warning.50', borderRadius: 1 }}>
                 <Typography variant="caption" color="text.secondary">Kalan Borç</Typography>
                 <Typography variant="h6" color="warning.dark" sx={{ fontWeight: 700, fontSize: '1rem' }}>
-                  {formatCurrency(filteredRentals.reduce((sum, r) => {
-                    const totalPaid = (r.upfront + r.pay1 + r.pay2 + r.pay3 + r.pay4)+ 
-                                    (r.payments || []).reduce((pSum, p) => pSum + p.amount, 0);
-                    return sum + (r.totalDue - totalPaid);
-                  }, 0))}
+                  {formatCurrency((() => {
+                    const totalRevenue = filteredRentals.reduce((sum, r) => sum + r.totalDue / 100, 0);
+                    const totalPaid = filteredRentals.reduce((sum, r) => {
+                      const paidAmount = (r.upfront + r.pay1 + r.pay2 + r.pay3 + r.pay4) + 
+                                        (r.payments || []).reduce((pSum, p) => pSum + p.amount, 0);
+                      return sum + paidAmount;
+                    }, 0);
+                    return totalRevenue - totalPaid;
+                  })())}
                 </Typography>
               </Box>
             </Grid>
@@ -436,7 +440,7 @@ export const AllRentals: React.FC = () => {
                 const totalPaidFromRental = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
                 const totalPaidFromPayments = (rental.payments || []).reduce((sum, payment) => sum + payment.amount, 0);
                 const totalPaid = totalPaidFromRental + totalPaidFromPayments;
-                const balance = (rental.totalDue - totalPaid) / 100;
+                const balance = (rental.totalDue / 100) - totalPaid;
 
                 return (
                   <TableRow key={rental.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
@@ -477,7 +481,7 @@ export const AllRentals: React.FC = () => {
                       {formatCurrency(rental.fuel || 0)}
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 600 }}>
-                      {formatCurrency(rental.totalDue)}
+                      {formatCurrency(rental.totalDue / 100)}
                     </TableCell>
                     <TableCell align="right">
                       {formatCurrency(rental.upfront)}
@@ -504,7 +508,7 @@ export const AllRentals: React.FC = () => {
                         fontWeight: 600,
                         color: balance > 0 ? 'error.main' : balance < 0 ? 'warning.main' : 'success.main'
                       }}>
-                      {formatCurrency(balance * 100)}
+                      {formatCurrency(balance )}
                     </TableCell>
                     <TableCell>
                       <Chip 
@@ -668,12 +672,12 @@ export const AllRentals: React.FC = () => {
                   <Typography variant="body2"><strong>Günlük Fiyat:</strong> {formatCurrency(detailDialog.rental.dailyPrice)}</Typography>
                 </Grid>
                 <Grid item xs={12}>
-                  <Typography variant="body2"><strong>Toplam Tutar:</strong> {formatCurrency(detailDialog.rental.totalDue)}</Typography>
+                  <Typography variant="body2"><strong>Toplam Tutar:</strong> {formatCurrency(detailDialog.rental.totalDue / 100)}</Typography>
                 </Grid>
                 <Grid item xs={12}>
                   <Typography variant="body2"><strong>Kalan Bakiye:</strong> 
                     <span style={{ color: calculateBalance(detailDialog.rental) > 0 ? 'red' : 'green', fontWeight: 'bold' }}>
-                      {formatCurrency(calculateBalance(detailDialog.rental) * 100)}
+                      {formatCurrency(calculateBalance(detailDialog.rental) )}
                     </span>
                   </Typography>
                 </Grid>

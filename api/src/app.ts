@@ -27,16 +27,11 @@ const allowlist = new Set([
   "http://www.elitefilomuhasabe.com", 
   "https://www.elitefilomuhasabe.com",
   
-  // Yanlış yazım da dursun, ileride yönlendirme olursa çakışmasın
-  "http://elitefilomuhasebe.com",
+  // Production domains
   "https://elitefilomuhasebe.com",
-  "http://www.elitefilomuhasebe.com",
   "https://www.elitefilomuhasebe.com",
-  
-  // Dev
-  "http://localhost:3000",
-  "http://localhost:5173",
-  "http://localhost:5174"
+  "http://elitefilomuhasebe.com",
+  "http://www.elitefilomuhasebe.com"
 ]);
 
 // Add environment origin if exists

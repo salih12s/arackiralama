@@ -339,8 +339,8 @@ export async function getDebtorReport(): Promise<{ customerId: string; customerN
     const paidFromPayments = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
     const totalPaid = paidFromRental + paidFromPayments;
     
-    // Gerçek kalan borç hesapla
-    const actualBalance = rental.totalDue - totalPaid;
+    // Gerçek kalan borç hesapla - AllRentals mantığıyla
+    const actualBalance = (rental.totalDue / 100) - totalPaid;
     
     if (actualBalance > 0) {
       const customerId = rental.customer.id;
@@ -361,7 +361,7 @@ export async function getDebtorReport(): Promise<{ customerId: string; customerN
   const debtorList = Array.from(customerDebtMap.entries()).map(([customerId, data]) => ({
     customerId,
     customerName: data.customerName,
-    totalDebt: data.totalDebt / 100 // Kuruş'tan TL'ye çevir
+    totalDebt: data.totalDebt // Artık zaten TL cinsinden
   }));
 
   return debtorList.sort((a, b) => b.totalDebt - a.totalDebt); // Borcu fazla olandan aza sırala
