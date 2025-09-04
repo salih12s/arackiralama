@@ -36,8 +36,11 @@ export default function DebtorDetails() {
   });
 
 
-  // API'den dönen veriyi güvenli şekilde işle
-  const debtors = Array.isArray(debtorsData) ? debtorsData : [];
+  // API'den dönen veriyi güvenli şekilde işle ve kuruş'dan TL'ye çevir
+  const debtors = Array.isArray(debtorsData) ? debtorsData.map((debtor: any) => ({
+    ...debtor,
+    totalDebt: debtor.totalDebt / 100 // Kuruş'dan TL'ye çevir
+  })) : [];
   const totalDebt = debtors.reduce((sum: number, debtor: any) => sum + (debtor.totalDebt || 0), 0);
   
   console.log('🔍 Debtors Debug:', { debtorsData, debtors, totalDebt });

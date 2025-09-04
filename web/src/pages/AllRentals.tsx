@@ -481,7 +481,7 @@ export const AllRentals: React.FC = () => {
                       {formatCurrency(rental.fuel || 0)}
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 600 }}>
-                      {formatCurrency(rental.totalDue / 100)}
+                      {formatCurrency(rental.totalDue)}
                     </TableCell>
                     <TableCell align="right">
                       {formatCurrency(rental.upfront)}

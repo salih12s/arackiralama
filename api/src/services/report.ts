@@ -342,8 +342,8 @@ export async function getDebtorReport(): Promise<{ customerId: string; customerN
     const paidFromPayments = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
     const totalPaid = paidFromRental + paidFromPayments;
     
-    // Gerçek kalan borç hesapla - AllRentals mantığıyla (TL cinsinden)
-    const actualBalance = rental.totalDue - totalPaid;
+    // Gerçek kalan borç hesapla - Backend veriler kuruş cinsinden
+    const actualBalance = (rental.totalDue / 100) - totalPaid;
     
     if (actualBalance > 0) {
       const customerId = rental.customer.id;
