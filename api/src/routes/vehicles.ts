@@ -14,10 +14,13 @@ const vehicleStatusSchema = z.enum(['IDLE', 'RENTED', 'RESERVED', 'SERVICE']);
 const createVehicleSchema = z.object({
   plate: z.string().min(1),
   name: z.string().optional(),
-  isConsignment: z.boolean().optional()
+  isConsignment: z.boolean().optional(),
+  status: vehicleStatusSchema.optional(),
+  active: z.boolean().optional()
 });
 
 const updateVehicleSchema = z.object({
+  plate: z.string().optional(),
   name: z.string().optional(),
   status: vehicleStatusSchema.optional(),
   active: z.boolean().optional()
@@ -121,13 +124,15 @@ router.get('/', async (req, res) => {
 // POST /api/vehicles
 router.post('/', async (req, res) => {
   try {
-    const { plate, name, isConsignment } = createVehicleSchema.parse(req.body);
+    const { plate, name, isConsignment, status, active } = createVehicleSchema.parse(req.body);
 
     const vehicle = await prisma.vehicle.create({
       data: {
         plate: plate.toUpperCase(),
         name,
-        isConsignment: isConsignment || false
+        isConsignment: isConsignment || false,
+        status: status || 'IDLE',
+        active: active !== undefined ? active : true
       }
     });
 
@@ -147,11 +152,47 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PATCH /api/vehicles/:id
+// PATCH/PUT /api/vehicles/:id
 router.patch('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = updateVehicleSchema.parse(req.body);
+
+    // If plate is being updated, make it uppercase
+    if (updateData.plate) {
+      updateData.plate = updateData.plate.toUpperCase();
+    }
+
+    const vehicle = await prisma.vehicle.update({
+      where: { id },
+      data: updateData
+    });
+
+    res.json(vehicle);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid input', details: error.errors });
+    }
+    
+    if (error instanceof PrismaClientKnownRequestError && error.code === 'P2025') {
+      return res.status(404).json({ error: 'Vehicle not found' });
+    }
+
+    console.error('Update vehicle error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT method for compatibility
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = updateVehicleSchema.parse(req.body);
+
+    // If plate is being updated, make it uppercase
+    if (updateData.plate) {
+      updateData.plate = updateData.plate.toUpperCase();
+    }
 
     const vehicle = await prisma.vehicle.update({
       where: { id },
@@ -256,6 +297,28 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ 
       error: 'Araç silinirken bir hata oluştu',
       details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// GET /api/vehicles/:id/rentals - Check if vehicle has rentals (for safety deletion)
+router.get('/:id/rentals', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const rentals = await prisma.rental.findMany({
+      where: { 
+        vehicleId: id,
+        deleted: false // Only count active rentals
+      },
+      select: { id: true } // Only return IDs for efficiency
+    });
+
+    res.json(rentals);
+  } catch (error) {
+    console.error('Error checking vehicle rentals:', error);
+    res.status(500).json({
+      error: 'Araç kiralamaları kontrol edilirken hata oluştu'
     });
   }
 });

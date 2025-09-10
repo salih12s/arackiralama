@@ -1,8 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db/prisma';
+import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
+
+// Apply authentication to all routes
+router.use(authenticateToken);
 
 // Validation schemas
 const createCustomerSchema = z.object({
@@ -207,6 +211,26 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Müşteri silinirken hata oluştu'
+    });
+  }
+});
+
+// GET /api/customers/:id/rentals - Check if customer has rentals (for safety deletion)
+router.get('/:id/rentals', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const rentals = await prisma.rental.findMany({
+      where: { customerId: id },
+      select: { id: true } // Only return IDs for efficiency
+    });
+
+    res.json(rentals);
+  } catch (error) {
+    console.error('Error checking customer rentals:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Müşteri kiralamaları kontrol edilirken hata oluştu'
     });
   }
 });
