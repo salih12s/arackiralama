@@ -25,7 +25,8 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
+  Tooltip
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -320,7 +321,7 @@ export const UnpaidDebtsDetail: React.FC = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'ACTIVE': return 'KIRADA';
-      case 'COMPLETED': return 'TAMAMLANDI';
+      case 'COMPLETED': return 'TESLİM EDİLDİ';
       case 'RETURNED': return 'TESLİM EDİLDİ';
       case 'CANCELLED': return 'İPTAL';
       case 'RESERVED': return 'REZERVE';
@@ -588,9 +589,6 @@ export const UnpaidDebtsDetail: React.FC = () => {
                 <TableCell sx={{ minWidth: 45, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center', fontSize: '0.6rem' }}>
                   Durum
                 </TableCell>
-                <TableCell sx={{ minWidth: 50, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center', fontSize: '0.6rem' }}>
-                  Tür
-                </TableCell>
                 <TableCell sx={{ minWidth: 100, fontWeight: 'bold', bgcolor: 'grey.100', fontSize: '0.6rem' }}>
                   Açıklama
                 </TableCell>
@@ -610,10 +608,10 @@ export const UnpaidDebtsDetail: React.FC = () => {
                 >
                   <TableCell>
                     <Box>
-                      <Typography variant="caption" display="block" sx={{ fontSize: '0.6rem' }}>
+                      <Typography variant="caption" display="block" sx={{ fontSize: '0.65rem' }}>
                         {formatDate(rental.startDate)}
                       </Typography>
-                      <Typography variant="caption" display="block" sx={{ fontSize: '0.6rem', color: 'text.secondary' }}>
+                      <Typography variant="caption" display="block" sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>
                         {formatDate(rental.endDate)}
                       </Typography>
                     </Box>
@@ -687,17 +685,12 @@ export const UnpaidDebtsDetail: React.FC = () => {
                       sx={{ fontSize: '0.65rem', height: 20 }}
                     />
                   </TableCell>
-                  <TableCell align="center">
-                    <Chip
-                      label={rental.rentalType === 'NEW' ? 'Yeni' : 'Uzatma'}
-                      color={rental.rentalType === 'NEW' ? 'primary' : 'secondary'}
-                      size="small"
-                      variant="outlined"
-                      sx={{ fontSize: '0.65rem', height: 20 }}
-                    />
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {rental.description || '-'}
+                  <TableCell sx={{ maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <Tooltip title={rental.description || 'Açıklama bulunmuyor'} arrow>
+                      <span style={{ cursor: rental.description ? 'help' : 'default' }}>
+                        {rental.description || '-'}
+                      </span>
+                    </Tooltip>
                   </TableCell>
                   <TableCell align="center">
                     <Button
@@ -1030,43 +1023,6 @@ export const UnpaidDebtsDetail: React.FC = () => {
                   placeholder="Kiralama ile ilgili notlar..."
                 />
               </Grid>
-
-              {/* Ek Ödemeler Bölümü */}
-              {editingRental && editingRental.extraPayments > 0 && (
-                <Grid item xs={12}>
-                  <Box sx={{ mt: 2, p: 2, bgcolor: 'info.50', borderRadius: 1, border: '1px solid', borderColor: 'info.200' }}>
-                    <Typography variant="h6" color="info.main" sx={{ mb: 2 }}>
-                      Ek Ödemeler
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={4}>
-                        <Typography variant="body2" color="text.secondary">
-                          Taksit Ödemeleri: {formatCurrency(
-                            (editingRental.advancePayment || 0) + 
-                            (editingRental.payment1 || 0) + 
-                            (editingRental.payment2 || 0) + 
-                            (editingRental.payment3 || 0) + 
-                            (editingRental.payment4 || 0)
-                          )}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="body2" color="success.main" fontWeight="bold">
-                          Ek Ödemeler: {formatCurrency(editingRental.extraPayments)}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="body2" color="primary.main" fontWeight="bold">
-                          Toplam Ödenen: {formatCurrency(editingRental.totalPaid)}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                      * Ek ödemeler taksit ödemeleri dışında yapılan ödemelerdir ve otomatik hesaplanır.
-                    </Typography>
-                  </Box>
-                </Grid>
-              )}
 
               {/* Calculated Totals */}
               <Grid item xs={12}>

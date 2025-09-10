@@ -47,7 +47,7 @@ const ReservationDialog: React.FC<ReservationDialogProps> = ({
     customerName: '',
     licensePlate: '',
     reservationDate: dayjs(),
-    reservationTime: dayjs().add(1, 'hour'),
+    reservationTime: dayjs(),
     rentalDuration: '' as string | number,
     note: ''
   });
@@ -70,7 +70,7 @@ const ReservationDialog: React.FC<ReservationDialogProps> = ({
         customerName: '',
         licensePlate: '',
         reservationDate: dayjs(),
-        reservationTime: dayjs().add(1, 'hour'),
+        reservationTime: dayjs(),
         rentalDuration: '',
         note: ''
       });
@@ -103,7 +103,7 @@ const ReservationDialog: React.FC<ReservationDialogProps> = ({
       customerName: '',
       licensePlate: '',
       reservationDate: dayjs(),
-      reservationTime: dayjs().add(1, 'hour'),
+      reservationTime: dayjs(),
       rentalDuration: '',
       note: ''
     });

@@ -29,7 +29,6 @@ import {
   Assessment,
   Backup,
   Person,
-  TrendingUp,
   Warning,
   Menu as MenuIcon,
 } from '@mui/icons-material';
@@ -140,7 +139,6 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/detailed-report', label: 'Kiralama Girişi', icon: <Assessment fontSize="small" /> },
     { path: '/debtor-details', label: 'Borçlu Kişiler', icon: <Person fontSize="small" /> },
     { path: '/unpaid-debts', label: 'Ödenmeyen Borçlar Detay', icon: <Warning fontSize="small" /> },
-    { path: '/vehicle-revenue', label: 'Araç Bazlı Gelir', icon: <TrendingUp fontSize="small" /> },
     { path: '/all-rentals', label: 'Kiralama Geçmişi', icon: <Receipt fontSize="small" /> },
     { path: '/backup', label: 'Yedekleme', icon: <Backup fontSize="small" /> },
   ];

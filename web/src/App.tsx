@@ -17,7 +17,6 @@ import Vehicles from './pages/Vehicles';
 import Customers from './pages/Customers';
 import Reports from './pages/Reports';
 import DebtorDetails from './pages/DebtorDetails';
-import VehicleRevenue from './pages/VehicleRevenue';
 import UnpaidDebtsDetail from './pages/UnpaidDebtsDetail';
 import VehicleDetail from './pages/VehicleDetail';
 import Backup from './pages/Backup';
@@ -154,14 +153,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <DebtorDetails />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/vehicle-revenue"
-        element={
-          <ProtectedRoute>
-            <VehicleRevenue />
           </ProtectedRoute>
         }
       />

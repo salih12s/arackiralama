@@ -30,7 +30,8 @@ import {
   Menu,
   ListItemIcon,
   ListItemText,
-  IconButton
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -171,7 +172,7 @@ export const AllRentals: React.FC = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'ACTIVE': return 'KIRADA';
-      case 'COMPLETED': return 'TAMAMLANDI';
+      case 'COMPLETED': return 'TESLİM EDİLDİ';
       case 'RETURNED': return 'TESLİM EDİLDİ';
       case 'CANCELLED': return 'İPTAL';
       case 'RESERVED': return 'REZERVE';
@@ -518,8 +519,12 @@ export const AllRentals: React.FC = () => {
                         sx={{ fontSize: '0.65rem', height: 20 }}
                       />
                     </TableCell>
-                    <TableCell sx={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {rental.note || '-'}
+                    <TableCell sx={{ maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <Tooltip title={rental.note || 'Not bulunmuyor'} arrow>
+                        <span style={{ cursor: rental.note ? 'help' : 'default' }}>
+                          {rental.note || '-'}
+                        </span>
+                      </Tooltip>
                     </TableCell>
                     <TableCell>
                       <IconButton
@@ -603,6 +608,7 @@ export const AllRentals: React.FC = () => {
             </MenuItem>
           )}
 
+          {/* 
           <MenuItem 
             onClick={() => {
               console.log('💰 Payment Click - selectedRental:', selectedRental?.id);
@@ -617,6 +623,7 @@ export const AllRentals: React.FC = () => {
             </ListItemIcon>
             <ListItemText>Ödeme Ekle</ListItemText>
           </MenuItem>
+          */}
 
           <MenuItem 
             onClick={() => {

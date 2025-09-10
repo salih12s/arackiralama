@@ -155,7 +155,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
     
     // Calculate end date based on current days
     const currentDays = watch('days') || 1;
-    const newEndDate = newStartDate.add(currentDays - 1, 'day'); // -1 because days include both start and end
+    const newEndDate = newStartDate.add(currentDays, 'day'); // 1 gün = başlangıç + 1 gün
     setEndDate(newEndDate);
     setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
   };
@@ -166,10 +166,12 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
     setEndDate(newEndDate);
     setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
     
-    // Calculate days based on date difference (inclusive)
-    if (newEndDate.isAfter(startDate) || newEndDate.isSame(startDate, 'day')) {
-      const calculatedDays = newEndDate.diff(startDate, 'day') + 1; // +1 to include both start and end days
-      setValue('days', calculatedDays, { shouldValidate: false });
+    // Calculate days based on date difference (consecutive days)
+    if (newEndDate.isAfter(startDate)) {
+      const calculatedDays = newEndDate.diff(startDate, 'day'); // No +1, consecutive counting
+      setValue('days', calculatedDays > 0 ? calculatedDays : 1, { shouldValidate: false });
+    } else {
+      setValue('days', 1, { shouldValidate: false }); // Minimum 1 day
     }
   };
 
@@ -178,10 +180,10 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
     
     setValue('days', newDays, { shouldValidate: false });
     
-    // Calculate end date based on new days
-    // newDays = 1 means same day (start and end same)
-    // newDays = 2 means start day + 1 day = 2 days total
-    const newEndDate = startDate.add(newDays - 1, 'day');
+    // Calculate end date based on new days (consecutive counting)
+    // newDays = 1 means start day + 1 day
+    // newDays = 2 means start day + 2 days
+    const newEndDate = startDate.add(newDays, 'day');
     setEndDate(newEndDate);
     setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
   };
@@ -200,6 +202,18 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
       setValue('endDate', endDate?.toDate() || dayjs().add(1, 'day').toDate(), { shouldValidate: false });
     }
   }, [open, setValue]); // Only depend on open and setValue, not the date states
+
+  // Set current system time when dialog opens
+  useEffect(() => {
+    if (open) {
+      const now = dayjs();
+      const currentTime = now.format('HH:mm');
+      setStartTime(currentTime);
+      setEndTime(currentTime);
+      setValue('startTime', currentTime);
+      setValue('endTime', currentTime);
+    }
+  }, [open, setValue]);
 
   const createRentalMutation = useMutation({
     mutationFn: (data: RentalFormData) => {
@@ -377,6 +391,14 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                     textField: {
                       fullWidth: true,
                       margin: 'normal',
+                      sx: {
+                        '& .MuiInputLabel-root': {
+                          fontSize: '1rem',
+                        },
+                        '& .MuiInputBase-input': {
+                          fontSize: '1rem',
+                        }
+                      }
                     },
                   }}
                 />
@@ -403,6 +425,14 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                     textField: {
                       fullWidth: true,
                       margin: 'normal',
+                      sx: {
+                        '& .MuiInputLabel-root': {
+                          fontSize: '1rem',
+                        },
+                        '& .MuiInputBase-input': {
+                          fontSize: '1rem',
+                        }
+                      }
                     },
                   }}
                 />

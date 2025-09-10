@@ -25,7 +25,8 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
+  Tooltip
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -319,7 +320,7 @@ export const DetailedReport: React.FC = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'ACTIVE': return 'KIRADA';
-      case 'COMPLETED': return 'TAMAMLANDI';
+      case 'COMPLETED': return 'TESLİM EDİLDİ';
       case 'RETURNED': return 'TESLİM EDİLDİ';
       case 'CANCELLED': return 'İPTAL';
       case 'RESERVED': return 'REZERVE';
@@ -606,9 +607,6 @@ export const DetailedReport: React.FC = () => {
                 <TableCell sx={{ minWidth: 45, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center', fontSize: '0.6rem' }}>
                   Durum
                 </TableCell>
-                <TableCell sx={{ minWidth: 50, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center', fontSize: '0.6rem' }}>
-                  Tür
-                </TableCell>
                 <TableCell sx={{ minWidth: 100, fontWeight: 'bold', bgcolor: 'grey.100', fontSize: '0.6rem' }}>
                   Açıklama
                 </TableCell>
@@ -628,10 +626,10 @@ export const DetailedReport: React.FC = () => {
                 >
                   <TableCell>
                     <Box>
-                      <Typography variant="caption" display="block" sx={{ fontSize: '0.6rem' }}>
+                      <Typography variant="caption" display="block" sx={{ fontSize: '0.65rem' }}>
                         {formatDate(rental.startDate)}
                       </Typography>
-                      <Typography variant="caption" display="block" sx={{ fontSize: '0.6rem', color: 'text.secondary' }}>
+                      <Typography variant="caption" display="block" sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>
                         {formatDate(rental.endDate)}
                       </Typography>
                     </Box>
@@ -677,17 +675,12 @@ export const DetailedReport: React.FC = () => {
                       sx={{ fontSize: '0.65rem', height: 20 }}
                     />
                   </TableCell>
-                  <TableCell align="center">
-                    <Chip
-                      label={rental.rentalType === 'NEW' ? 'Yeni' : 'Uzatma'}
-                      color={rental.rentalType === 'NEW' ? 'primary' : 'secondary'}
-                      size="small"
-                      variant="outlined"
-                      sx={{ fontSize: '0.65rem', height: 20 }}
-                    />
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {rental.description || '-'}
+                  <TableCell sx={{ maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <Tooltip title={rental.description || 'Açıklama bulunmuyor'} arrow>
+                      <span style={{ cursor: rental.description ? 'help' : 'default' }}>
+                        {rental.description || '-'}
+                      </span>
+                    </Tooltip>
                   </TableCell>
                   <TableCell align="center">
                     <Button

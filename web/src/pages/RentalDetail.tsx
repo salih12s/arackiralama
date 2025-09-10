@@ -100,7 +100,7 @@ export default function RentalDetail() {
       case 'ACTIVE': return 'Aktif';
       case 'RETURNED': return 'Teslim Edildi';
       case 'CANCELLED': return 'İptal Edildi';
-      case 'COMPLETED': return 'Tamamlandı';
+      case 'COMPLETED': return 'Teslim Edildi';
       default: return status;
     }
   };

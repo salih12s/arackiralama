@@ -134,7 +134,7 @@ export default function Rentals() {
     switch (status) {
       case 'ACTIVE': return 'Aktif';
       case 'RETURNED': return 'Teslim Edildi';
-      case 'COMPLETED': return 'Tamamlandı';
+      case 'COMPLETED': return 'Teslim Edildi';
       case 'CANCELLED': return 'İptal Edildi';
       default: return status;
     }
@@ -361,7 +361,7 @@ export default function Rentals() {
                           <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                             {formatDate(rental.startDate)}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
                             {formatDate(rental.endDate)}
                           </Typography>
                         </TableCell>
@@ -518,9 +518,22 @@ export default function Rentals() {
                         </TableCell>
 
                         <TableCell sx={{ padding: '4px 8px' }}>
-                          <Typography variant="body2" sx={{ maxWidth: 80, wordWrap: 'break-word', fontSize: '0.75rem' }}>
-                            {rental.note || '-'}
-                          </Typography>
+                          <Tooltip title={rental.note || 'Not bulunmuyor'} arrow>
+                            <Typography 
+                              variant="body2" 
+                              sx={{ 
+                                maxWidth: 104, 
+                                wordWrap: 'break-word', 
+                                fontSize: '0.75rem',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                cursor: rental.note ? 'help' : 'default'
+                              }}
+                            >
+                              {rental.note || '-'}
+                            </Typography>
+                          </Tooltip>
                         </TableCell>
                         
                         <TableCell align="center" sx={{ padding: '4px 8px' }}>
@@ -598,12 +611,14 @@ export default function Rentals() {
             {returnRentalMutation.isPending ? 'Teslim Ediliyor...' : 'Teslim Et'}
           </ListItemText>
         </MenuItem>
+        {/* 
         <MenuItem onClick={handleAddPayment}>
           <ListItemIcon>
             <PaymentIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Ödeme Ekle</ListItemText>
         </MenuItem>
+        */}
       </Menu>
 
       {/* New Rental Dialog */}

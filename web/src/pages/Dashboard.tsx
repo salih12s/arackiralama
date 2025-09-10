@@ -184,7 +184,7 @@ export default function Dashboard() {
     switch (status) {
       case 'ACTIVE': return 'Aktif';
       case 'RETURNED': return 'Teslim Edildi';
-      case 'COMPLETED': return 'Tamamlandı';
+      case 'COMPLETED': return 'Teslim Edildi';
       case 'CANCELLED': return 'İptal Edildi';
       default: return status;
     }
@@ -1562,7 +1562,13 @@ export default function Dashboard() {
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>{reservation.note || '-'}</TableCell>
+                  <TableCell>
+                    <Tooltip title={reservation.note || 'Not bulunmuyor'} arrow>
+                      <span style={{ cursor: reservation.note ? 'help' : 'default' }}>
+                        {reservation.note || '-'}
+                      </span>
+                    </Tooltip>
+                  </TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={0.5}>
                       <IconButton
