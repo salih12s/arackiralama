@@ -350,7 +350,7 @@ export const AllRentals: React.FC = () => {
               <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'success.50', borderRadius: 1 }}>
                 <Typography variant="caption" color="text.secondary">Toplam Gelir</Typography>
                 <Typography variant="h6" color="success.dark" sx={{ fontWeight: 700, fontSize: '1rem' }}>
-                  {formatCurrency(filteredRentals.reduce((sum, r) => sum + r.totalDue, 0))}
+                  {formatCurrency(filteredRentals.reduce((sum, r) => sum + r.totalDue, 0) / 100)}
                 </Typography>
               </Box>
             </Grid>
@@ -377,7 +377,7 @@ export const AllRentals: React.FC = () => {
                                         (r.payments || []).reduce((pSum, p) => pSum + p.amount, 0);
                       return sum + paidAmount;
                     }, 0);
-                    return totalRevenue - totalPaid;
+                    return (totalRevenue - totalPaid) / 100;
                   })())}
                 </Typography>
               </Box>
@@ -482,7 +482,7 @@ export const AllRentals: React.FC = () => {
                       {formatCurrency(rental.fuel || 0)}
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 600 }}>
-                      {formatCurrency(rental.totalDue)}
+                      {formatCurrency(rental.totalDue / 100)}
                     </TableCell>
                     <TableCell align="right">
                       {formatCurrency(rental.upfront)}
@@ -509,7 +509,7 @@ export const AllRentals: React.FC = () => {
                         fontWeight: 600,
                         color: balance > 0 ? 'error.main' : balance < 0 ? 'warning.main' : 'success.main'
                       }}>
-                      {formatCurrency(balance )}
+                      {formatCurrency(balance / 100)}
                     </TableCell>
                     <TableCell>
                       <Chip 
@@ -679,12 +679,12 @@ export const AllRentals: React.FC = () => {
                   <Typography variant="body2"><strong>Günlük Fiyat:</strong> {formatCurrency(detailDialog.rental.dailyPrice)}</Typography>
                 </Grid>
                 <Grid item xs={12}>
-                  <Typography variant="body2"><strong>Toplam Tutar:</strong> {formatCurrency(detailDialog.rental.totalDue / 100)}</Typography>
+                  <Typography variant="body2"><strong>Toplam Tutar:</strong> {formatCurrency(detailDialog.rental.totalDue)}</Typography>
                 </Grid>
                 <Grid item xs={12}>
                   <Typography variant="body2"><strong>Kalan Bakiye:</strong> 
                     <span style={{ color: calculateBalance(detailDialog.rental) > 0 ? 'red' : 'green', fontWeight: 'bold' }}>
-                      {formatCurrency(calculateBalance(detailDialog.rental) )}
+                      {formatCurrency(calculateBalance(detailDialog.rental) / 100)}
                     </span>
                   </Typography>
                 </Grid>

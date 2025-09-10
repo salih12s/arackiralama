@@ -116,7 +116,7 @@ export function calculateDaysBetween(startDate: Date, endDate: Date): number {
   end.setHours(0, 0, 0, 0);
   
   const diffTime = end.getTime() - start.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end date
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // Remove +1 to fix calculation
   
   return Math.max(1, diffDays); // Minimum 1 day
 }

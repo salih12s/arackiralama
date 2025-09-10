@@ -140,7 +140,7 @@ export default function DebtorDetails() {
                               fontWeight: 600
                             }}
                           >
-                            {formatCurrency(debtor.totalDebt)}
+                            {formatCurrency(debtor.totalDebt / 100)}
                           </Typography>
                         </TableCell>
                       </TableRow>
@@ -179,7 +179,7 @@ export default function DebtorDetails() {
                 fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' }
               }}
             >
-              {formatCurrency(totalDebt)}
+              {formatCurrency(totalDebt / 100)}
             </Typography>
             
             <Typography variant="body2" color="text.secondary">

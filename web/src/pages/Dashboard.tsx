@@ -981,7 +981,7 @@ export default function Dashboard() {
               Alacaklar:
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
-              {formatCurrency(totalDebt || 0)}
+              {formatCurrency(totalDebt || 0 / 100)}
             </Typography>
           </Box>
           

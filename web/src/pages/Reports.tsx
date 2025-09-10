@@ -78,7 +78,7 @@ export default function Reports() {
     
     const startDate = dayjs(rental.startDate);
     const endDate = dayjs(rental.endDate);
-    const totalDays = endDate.diff(startDate, 'days') + 1;
+    const totalDays = endDate.diff(startDate, 'days');
     
     console.log(`📅 Rental ${rental.id}: ${totalDays} days from ${startDate.format('YYYY-MM-DD')} to ${endDate.format('YYYY-MM-DD')}`);
     
