@@ -912,44 +912,6 @@ export default function Dashboard() {
             borderRadius: { xs: 1, sm: 0 },
             backgroundColor: { xs: 'background.paper', sm: 'transparent' }
           }}>
-            <WalletIcon sx={{ fontSize: { xs: 14, sm: 16 }, color: 'text.secondary' }} />
-            <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>
-              Aylık:
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
-              {formatCurrency(currentMonthRevenue || 0)}
-            </Typography>
-          </Box>
-          
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 0.5,
-            p: { xs: 1, sm: 0 },
-            border: { xs: '1px solid', sm: 'none' },
-            borderColor: 'divider',
-            borderRadius: { xs: 1, sm: 0 },
-            backgroundColor: { xs: 'background.paper', sm: 'transparent' }
-          }}>
-            <TrendingUpIcon sx={{ fontSize: { xs: 14, sm: 16 }, color: 'text.secondary' }} />
-            <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>
-              Araç Ort.:
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
-              {formatCurrency(stats.totalVehicles > 0 ? (currentMonthRevenue || 0) / stats.totalVehicles : 0)}
-            </Typography>
-          </Box>
-          
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 0.5,
-            p: { xs: 1, sm: 0 },
-            border: { xs: '1px solid', sm: 'none' },
-            borderColor: 'divider',
-            borderRadius: { xs: 1, sm: 0 },
-            backgroundColor: { xs: 'background.paper', sm: 'transparent' }
-          }}>
             <PeopleIcon sx={{ fontSize: { xs: 14, sm: 16 }, color: 'text.secondary' }} />
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>
               Borçlu:

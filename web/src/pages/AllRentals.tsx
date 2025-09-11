@@ -161,7 +161,7 @@ export const AllRentals: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'ACTIVE': return 'primary';
-      case 'COMPLETED': return 'success';
+      case 'COMPLETED': return 'success'; // COMPLETED'ı RETURNED gibi göster
       case 'RETURNED': return 'success';
       case 'CANCELLED': return 'error';
       case 'RESERVED': return 'warning';
@@ -172,7 +172,7 @@ export const AllRentals: React.FC = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'ACTIVE': return 'KIRADA';
-      case 'COMPLETED': return 'TESLİM EDİLDİ';
+      case 'COMPLETED': return 'TESLİM EDİLDİ'; // COMPLETED'ı RETURNED gibi göster
       case 'RETURNED': return 'TESLİM EDİLDİ';
       case 'CANCELLED': return 'İPTAL';
       case 'RESERVED': return 'REZERVE';
@@ -337,7 +337,6 @@ export const AllRentals: React.FC = () => {
               >
                 <MenuItem value="">Tümü</MenuItem>
                 <MenuItem value="ACTIVE">Kirada</MenuItem>
-                <MenuItem value="COMPLETED">Tamamlandı</MenuItem>
                 <MenuItem value="RETURNED">Teslim Edildi</MenuItem>
                 <MenuItem value="CANCELLED">İptal</MenuItem>
                 <MenuItem value="RESERVED">Rezerve</MenuItem>
