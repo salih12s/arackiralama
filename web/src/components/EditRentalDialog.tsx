@@ -64,7 +64,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
   // Fetch customers for autocomplete
   const { data: customersResponse } = useQuery({
     queryKey: ['customers'],
-    queryFn: () => customersApi.getAll()
+    queryFn: () => customersApi.getAll(undefined, 1000)
   });
 
   const customers = customersResponse?.data?.data || [];
@@ -174,7 +174,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
   // Fetch all vehicles (for changing vehicle if needed)
   const { data: vehiclesResponse } = useQuery({
     queryKey: ['vehicles-all'],
-    queryFn: () => vehiclesApi.getAll(),
+    queryFn: () => vehiclesApi.getAll(undefined, 1000),
     enabled: true, // Always load vehicles
   });
 

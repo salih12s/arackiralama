@@ -116,7 +116,7 @@ export default function Backup() {
     try {
       // Fetch all data
       const [vehiclesRes, rentalsRes] = await Promise.all([
-        vehiclesApi.getAll(),
+        vehiclesApi.getAll(undefined, 1000),
         rentalsApi.getAll({ limit: 1000 })
       ]);
 
@@ -187,8 +187,8 @@ export default function Backup() {
     try {
       // Fetch summary data
       const [vehiclesRes, rentalsRes] = await Promise.all([
-        vehiclesApi.getAll(),
-        rentalsApi.getAll({ limit: 100 })
+        vehiclesApi.getAll(undefined, 1000),
+        rentalsApi.getAll({ limit: 1000 })
       ]);
 
       const vehicles = vehiclesRes.data || [];

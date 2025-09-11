@@ -193,8 +193,13 @@ export const authApi = {
 
 // Vehicles API
 export const vehiclesApi = {
-  getAll: (status?: string) =>
-    api.get<Vehicle[]>(`/vehicles${status ? `?status=${status}` : ''}`),
+  getAll: (status?: string, limit?: number) => {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (limit) params.append('limit', limit.toString());
+    const queryString = params.toString();
+    return api.get<Vehicle[]>(`/vehicles${queryString ? `?${queryString}` : ''}`);
+  },
   getById: (id: string) => api.get<Vehicle>(`/vehicles/${id}`),
   create: (data: { plate: string; name?: string }) =>
     api.post<Vehicle>('/vehicles', data),
@@ -259,8 +264,13 @@ export const paymentsApi = {
 
 // Customers API
 export const customersApi = {
-  getAll: (search?: string) => 
-    api.get<{ success: boolean; data: Customer[] }>(`/customers${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  getAll: (search?: string, limit?: number) => {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (limit) params.append('limit', limit.toString());
+    const queryString = params.toString();
+    return api.get<{ success: boolean; data: Customer[] }>(`/customers${queryString ? `?${queryString}` : ''}`);
+  },
   getById: (id: string) => api.get<{ success: boolean; data: Customer }>(`/customers/${id}`),
   create: (data: {
     fullName: string;

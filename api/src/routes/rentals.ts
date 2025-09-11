@@ -48,7 +48,7 @@ router.get('/', async (req, res) => {
       from,
       to,
       page = '1',
-      limit = '50'
+      limit = '1000'
     } = req.query;
 
     const pageNum = parseInt(page as string, 10);

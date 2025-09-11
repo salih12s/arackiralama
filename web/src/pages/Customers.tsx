@@ -59,7 +59,7 @@ export default function Customers() {
   // Fetch customers
   const { data: customersRes, isLoading } = useQuery({
     queryKey: ['customers', searchTerm],
-    queryFn: () => customersApi.getAll(searchTerm || undefined),
+    queryFn: () => customersApi.getAll(searchTerm || undefined, 1000),
     staleTime: 30 * 1000,
   });
 

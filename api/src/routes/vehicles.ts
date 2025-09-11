@@ -29,7 +29,7 @@ const updateVehicleSchema = z.object({
 // GET /api/vehicles
 router.get('/', async (req, res) => {
   try {
-    const { status, consignment } = req.query;
+    const { status, consignment, limit = '1000' } = req.query;
     
     const where: any = {};
     if (status && vehicleStatusSchema.safeParse(status).success) {
@@ -44,6 +44,7 @@ router.get('/', async (req, res) => {
     const vehicles = await prisma.vehicle.findMany({
       where,
       orderBy: { plate: 'asc' },
+      take: parseInt(limit as string),
       include: {
         _count: {
           select: { rentals: true }

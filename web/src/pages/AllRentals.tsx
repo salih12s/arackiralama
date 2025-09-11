@@ -100,7 +100,7 @@ export const AllRentals: React.FC = () => {
   // Fetch vehicles for filter
   const { data: vehiclesRes } = useQuery({
     queryKey: ['vehicles'],
-    queryFn: () => vehiclesApi.getAll(),
+    queryFn: () => vehiclesApi.getAll(undefined, 1000),
     staleTime: 60 * 1000,
   });
 

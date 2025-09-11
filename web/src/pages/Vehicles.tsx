@@ -72,7 +72,7 @@ export default function Tanimalar() {
     queryKey: ['vehicles'],
     queryFn: async () => {
       try {
-        const response = await client.get('/vehicles');
+        const response = await client.get('/vehicles?limit=1000');
         return response.data;
       } catch (error) {
         console.error('Vehicles API Error:', error);
@@ -86,7 +86,7 @@ export default function Tanimalar() {
   // Fetch customers - using the same API as Customers.tsx
   const { data: customersData, isLoading: customersLoading, error: customersError } = useQuery({
     queryKey: ['customers'],
-    queryFn: () => customersApi.getAll(),
+    queryFn: () => customersApi.getAll(undefined, 1000),
     staleTime: 30 * 1000,
     retry: 3,
   });

@@ -35,9 +35,7 @@ import {
   Edit as EditIcon
 } from '@mui/icons-material';
 import Layout from '../components/Layout';
-import { rentalsApi } from '../api/rentals';
-import { vehiclesApi } from '../api/vehicles';
-import { customersApi } from '../api/client';
+import { rentalsApi, vehiclesApi, customersApi } from '../api/client';
 import { formatCurrency } from '../utils/currency';
 
 // Compact date formatting (DD.MM)
@@ -191,15 +189,15 @@ export const DetailedReport: React.FC = () => {
       setLoading(true);
       const [rentalsResponse, vehiclesResponse, customersResponse] = await Promise.all([
         rentalsApi.getAll(),
-        vehiclesApi.getAll(),
-        customersApi.getAll()
+        vehiclesApi.getAll(undefined, 1000),
+        customersApi.getAll(undefined, 1000)
       ]);
 
       console.log('Rentals Response:', rentalsResponse);
       console.log('Vehicles Response:', vehiclesResponse);
       console.log('Customers Response:', customersResponse);
 
-      const rentalsData = rentalsResponse.data;
+      const rentalsData = Array.isArray(rentalsResponse.data) ? rentalsResponse.data : (rentalsResponse.data.data || []);
       const vehiclesData = vehiclesResponse.data ? vehiclesResponse.data : vehiclesResponse;
       const customersData = customersResponse.data ? customersResponse.data.data : customersResponse.data;
 

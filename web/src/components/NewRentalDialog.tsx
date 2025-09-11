@@ -68,7 +68,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
   // Fetch customers for autocomplete
   const { data: customersResponse } = useQuery({
     queryKey: ['customers'],
-    queryFn: () => customersApi.getAll()
+    queryFn: () => customersApi.getAll(undefined, 1000)
   });
 
   const customers = customersResponse?.data?.data || [];
@@ -142,7 +142,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
   // Fetch available vehicles
   const { data: vehicles } = useQuery({
     queryKey: ['vehicles-available'],
-    queryFn: () => vehiclesApi.getAll('IDLE'),
+    queryFn: () => vehiclesApi.getAll('IDLE', 1000),
     enabled: open,
   });
 

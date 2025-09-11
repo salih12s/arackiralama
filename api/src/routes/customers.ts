@@ -19,7 +19,7 @@ const updateCustomerSchema = createCustomerSchema.partial();
 // GET /api/customers - List all customers
 router.get('/', async (req, res) => {
   try {
-    const { search, limit = '50' } = req.query;
+    const { search, limit = '1000' } = req.query;
     
     const customers = await prisma.customer.findMany({
       where: search ? {

@@ -60,7 +60,7 @@ export default function Rentals() {
     queryKey: ['rentals', search],
     queryFn: () => rentalsApi.getAll({ 
       search: search || undefined,
-      limit: 200 
+      limit: 1000 
     }),
     staleTime: 30 * 1000, // 30 saniye fresh
     gcTime: 2 * 60 * 1000, // 2 dakika cache

@@ -248,7 +248,7 @@ export default function Dashboard() {
   // Boşta olan araçları getir
   const { data: idleVehiclesRes, isFetching: idleLoading } = useQuery({
     queryKey: ['idle-vehicles'],
-    queryFn: () => vehiclesApi.getAll('IDLE'),
+    queryFn: () => vehiclesApi.getAll('IDLE', 1000),
     staleTime: 45 * 1000, // 45 saniye fresh tut
     gcTime: 3 * 60 * 1000, // 3 dakika cache'de sakla
   });
@@ -256,7 +256,7 @@ export default function Dashboard() {
   // Rezerve araçları getir
   const { data: reservedVehiclesRes } = useQuery({
     queryKey: ['reserved-vehicles'],
-    queryFn: () => vehiclesApi.getAll('RESERVED'),
+    queryFn: () => vehiclesApi.getAll('RESERVED', 1000),
     staleTime: 45 * 1000,
     gcTime: 3 * 60 * 1000,
   });
@@ -272,7 +272,7 @@ export default function Dashboard() {
   // Serviste olan araçları getir
   const { data: serviceVehiclesRes } = useQuery({
     queryKey: ['service-vehicles'],
-    queryFn: () => vehiclesApi.getAll('SERVICE'),
+    queryFn: () => vehiclesApi.getAll('SERVICE', 1000),
     staleTime: 45 * 1000,
     gcTime: 3 * 60 * 1000,
   });
@@ -280,7 +280,7 @@ export default function Dashboard() {
   // Tüm araçları getir (rezervasyon dialog için)
   const { data: allVehiclesRes } = useQuery({
     queryKey: ['all-vehicles'],
-    queryFn: () => vehiclesApi.getAll(),
+    queryFn: () => vehiclesApi.getAll(undefined, 1000),
     staleTime: 45 * 1000,
     gcTime: 3 * 60 * 1000,
   });
@@ -290,7 +290,7 @@ export default function Dashboard() {
     queryKey: ['active-rentals'],
     queryFn: async () => {
       console.log('🔄 Fetching active rentals...');
-      const result = await rentalsApi.getAll({ limit: 100 });
+      const result = await rentalsApi.getAll({ limit: 1000 });
       console.log('📋 Active rentals API response:', result);
       console.log('📋 Active rentals data structure:', result.data);
       return result;
@@ -304,7 +304,7 @@ export default function Dashboard() {
     queryKey: ['all-rentals'],
     queryFn: async () => {
       console.log('🔄 Fetching all rentals...');
-      const result = await rentalsApi.getAll({ limit: 200 });
+      const result = await rentalsApi.getAll({ limit: 1000 });
       console.log('📋 All rentals API response:', result);
       return result;
     },
@@ -963,25 +963,6 @@ export default function Dashboard() {
                   (rental.upfront || 0) + (rental.pay1 || 0) + (rental.pay2 || 0) + (rental.pay3 || 0) + (rental.pay4 || 0);
                 return totalDue > totalPaid;
               }).length}
-            </Typography>
-          </Box>
-          
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 0.5,
-            p: { xs: 1, sm: 0 },
-            border: { xs: '1px solid', sm: 'none' },
-            borderColor: 'divider',
-            borderRadius: { xs: 1, sm: 0 },
-            backgroundColor: { xs: 'background.paper', sm: 'transparent' }
-          }}>
-            <TrendingDownIcon sx={{ fontSize: { xs: 14, sm: 16 }, color: 'text.secondary' }} />
-            <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>
-              Alacaklar:
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
-              {formatCurrency(totalDebt || 0 / 100)}
             </Typography>
           </Box>
           
