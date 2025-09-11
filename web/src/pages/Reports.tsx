@@ -76,9 +76,9 @@ export default function Reports() {
       return [];
     }
     
-    const startDate = dayjs(rental.startDate);
-    const endDate = dayjs(rental.endDate);
-    const totalDays = endDate.diff(startDate, 'days');
+    const startDate = dayjs(rental.startDate).startOf('day'); // Saati 00:00:00 yap
+    const endDate = dayjs(rental.endDate).startOf('day'); // Saati 00:00:00 yap  
+    const totalDays = endDate.diff(startDate, 'days'); // +1 çünkü başlangıç günü de dahil
     
     console.log(`📅 Rental ${rental.id}: ${totalDays} days from ${startDate.format('YYYY-MM-DD')} to ${endDate.format('YYYY-MM-DD')}`);
     

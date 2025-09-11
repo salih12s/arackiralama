@@ -195,9 +195,27 @@ export const AllRentals: React.FC = () => {
   };
 
   const calculateBalance = (rental: Rental) => {
-    const paidFromRental = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
-    const paidFromPayments = (rental.payments || []).reduce((sum, payment) => sum + payment.amount, 0);
-    return rental.totalDue - (paidFromRental + paidFromPayments);
+    // UnpaidDebtsDetail mantığı ile hesaplama
+    const days = rental.days || 0;
+    const dailyPrice = rental.dailyPrice || 0;
+    const totalPrice = days * dailyPrice;
+    
+    // Ek ücretler
+    const kmPrice = rental.kmDiff || 0;
+    const hgsFee = rental.hgs || 0;
+    const cleaningFee = rental.cleaning || 0;
+    const damageFee = rental.damage || 0;
+    const fuelCost = rental.fuel || 0;
+    
+    // Toplam tutar
+    const totalAmount = totalPrice + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
+    
+    // Ödemeler
+    const installmentPayments = (rental.upfront || 0) + (rental.pay1 || 0) + (rental.pay2 || 0) + (rental.pay3 || 0) + (rental.pay4 || 0);
+    const extraPayments = (rental.payments || []).reduce((sum, payment) => sum + (payment.amount || 0), 0);
+    const totalPaid = installmentPayments + extraPayments;
+    
+    return totalAmount - totalPaid;
   };
 
   const handlePrint = () => {
@@ -350,7 +368,19 @@ export const AllRentals: React.FC = () => {
               <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'success.50', borderRadius: 1 }}>
                 <Typography variant="caption" color="text.secondary">Toplam Gelir</Typography>
                 <Typography variant="h6" color="success.dark" sx={{ fontWeight: 700, fontSize: '1rem' }}>
-                  {formatCurrency(filteredRentals.reduce((sum, r) => sum + r.totalDue, 0) / 100)}
+                  {formatCurrency(filteredRentals.reduce((sum, r) => {
+                    // UnpaidDebtsDetail mantığı ile gerçek zamanlı hesaplama
+                    const days = r.days || 0;
+                    const dailyPrice = r.dailyPrice || 0;
+                    const totalPrice = days * dailyPrice;
+                    const kmPrice = r.kmDiff || 0;
+                    const hgsFee = r.hgs || 0;
+                    const cleaningFee = r.cleaning || 0;
+                    const damageFee = r.damage || 0;
+                    const fuelCost = r.fuel || 0;
+                    const totalAmount = totalPrice + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
+                    return sum + totalAmount;
+                  }, 0))}
                 </Typography>
               </Box>
             </Grid>
@@ -359,8 +389,9 @@ export const AllRentals: React.FC = () => {
                 <Typography variant="caption" color="text.secondary">Toplam Ödenen</Typography>
                 <Typography variant="h6" color="info.dark" sx={{ fontWeight: 700, fontSize: '1rem' }}>
                   {formatCurrency(filteredRentals.reduce((sum, r) => {
-                    const totalPaid = (r.upfront + r.pay1 + r.pay2 + r.pay3 + r.pay4) + 
-                                    (r.payments || []).reduce((pSum, p) => pSum + p.amount, 0);
+                    const installmentPayments = (r.upfront || 0) + (r.pay1 || 0) + (r.pay2 || 0) + (r.pay3 || 0) + (r.pay4 || 0);
+                    const extraPayments = (r.payments || []).reduce((pSum, p) => pSum + (p.amount || 0), 0);
+                    const totalPaid = installmentPayments + extraPayments;
                     return sum + totalPaid;
                   }, 0))}
                 </Typography>
@@ -371,13 +402,26 @@ export const AllRentals: React.FC = () => {
                 <Typography variant="caption" color="text.secondary">Kalan Borç</Typography>
                 <Typography variant="h6" color="warning.dark" sx={{ fontWeight: 700, fontSize: '1rem' }}>
                   {formatCurrency((() => {
-                    const totalRevenue = filteredRentals.reduce((sum, r) => sum + r.totalDue, 0);
-                    const totalPaid = filteredRentals.reduce((sum, r) => {
-                      const paidAmount = (r.upfront + r.pay1 + r.pay2 + r.pay3 + r.pay4) + 
-                                        (r.payments || []).reduce((pSum, p) => pSum + p.amount, 0);
-                      return sum + paidAmount;
+                    const totalRevenue = filteredRentals.reduce((sum, r) => {
+                      // UnpaidDebtsDetail mantığı ile gerçek zamanlı hesaplama
+                      const days = r.days || 0;
+                      const dailyPrice = r.dailyPrice || 0;
+                      const totalPrice = days * dailyPrice;
+                      const kmPrice = r.kmDiff || 0;
+                      const hgsFee = r.hgs || 0;
+                      const cleaningFee = r.cleaning || 0;
+                      const damageFee = r.damage || 0;
+                      const fuelCost = r.fuel || 0;
+                      const totalAmount = totalPrice + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
+                      return sum + totalAmount;
                     }, 0);
-                    return (totalRevenue - totalPaid) / 100;
+                    const totalPaid = filteredRentals.reduce((sum, r) => {
+                      const installmentPayments = (r.upfront || 0) + (r.pay1 || 0) + (r.pay2 || 0) + (r.pay3 || 0) + (r.pay4 || 0);
+                      const extraPayments = (r.payments || []).reduce((pSum, p) => pSum + (p.amount || 0), 0);
+                      const totalPaid = installmentPayments + extraPayments;
+                      return sum + totalPaid;
+                    }, 0);
+                    return totalRevenue - totalPaid;
                   })())}
                 </Typography>
               </Box>
@@ -438,10 +482,39 @@ export const AllRentals: React.FC = () => {
             </TableHead>
             <TableBody>
               {filteredRentals.map((rental) => {
-                const totalPaidFromRental = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
-                const totalPaidFromPayments = (rental.payments || []).reduce((sum, payment) => sum + payment.amount, 0);
-                const totalPaid = totalPaidFromRental + totalPaidFromPayments;
-                const balance = rental.totalDue - totalPaid;
+                // UnpaidDebtsDetail mantığı ile gerçek zamanlı hesaplama
+                const days = rental.days || 0;
+                const dailyPrice = rental.dailyPrice || 0;  // TL cinsinden
+                const totalPrice = days * dailyPrice;
+                
+                // Ek ücretler - API'dan TL cinsinde geliyor
+                const kmPrice = rental.kmDiff || 0;
+                const hgsFee = rental.hgs || 0;
+                const cleaningFee = rental.cleaning || 0;
+                const damageFee = rental.damage || 0;
+                const fuelCost = rental.fuel || 0;
+                
+                // Toplam tutar hesaplama
+                const totalAmount = totalPrice + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
+                
+                // Ödemeler - TL cinsinden
+                const advancePayment = rental.upfront || 0;
+                const pay1 = rental.pay1 || 0;
+                const pay2 = rental.pay2 || 0;
+                const pay3 = rental.pay3 || 0;
+                const pay4 = rental.pay4 || 0;
+                
+                // Ek ödemeler (payments array'inden)
+                const totalPaidFromPayments = (rental.payments || []).reduce((sum, payment) => sum + (payment.amount || 0), 0);
+                
+                // Taksit ödemeleri
+                const installmentPayments = advancePayment + pay1 + pay2 + pay3 + pay4;
+                
+                // Toplam ödenen
+                const totalPaid = installmentPayments + totalPaidFromPayments;
+                
+                // Bakiye hesaplama
+                const balance = totalAmount - totalPaid;
 
                 return (
                   <TableRow key={rental.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
@@ -482,7 +555,7 @@ export const AllRentals: React.FC = () => {
                       {formatCurrency(rental.fuel || 0)}
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 600 }}>
-                      {formatCurrency(rental.totalDue / 100)}
+                      {formatCurrency(totalAmount)}
                     </TableCell>
                     <TableCell align="right">
                       {formatCurrency(rental.upfront)}
@@ -509,7 +582,7 @@ export const AllRentals: React.FC = () => {
                         fontWeight: 600,
                         color: balance > 0 ? 'error.main' : balance < 0 ? 'warning.main' : 'success.main'
                       }}>
-                      {formatCurrency(balance / 100)}
+                      {formatCurrency(balance)}
                     </TableCell>
                     <TableCell>
                       <Chip 
@@ -679,12 +752,24 @@ export const AllRentals: React.FC = () => {
                   <Typography variant="body2"><strong>Günlük Fiyat:</strong> {formatCurrency(detailDialog.rental.dailyPrice)}</Typography>
                 </Grid>
                 <Grid item xs={12}>
-                  <Typography variant="body2"><strong>Toplam Tutar:</strong> {formatCurrency(detailDialog.rental.totalDue)}</Typography>
+                  <Typography variant="body2"><strong>Toplam Tutar:</strong> {formatCurrency(
+                    (() => {
+                      const days = detailDialog.rental.days || 0;
+                      const dailyPrice = detailDialog.rental.dailyPrice || 0;
+                      const totalPrice = days * dailyPrice;
+                      const kmPrice = detailDialog.rental.kmDiff || 0;
+                      const hgsFee = detailDialog.rental.hgs || 0;
+                      const cleaningFee = detailDialog.rental.cleaning || 0;
+                      const damageFee = detailDialog.rental.damage || 0;
+                      const fuelCost = detailDialog.rental.fuel || 0;
+                      return totalPrice + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
+                    })()
+                  )}</Typography>
                 </Grid>
                 <Grid item xs={12}>
                   <Typography variant="body2"><strong>Kalan Bakiye:</strong> 
                     <span style={{ color: calculateBalance(detailDialog.rental) > 0 ? 'red' : 'green', fontWeight: 'bold' }}>
-                      {formatCurrency(calculateBalance(detailDialog.rental) / 100)}
+                      {formatCurrency(calculateBalance(detailDialog.rental))}
                     </span>
                   </Typography>
                 </Grid>

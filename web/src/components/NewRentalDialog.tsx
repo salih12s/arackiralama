@@ -30,11 +30,9 @@ import { invalidateAllRentalCaches } from '../utils/cacheInvalidation';
 const rentalSchema = z.object({
   vehicleId: z.string().min(1, 'Araç seçimi gereklidir'),
   customerName: z.string().min(1, 'Müşteri adı gereklidir'),
-  customerPhone: z.string().optional(),
   startDate: z.date(),
   startTime: z.string().default('09:00'),
   endDate: z.date(),
-  endTime: z.string().default('18:00'),
   days: z.number().int().min(1, 'Minimum 1 gün olmalıdır'),
   dailyPrice: z.number().min(0, 'Günlük ücret negatif olamaz'),
   kmDiff: z.number().min(0).default(0),
@@ -63,7 +61,11 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
   const [startDate, setStartDate] = useState<Dayjs | null>(dayjs());
   const [endDate, setEndDate] = useState<Dayjs | null>(dayjs().add(1, 'day'));
   const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('18:00');
+  
+  // Hesaplama alanları (sadece görsel hesaplama için)
+  const [calculationTotalAmount, setCalculationTotalAmount] = useState<string>('');
+  const [calculationDailyRate, setCalculationDailyRate] = useState<string>('');
+  const [calculationDays, setCalculationDays] = useState<string>('1');
 
   // Fetch customers for autocomplete
   const { data: customersResponse } = useQuery({
@@ -103,7 +105,6 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
       days: 1,
       dailyPrice: 150, // 150 TRY
       startTime: '09:00',
-      endTime: '18:00',
       kmDiff: 0,
       cleaning: 0,
       hgs: 0,
@@ -209,9 +210,6 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
       const now = dayjs();
       const currentTime = now.format('HH:mm');
       setStartTime(currentTime);
-      setEndTime(currentTime);
-      setValue('startTime', currentTime);
-      setValue('endTime', currentTime);
     }
   }, [open, setValue]);
 
@@ -221,12 +219,11 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
       const payload = {
         vehicleId: data.vehicleId,
         customerName: data.customerName,
-        customerPhone: data.customerPhone,
         startDate: startDate && startTime ? 
           dayjs(`${startDate.format('YYYY-MM-DD')}T${startTime}:00`).toISOString() :
           dayjs(data.startDate).toISOString(),
-        endDate: endDate && endTime ? 
-          dayjs(`${endDate.format('YYYY-MM-DD')}T${endTime}:00`).toISOString() :
+        endDate: endDate ? 
+          dayjs(`${endDate.format('YYYY-MM-DD')}T18:00:00`).toISOString() :
           dayjs(data.endDate).toISOString(),
         days: data.days,
         dailyPrice: Math.round(data.dailyPrice * 100),
@@ -265,7 +262,9 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
       setStartDate(dayjs());
       setEndDate(dayjs().add(1, 'day'));
       setStartTime('09:00');
-      setEndTime('18:00');
+      setCalculationTotalAmount('');
+      setCalculationDailyRate('');
+      setCalculationDays('1');
       onClose();
     }
   };
@@ -325,10 +324,6 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                     onChange={(_event, value) => {
                       const name = typeof value === 'string' ? value : value?.fullName || '';
                       field.onChange(name);
-                      // If customer is selected, populate phone field
-                      if (value && typeof value === 'object') {
-                        setValue('customerPhone', value.phone || '');
-                      }
                     }}
                     onInputChange={(_event, inputValue) => {
                       field.onChange(inputValue);
@@ -363,21 +358,87 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
               />
             </Grid>
 
-            {/* Customer Phone */}
+            {/* Hesaplama Yardımcısı */}
             <Grid item xs={12} md={6}>
-              <Controller
-                name="customerPhone"
-                control={control}
-                defaultValue=""
-                render={({ field }) => (
+              <Box sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 1, bgcolor: '#f5f5f5' }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Hesaplama Yardımcısı
+                </Typography>
+                
+                {/* Gün Sayısı */}
+                <Box sx={{ mb: 1 }}>
                   <TextField
-                    {...field}
                     fullWidth
-                    label="Telefon (Opsiyonel)"
-                    margin="normal"
+                    label="Gün Sayısı"
+                    type="number"
+                    value={calculationDays}
+                    onChange={(e) => {
+                      const days = e.target.value;
+                      setCalculationDays(days);
+                      
+                      // Toplam tutar varsa günlük ücreti hesapla
+                      if (calculationTotalAmount && days && parseInt(days) > 0) {
+                        const dailyRate = (parseFloat(calculationTotalAmount) / parseInt(days)).toFixed(2);
+                        setCalculationDailyRate(dailyRate);
+                      }
+                      // Günlük ücret varsa toplam tutarı hesapla
+                      else if (calculationDailyRate && days && parseInt(days) > 0) {
+                        const totalAmount = (parseFloat(calculationDailyRate) * parseInt(days)).toFixed(2);
+                        setCalculationTotalAmount(totalAmount);
+                      }
+                    }}
+                    inputProps={{ min: 1, step: 1 }}
+                    size="small"
                   />
-                )}
-              />
+                </Box>
+
+                {/* Toplam Tutar ve Günlük Ücret */}
+                <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                  <TextField
+                    fullWidth
+                    label="Toplam Tutar (TRY)"
+                    type="number"
+                    value={calculationTotalAmount}
+                    onChange={(e) => {
+                      const totalAmount = e.target.value;
+                      setCalculationTotalAmount(totalAmount);
+                      
+                      const days = parseInt(calculationDays) || 1;
+                      if (totalAmount && days > 0) {
+                        const dailyRate = (parseFloat(totalAmount) / days).toFixed(2);
+                        setCalculationDailyRate(dailyRate);
+                      } else {
+                        setCalculationDailyRate('');
+                      }
+                    }}
+                    inputProps={{ min: 0, step: 0.01 }}
+                    size="small"
+                  />
+                  <TextField
+                    fullWidth
+                    label="Günlük Ücret (TRY)"
+                    type="number"
+                    value={calculationDailyRate}
+                    onChange={(e) => {
+                      const dailyRate = e.target.value;
+                      setCalculationDailyRate(dailyRate);
+                      
+                      const days = parseInt(calculationDays) || 1;
+                      if (dailyRate && days > 0) {
+                        const totalAmount = (parseFloat(dailyRate) * days).toFixed(2);
+                        setCalculationTotalAmount(totalAmount);
+                      } else {
+                        setCalculationTotalAmount('');
+                      }
+                    }}
+                    inputProps={{ min: 0, step: 0.01 }}
+                    size="small"
+                  />
+                </Box>
+                <Typography variant="caption" color="text.secondary">
+                  Bu alanlar sadece hesaplama içindir, form verilerini etkilemez.
+                </Typography>
+              </Box>
             </Grid>
 
             {/* Date Range */}
@@ -415,37 +476,26 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <DatePicker
-                  label="Bitiş Tarihi"
-                  value={endDate}
-                  onChange={handleEndDateChange}
-                  minDate={startDate || undefined}
-                  slotProps={{
-                    textField: {
-                      fullWidth: true,
-                      margin: 'normal',
-                      sx: {
-                        '& .MuiInputLabel-root': {
-                          fontSize: '1rem',
-                        },
-                        '& .MuiInputBase-input': {
-                          fontSize: '1rem',
-                        }
+              <DatePicker
+                label="Bitiş Tarihi"
+                value={endDate}
+                onChange={handleEndDateChange}
+                minDate={startDate || undefined}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    margin: 'normal',
+                    sx: {
+                      '& .MuiInputLabel-root': {
+                        fontSize: '1rem',
+                      },
+                      '& .MuiInputBase-input': {
+                        fontSize: '1rem',
                       }
-                    },
-                  }}
-                />
-                <TextField
-                  label="Saat"
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  margin="normal"
-                  sx={{ minWidth: 120 }}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Box>
+                    }
+                  },
+                }}
+              />
             </Grid>
 
             {/* Days and Daily Price */}

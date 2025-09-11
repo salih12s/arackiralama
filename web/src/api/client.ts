@@ -1,10 +1,25 @@
 import axios from 'axios';
 
+// Environment-based API URL configuration
+const getApiBaseUrl = () => {
+  // Development mode check
+  if (import.meta.env.DEV) {
+    // Use local development server
+    return import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+  }
+  
+  // Production mode - use Railway deployment
+  return 'https://arackiralama-production.up.railway.app/api';
+};
+
 // Create axios instance
 const api = axios.create({
-  baseURL: 'https://arackiralama-production.up.railway.app/api',
+  baseURL: getApiBaseUrl(),
   timeout: 30000, // Increase timeout
 });
+
+console.log('🔧 API Base URL:', getApiBaseUrl());
+console.log('🔧 Environment:', import.meta.env.DEV ? 'Development' : 'Production');
 
 // Request interceptor to add auth token
 api.interceptors.request.use(

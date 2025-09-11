@@ -307,25 +307,6 @@ export default function Rentals() {
                 </TableHead>
                 <TableBody>
                   {filteredRentals.map((rental: Rental) => {
-                    const today = dayjs();
-                    const endDate = dayjs(rental.endDate);
-                    const daysLeft = endDate.diff(today, 'day');
-                    let statusInfo = '';
-                    let statusColor = 'default';
-                    
-                    if (rental.status === 'ACTIVE') {
-                      if (daysLeft < 0) {
-                        statusInfo = `${Math.abs(daysLeft)} gün gecikmiş`;
-                        statusColor = 'error';
-                      } else if (daysLeft === 0) {
-                        statusInfo = 'Bugün bitiyor';
-                        statusColor = 'warning';
-                      } else if (daysLeft <= 3) {
-                        statusInfo = `${daysLeft} gün kaldı`;
-                        statusColor = 'warning';
-                      }
-                    }
-
                     return (
                       <TableRow 
                         key={rental.id}
@@ -370,15 +351,6 @@ export default function Rentals() {
                           <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
                             {rental.days}g
                           </Typography>
-                          {statusInfo && rental.status === 'ACTIVE' && (
-                            <Chip 
-                              label={statusInfo} 
-                              size="small" 
-                              color={statusColor as any}
-                              variant="outlined"
-                              sx={{ fontSize: '0.6rem', height: 18, mt: 0.5 }}
-                            />
-                          )}
                         </TableCell>
                         
                         <TableCell align="right" sx={{ padding: '4px 8px' }}>

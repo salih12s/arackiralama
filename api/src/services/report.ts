@@ -339,18 +339,33 @@ export async function getDebtorReport(): Promise<{ customerId: string; customerN
   const customerDebtMap = new Map<string, { customerName: string; totalDebt: number }>();
 
   rentals.forEach((rental: any) => {
-    // Toplam ödenen = kiralama içindeki ödemeler + ayrı ödemeler
-    const paidFromRental = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
-    const paidFromPayments = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
-    const totalPaid = paidFromRental + paidFromPayments;
+    // UnpaidDebtsDetail mantığı ile gerçek zamanlı hesaplama
+    const days = rental.days || 0;
+    const dailyPrice = rental.dailyPrice || 0;  // TL cinsinden
+    const totalPrice = days * dailyPrice;
     
-    // Gerçek kalan borç hesapla - Backend'den kuruş cinsinden gelir, TL olarak hesapla
-    const actualBalance = rental.totalDue - totalPaid;
+    // Ek ücretler - TL cinsinden
+    const kmPrice = rental.kmDiff || 0;
+    const hgsFee = rental.hgs || 0;
+    const cleaningFee = rental.cleaning || 0;
+    const damageFee = rental.damage || 0;
+    const fuelCost = rental.fuel || 0;
+    
+    // Toplam tutar hesaplama
+    const totalAmount = totalPrice + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
+    
+    // Ödemeler - TL cinsinden
+    const installmentPayments = (rental.upfront || 0) + (rental.pay1 || 0) + (rental.pay2 || 0) + (rental.pay3 || 0) + (rental.pay4 || 0);
+    const extraPayments = rental.payments.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0);
+    const totalPaid = installmentPayments + extraPayments;
+    
+    // Bakiye hesaplama
+    const actualBalance = totalAmount - totalPaid;
     
     console.log(`🔍 Rental ${rental.id}:`, {
-      totalDue: rental.totalDue,
-      paidFromRental,
-      paidFromPayments,
+      totalAmount,
+      installmentPayments,
+      extraPayments,
       totalPaid,
       actualBalance,
       customer: rental.customer.fullName
@@ -375,7 +390,7 @@ export async function getDebtorReport(): Promise<{ customerId: string; customerN
   const debtorList = Array.from(customerDebtMap.entries()).map(([customerId, data]) => ({
     customerId,
     customerName: data.customerName,
-    totalDebt: data.totalDebt // Kuruş cinsinden döndürülür, frontend'de /100 ile TL'ye çevrilir
+    totalDebt: data.totalDebt // TL cinsinden döndürülür
   }));
 
   console.log(`🔍 Final debtors result:`, debtorList);

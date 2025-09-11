@@ -36,10 +36,10 @@ export default function DebtorDetails() {
   });
 
 
-  // API'den dönen veriyi güvenli şekilde işle ve kuruş'dan TL'ye çevir
+  // API'den dönen veriyi güvenli şekilde işle - artık TL cinsinden geliyor
   const debtors = Array.isArray(debtorsData) ? debtorsData.map((debtor: any) => ({
     ...debtor,
-    totalDebt: debtor.totalDebt / 100 // Kuruş'dan TL'ye çevir
+    totalDebt: debtor.totalDebt // TL cinsinden direkt kullan
   })) : [];
   const totalDebt = debtors.reduce((sum: number, debtor: any) => sum + (debtor.totalDebt || 0), 0);
   
