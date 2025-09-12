@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -42,7 +43,9 @@ import {
   Delete,
   DirectionsCar,
   MoreVert,
-  Payment as PaymentIcon
+  Payment as PaymentIcon,
+  Assignment as AssignmentIcon,
+  Add as AddIcon
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -51,9 +54,11 @@ import { rentalsApi, vehiclesApi, Rental } from '../api/client';
 import { formatCurrency } from '../utils/currency';
 import AddPaymentDialog from '../components/AddPaymentDialog';
 import EditRentalDialog from '../components/EditRentalDialog';
+import NewRentalDialog from '../components/NewRentalDialog';
 import { invalidateAllRentalCaches } from '../utils/cacheInvalidation';
 
 export const AllRentals: React.FC = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
@@ -61,10 +66,7 @@ export const AllRentals: React.FC = () => {
   const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
   
   // Dialog states
-  const [detailDialog, setDetailDialog] = useState<{open: boolean; rental: Rental | null}>({
-    open: false,
-    rental: null
-  });
+  const [newRentalDialog, setNewRentalDialog] = useState(false);
   const [editRentalDialog, setEditRentalDialog] = useState<{open: boolean; rental: Rental | null}>({
     open: false,
     rental: null
@@ -265,6 +267,17 @@ export const AllRentals: React.FC = () => {
           </Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setNewRentalDialog(true)}
+              sx={{
+                fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                px: { xs: 1, sm: 1.5 }
+              }}
+            >
+              Yeni Kiralama
+            </Button>
+            <Button
               startIcon={<DownloadIcon />}
               onClick={handleExport}
               variant="outlined"
@@ -300,7 +313,7 @@ export const AllRentals: React.FC = () => {
             flexWrap="wrap"
           >
             <TextField
-              placeholder="Müşteri adı, araç markası/modeli veya plaka ile ara..."
+              placeholder="Müşteri adı, araç adı/modeli veya plaka ile ara..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               size="small"
@@ -455,12 +468,12 @@ export const AllRentals: React.FC = () => {
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 70 }}>Plaka</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 120 }}>Müşteri</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 85 }}>Telefon</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 75 }}>Başlangıç</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 75 }}>Bitiş</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 85 }}>Araç</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 95 }}>Tarih</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'center', minWidth: 35 }}>Gün</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 60 }}>Günlük</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 50 }}>KM</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 70 }}>Kira+KM</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 45 }}>HGS</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 60 }}>Temizlik</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 50 }}>Hasar</TableCell>
@@ -524,13 +537,15 @@ export const AllRentals: React.FC = () => {
                       {rental.customer?.fullName || 'İsimsiz'}
                     </TableCell>
                     <TableCell sx={{ maxWidth: 85, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {rental.customer?.phone}
+                      {rental.vehicle?.name || 'Bilinmiyor'}
                     </TableCell>
                     <TableCell>
-                      {formatDate(rental.startDate)}
-                    </TableCell>
-                    <TableCell>
-                      {formatDate(rental.endDate)}
+                      <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.1 }}>
+                        {formatDate(rental.startDate)}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.1 }}>
+                        {formatDate(rental.endDate)}
+                      </Typography>
                     </TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600 }}>
                       {rental.days}
@@ -540,6 +555,9 @@ export const AllRentals: React.FC = () => {
                     </TableCell>
                     <TableCell align="right">
                       {formatCurrency(rental.kmDiff || 0)}
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600, backgroundColor: '#f5f5f5' }}>
+                      {formatCurrency((rental.dailyPrice * (rental.days || 0)) + (rental.kmDiff || 0))}
                     </TableCell>
                     <TableCell align="right">
                       {formatCurrency(rental.hgs || 0)}
@@ -636,15 +654,15 @@ export const AllRentals: React.FC = () => {
           <MenuItem 
             onClick={() => {
               if (selectedRental) {
-                setDetailDialog({ open: true, rental: selectedRental });
+                navigate(`/rentals/${selectedRental.id}`);
               }
               handleMenuClose();
             }}
           >
             <ListItemIcon>
-              <Visibility fontSize="small" />
+              <AssignmentIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText>Detay Görüntüle</ListItemText>
+            <ListItemText>Detay</ListItemText>
           </MenuItem>
           
           <MenuItem 
@@ -713,80 +731,6 @@ export const AllRentals: React.FC = () => {
           </MenuItem>
         </Menu>
 
-        {/* Detail Dialog */}
-        <Dialog 
-          open={detailDialog.open} 
-          onClose={() => setDetailDialog({ open: false, rental: null })}
-          maxWidth="md"
-          fullWidth
-        >
-          <DialogTitle>
-            Kiralama Detayları - {detailDialog.rental?.vehicle?.plate}
-          </DialogTitle>
-          <DialogContent>
-            {detailDialog.rental && (
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="body2"><strong>Müşteri:</strong> {detailDialog.rental.customer?.fullName}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2"><strong>Telefon:</strong> {detailDialog.rental.customer?.phone}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2"><strong>Araç:</strong> {detailDialog.rental.vehicle?.name}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2"><strong>Plaka:</strong> {detailDialog.rental.vehicle?.plate}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2"><strong>Başlangıç:</strong> {formatDate(detailDialog.rental.startDate)}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2"><strong>Bitiş:</strong> {formatDate(detailDialog.rental.endDate)}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2"><strong>Gün Sayısı:</strong> {detailDialog.rental.days}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2"><strong>Günlük Fiyat:</strong> {formatCurrency(detailDialog.rental.dailyPrice)}</Typography>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="body2"><strong>Toplam Tutar:</strong> {formatCurrency(
-                    (() => {
-                      const days = detailDialog.rental.days || 0;
-                      const dailyPrice = detailDialog.rental.dailyPrice || 0;
-                      const totalPrice = days * dailyPrice;
-                      const kmPrice = detailDialog.rental.kmDiff || 0;
-                      const hgsFee = detailDialog.rental.hgs || 0;
-                      const cleaningFee = detailDialog.rental.cleaning || 0;
-                      const damageFee = detailDialog.rental.damage || 0;
-                      const fuelCost = detailDialog.rental.fuel || 0;
-                      return totalPrice + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
-                    })()
-                  )}</Typography>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="body2"><strong>Kalan Bakiye:</strong> 
-                    <span style={{ color: calculateBalance(detailDialog.rental) > 0 ? 'red' : 'green', fontWeight: 'bold' }}>
-                      {formatCurrency(calculateBalance(detailDialog.rental))}
-                    </span>
-                  </Typography>
-                </Grid>
-                {detailDialog.rental.note && (
-                  <Grid item xs={12}>
-                    <Typography variant="body2"><strong>Not:</strong> {detailDialog.rental.note}</Typography>
-                  </Grid>
-                )}
-              </Grid>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDetailDialog({ open: false, rental: null })}>
-              Kapat
-            </Button>
-          </DialogActions>
-        </Dialog>
-
         {/* Complete Dialog */}
         <Dialog open={completeDialog.open} onClose={() => setCompleteDialog({ open: false, rental: null })}>
           <DialogTitle>Kiralama Teslim Al</DialogTitle>
@@ -841,6 +785,12 @@ export const AllRentals: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* New Rental Dialog */}
+        <NewRentalDialog
+          open={newRentalDialog}
+          onClose={() => setNewRentalDialog(false)}
+        />
 
         {/* Payment Dialog */}
         <AddPaymentDialog

@@ -133,13 +133,11 @@ export default function Layout({ children }: LayoutProps) {
 
   const navigationItems = [
     { path: '/', label: 'Ana Sayfa', icon: <DashboardIcon fontSize="small" /> },
-    { path: '/rentals', label: 'Kiralama', icon: <Receipt fontSize="small" /> },
+    { path: '/rentals', label: 'Kiralama Yönetimi', icon: <Receipt fontSize="small" /> },
     { path: '/vehicles', label: 'Tanımlamalar', icon: <DirectionsCar fontSize="small" /> },
     { path: '/reports', label: 'Raporlar', icon: <Assessment fontSize="small" /> },
-    { path: '/detailed-report', label: 'Kiralama Girişi', icon: <Assessment fontSize="small" /> },
     { path: '/debtor-details', label: 'Borçlu Kişiler', icon: <Person fontSize="small" /> },
     { path: '/unpaid-debts', label: 'Ödenmeyen Borçlar Detay', icon: <Warning fontSize="small" /> },
-    { path: '/all-rentals', label: 'Kiralama Geçmişi', icon: <Receipt fontSize="small" /> },
     { path: '/backup', label: 'Yedekleme', icon: <Backup fontSize="small" /> },
   ];
 

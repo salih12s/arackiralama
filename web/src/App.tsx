@@ -11,7 +11,6 @@ import theme from './theme';
 import { AuthProvider, useAuth } from './hooks/useAuth.tsx';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import Rentals from './pages/Rentals';
 import RentalDetail from './pages/RentalDetail';
 import Vehicles from './pages/Vehicles';
 import Customers from './pages/Customers';
@@ -20,7 +19,6 @@ import DebtorDetails from './pages/DebtorDetails';
 import UnpaidDebtsDetail from './pages/UnpaidDebtsDetail';
 import VehicleDetail from './pages/VehicleDetail';
 import Backup from './pages/Backup';
-import { DetailedReport } from './pages/DetailedReport';
 import AllRentals from './pages/AllRentals';
 
 // Set dayjs locale
@@ -88,7 +86,7 @@ function AppRoutes() {
         path="/rentals"
         element={
           <ProtectedRoute>
-            <Rentals />
+            <AllRentals />
           </ProtectedRoute>
         }
       />
@@ -141,14 +139,6 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/detailed-report"
-        element={
-          <ProtectedRoute>
-            <DetailedReport />
-          </ProtectedRoute>
-        }
-      />
-      <Route
         path="/debtor-details"
         element={
           <ProtectedRoute>
@@ -169,14 +159,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Backup />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/all-rentals"
-        element={
-          <ProtectedRoute>
-            <AllRentals />
           </ProtectedRoute>
         }
       />
