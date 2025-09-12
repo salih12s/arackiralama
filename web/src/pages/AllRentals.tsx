@@ -28,9 +28,6 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Menu,
-  ListItemIcon,
-  ListItemText,
   IconButton,
   Tooltip
 } from '@mui/material';
@@ -42,8 +39,6 @@ import {
   Visibility,
   Delete,
   DirectionsCar,
-  MoreVert,
-  Payment as PaymentIcon,
   Assignment as AssignmentIcon,
   Add as AddIcon
 } from '@mui/icons-material';
@@ -62,8 +57,6 @@ export const AllRentals: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
   
   // Dialog states
   const [newRentalDialog, setNewRentalDialog] = useState(false);
@@ -182,18 +175,12 @@ export const AllRentals: React.FC = () => {
     }
   };
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, rental: Rental) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedRental(rental);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedRental(null);
-  };
-
   const formatDate = (dateString: string) => {
     return dayjs(dateString).format('DD.MM.YYYY');
+  };
+
+  const formatDateTime = (dateString: string) => {
+    return dayjs(dateString).format('DD.MM.YYYY HH:mm');
   };
 
   const calculateBalance = (rental: Rental) => {
@@ -259,12 +246,86 @@ export const AllRentals: React.FC = () => {
           sx={{ mb: { xs: 2, sm: 3 } }}
           spacing={{ xs: 2, sm: 0 }}
         >
-          <Typography variant="h5" component="h1" sx={{ 
-            fontWeight: 700,
-            fontSize: { xs: '1.25rem', sm: '1.5rem' }
-          }}>
-            📋 Tüm Kiralamalar
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <Typography variant="h5" component="h1" sx={{ 
+              fontWeight: 700,
+              fontSize: { xs: '1.25rem', sm: '1.5rem' }
+            }}>
+              📋 Tüm Kiralamalar
+            </Typography>
+            
+            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+              <Button
+                variant={selectedStatus === '' ? 'contained' : 'outlined'}
+                size="small"
+                onClick={() => setSelectedStatus('')}
+                sx={{ 
+                  fontSize: '0.75rem',
+                  minWidth: 'auto',
+                  px: 1.5,
+                  py: 0.5
+                }}
+              >
+                Tümü
+              </Button>
+              <Button
+                variant={selectedStatus === 'ACTIVE' ? 'contained' : 'outlined'}
+                size="small"
+                onClick={() => setSelectedStatus('ACTIVE')}
+                color={selectedStatus === 'ACTIVE' ? 'primary' : 'success'}
+                sx={{ 
+                  fontSize: '0.75rem',
+                  minWidth: 'auto',
+                  px: 1.5,
+                  py: 0.5
+                }}
+              >
+                Kirada
+              </Button>
+              <Button
+                variant={selectedStatus === 'RETURNED' ? 'contained' : 'outlined'}
+                size="small"
+                onClick={() => setSelectedStatus('RETURNED')}
+                color={selectedStatus === 'RETURNED' ? 'primary' : 'info'}
+                sx={{ 
+                  fontSize: '0.75rem',
+                  minWidth: 'auto',
+                  px: 1.5,
+                  py: 0.5
+                }}
+              >
+                Teslim Edildi
+              </Button>
+              <Button
+                variant={selectedStatus === 'CANCELLED' ? 'contained' : 'outlined'}
+                size="small"
+                onClick={() => setSelectedStatus('CANCELLED')}
+                color={selectedStatus === 'CANCELLED' ? 'primary' : 'error'}
+                sx={{ 
+                  fontSize: '0.75rem',
+                  minWidth: 'auto',
+                  px: 1.5,
+                  py: 0.5
+                }}
+              >
+                İptal
+              </Button>
+              <Button
+                variant={selectedStatus === 'RESERVED' ? 'contained' : 'outlined'}
+                size="small"
+                onClick={() => setSelectedStatus('RESERVED')}
+                color={selectedStatus === 'RESERVED' ? 'primary' : 'warning'}
+                sx={{ 
+                  fontSize: '0.75rem',
+                  minWidth: 'auto',
+                  px: 1.5,
+                  py: 0.5
+                }}
+              >
+                Rezerve
+              </Button>
+            </Stack>
+          </Box>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <Button
               variant="contained"
@@ -341,30 +402,15 @@ export const AllRentals: React.FC = () => {
                 ))}
               </Select>
             </FormControl>
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel>Durum</InputLabel>
-              <Select
-                value={selectedStatus}
-                label="Durum"
-                onChange={(e) => setSelectedStatus(e.target.value)}
-              >
-                <MenuItem value="">Tümü</MenuItem>
-                <MenuItem value="ACTIVE">Kirada</MenuItem>
-                <MenuItem value="RETURNED">Teslim Edildi</MenuItem>
-                <MenuItem value="CANCELLED">İptal</MenuItem>
-                <MenuItem value="RESERVED">Rezerve</MenuItem>
-              </Select>
-            </FormControl>
-            {(selectedVehicle || selectedStatus) && (
+            {selectedVehicle && (
               <Button
                 size="small"
                 onClick={() => {
                   setSelectedVehicle('');
-                  setSelectedStatus('');
                 }}
                 color="secondary"
               >
-                Filtreleri Temizle
+                Araç Filtresini Temizle
               </Button>
             )}
             <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
@@ -489,7 +535,7 @@ export const AllRentals: React.FC = () => {
                 <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 65 }}>Kalan</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 65 }}>Durum</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 100 }}>Not</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 100 }}>İşlemler</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 140 }}>İşlemler</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -540,12 +586,19 @@ export const AllRentals: React.FC = () => {
                       {rental.vehicle?.name || 'Bilinmiyor'}
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.1 }}>
-                        {formatDate(rental.startDate)}
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.1 }}>
-                        {formatDate(rental.endDate)}
-                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
+                            {formatDate(rental.startDate)}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3, color: 'primary.main', fontWeight: 500 }}>
+                            {dayjs(rental.startDate).format('HH:mm')}
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
+                          {formatDate(rental.endDate)}
+                        </Typography>
+                      </Box>
                     </TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600 }}>
                       {rental.days}
@@ -617,13 +670,52 @@ export const AllRentals: React.FC = () => {
                       </Tooltip>
                     </TableCell>
                     <TableCell>
-                      <IconButton
-                        size="small"
-                        onClick={(e) => handleMenuOpen(e, rental)}
-                        sx={{ padding: '2px' }}
-                      >
-                        <MoreVert fontSize="small" />
-                      </IconButton>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Tooltip title="Detay">
+                          <IconButton
+                            size="small"
+                            onClick={() => navigate(`/rentals/${rental.id}`)}
+                            sx={{ padding: '2px', color: 'primary.main' }}
+                          >
+                            <AssignmentIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        
+                        <Tooltip title="Düzenle">
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              console.log('🔧 Edit Click - rental:', rental.id);
+                              setEditRentalDialog({ open: true, rental: rental });
+                            }}
+                            sx={{ padding: '2px', color: 'warning.main' }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+
+                        {rental.status === 'ACTIVE' && (
+                          <Tooltip title="Teslim Al">
+                            <IconButton
+                              size="small"
+                              onClick={() => setCompleteDialog({ open: true, rental: rental })}
+                              sx={{ padding: '2px', color: 'success.main' }}
+                            >
+                              <DirectionsCar fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+
+                        <Tooltip title="Sil">
+                          <IconButton
+                            size="small"
+                            onClick={() => setDeleteDialog({ open: true, rental: rental })}
+                            sx={{ padding: '2px', color: 'error.main' }}
+                          >
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 );
@@ -642,94 +734,6 @@ export const AllRentals: React.FC = () => {
             </Typography>
           </Box>
         )}
-
-        {/* Actions Menu */}
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleMenuClose}
-          transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-          anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-        >
-          <MenuItem 
-            onClick={() => {
-              if (selectedRental) {
-                navigate(`/rentals/${selectedRental.id}`);
-              }
-              handleMenuClose();
-            }}
-          >
-            <ListItemIcon>
-              <AssignmentIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Detay</ListItemText>
-          </MenuItem>
-          
-          <MenuItem 
-            onClick={() => {
-              console.log('🔧 Edit Click - selectedRental:', selectedRental?.id);
-              console.log('🔧 Edit Click - Before state change');
-              if (selectedRental) {
-                setEditRentalDialog({ open: true, rental: selectedRental });
-                console.log('🔧 Edit Click - After state change, setting open=true');
-              }
-              handleMenuClose();
-            }}
-          >
-            <ListItemIcon>
-              <EditIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Düzenle</ListItemText>
-          </MenuItem>
-
-          {selectedRental && selectedRental.status === 'ACTIVE' && (
-            <MenuItem 
-              onClick={() => {
-                if (selectedRental) {
-                  setCompleteDialog({ open: true, rental: selectedRental });
-                }
-                handleMenuClose();
-              }}
-            >
-              <ListItemIcon>
-                <DirectionsCar fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Teslim Al</ListItemText>
-            </MenuItem>
-          )}
-
-          {/* 
-          <MenuItem 
-            onClick={() => {
-              console.log('💰 Payment Click - selectedRental:', selectedRental?.id);
-              if (selectedRental) {
-                setPaymentDialog({ open: true, rental: selectedRental });
-              }
-              handleMenuClose();
-            }}
-          >
-            <ListItemIcon>
-              <PaymentIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Ödeme Ekle</ListItemText>
-          </MenuItem>
-          */}
-
-          <MenuItem 
-            onClick={() => {
-              if (selectedRental) {
-                setDeleteDialog({ open: true, rental: selectedRental });
-              }
-              handleMenuClose();
-            }}
-            sx={{ color: 'error.main' }}
-          >
-            <ListItemIcon>
-              <Delete fontSize="small" sx={{ color: 'error.main' }} />
-            </ListItemIcon>
-            <ListItemText>Sil</ListItemText>
-          </MenuItem>
-        </Menu>
 
         {/* Complete Dialog */}
         <Dialog open={completeDialog.open} onClose={() => setCompleteDialog({ open: false, rental: null })}>

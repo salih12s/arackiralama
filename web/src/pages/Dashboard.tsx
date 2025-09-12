@@ -728,17 +728,7 @@ export default function Dashboard() {
   };
 
   const handleVehicleStatusChange = (vehicleId: string, newStatus: 'IDLE' | 'RENTED' | 'RESERVED' | 'SERVICE') => {
-    const vehicle = idleVehicles.find(v => v.id === vehicleId);
-    const statusText = newStatus === 'IDLE' ? 'Boş' : newStatus === 'RENTED' ? 'Kirada' : newStatus === 'RESERVED' ? 'Rezerve' : 'Serviste';
-    
-    setDeleteConfirmDialog({
-      open: true,
-      type: 'status',
-      id: vehicleId,
-      title: 'Araç Durumu Değiştirme',
-      message: `${vehicle?.plate} plakası araç durumunu "${statusText}" olarak değiştirmek istediğinizden emin misiniz?`,
-      statusData: { vehicleId, status: newStatus }
-    });
+    changeVehicleStatusMutation.mutate({ vehicleId, status: newStatus });
   };
 
   const exportToExcel = () => {
@@ -1010,165 +1000,7 @@ export default function Dashboard() {
         </Box>
       </Box>
 
-      {/* ANA GİRİŞ EKRANI TABLOSU - Mobile Responsive */}
-      <Paper sx={{ p: { xs: 1, sm: 2 }, mb: 3 }}>
-        <Typography 
-          variant="h6" 
-          sx={{ 
-            fontWeight: 600, 
-            mb: 2, 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 1,
-            fontSize: { xs: '1rem', sm: '1.25rem' }
-          }}
-        >
-          <Assignment sx={{ color: 'primary.main', fontSize: { xs: 16, sm: 20 } }} />
-          {isMobile ? 'Giriş Ekranı' : 'Ana Giriş Ekranı'}
-        </Typography>
-        
-        <Box sx={{ overflowX: 'auto' }}>
-          <Table size="small" sx={{ 
-            minWidth: { xs: 800, sm: 'auto' },
-            '& .MuiTableCell-root': { 
-              padding: { xs: '2px 4px', sm: '4px 8px' },
-              fontSize: { xs: '0.65rem', sm: '0.75rem' },
-              borderRight: '1px solid #e0e0e0',
-              whiteSpace: 'nowrap'
-            } 
-          }}>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Tarih</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Saat</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Plaka</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Müşteri</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Gün</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Kira Ücreti</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Km Farkı</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Kira+Km</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Temizlik</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>HGS</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Kaza/Sürtme</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Yakıt</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>Toplam Ödenecek</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center' }} rowSpan={2}>Kalan Bakiye</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center' }} rowSpan={2}>Açıklama</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center' }} rowSpan={2}>İşlemler</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(activeRentalsRes?.data?.data || [])
-                .filter((rental: any) => 
-                  !activeRentalsFilter || 
-                  rental.vehicle?.plate?.toLowerCase().includes(activeRentalsFilter.toLowerCase()) ||
-                  rental.customer?.fullName?.toLowerCase().includes(activeRentalsFilter.toLowerCase())
-                )
-                .slice(0, 10) // İlk 10 aktif kiralama
-                .map((rental: any) => {
-                  // Hesaplamalar - aynı mantık
-                  const totalPaid = Array.isArray(rental.payments) 
-                    ? rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0) 
-                    : 0;
-                  
-                  const totalDueTL = 
-                    (rental.days || 0) * (rental.dailyPrice || 0) + 
-                    (rental.kmDiff || 0) + 
-                    (rental.hgs || 0) + 
-                    (rental.damage || 0) + 
-                    (rental.fuel || 0) + 
-                    (rental.cleaning || 0);
-
-                  const paidFromRental = 
-                    (rental.upfront || 0) + 
-                    (rental.pay1 || 0) + 
-                    (rental.pay2 || 0) + 
-                    (rental.pay3 || 0) + 
-                    (rental.pay4 || 0);
-
-                  const totalPaidTL = totalPaid + paidFromRental;
-                  const balanceTL = totalDueTL - totalPaidTL;
-
-                  const kiraKmToplam = (rental.days || 0) * (rental.dailyPrice || 0) + (rental.kmDiff || 0);
-                  const plannedPaymentsTotal = (rental.pay1 || 0) + (rental.pay2 || 0) + (rental.pay3 || 0) + (rental.pay4 || 0);
-
-                  return (
-                    <React.Fragment key={rental.id}>
-                      {/* GİRİŞ SATIRI */}
-                      <TableRow>
-                        <TableCell>{dayjs(rental.startDate).format('DD.MM.YY')}</TableCell>
-                        <TableCell>{dayjs(rental.startDate).format('HH:mm')}</TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>{rental.vehicle?.plate}</TableCell>
-                        <TableCell>{rental.customer?.fullName}</TableCell>
-                        <TableCell sx={{ textAlign: 'center' }}>{rental.days}</TableCell>
-                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.dailyPrice || 0)}</TableCell>
-                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.kmDiff || 0)}</TableCell>
-                        <TableCell sx={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(kiraKmToplam)}</TableCell>
-                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.cleaning || 0)}</TableCell>
-                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.hgs || 0)}</TableCell>
-                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.damage || 0)}</TableCell>
-                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.fuel || 0)}</TableCell>
-                        <TableCell sx={{ textAlign: 'right', fontWeight: 600 }}>
-                          {formatCurrency(totalDueTL)}
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', fontWeight: 600, color: balanceTL > 0 ? 'text.primary' : 'text.primary' }} rowSpan={2}>
-                          {formatCurrency(balanceTL)}
-                        </TableCell>
-                        <TableCell sx={{ fontSize: '0.7rem' }} rowSpan={2}>
-                          {rental.note || '-'}
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center' }} rowSpan={2}>
-                          <Stack direction="column" spacing={0.5}>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              startIcon={<Edit />}
-                              onClick={() => setEditRentalDialog({ open: true, rental })}
-                              sx={{ fontSize: '0.65rem', py: 0.5 }}
-                            >
-                              Düzenle
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              color="error"
-                              startIcon={<Delete />}
-                              onClick={() => setDeleteDialog({ open: true, rental })}
-                              sx={{ fontSize: '0.65rem', py: 0.5 }}
-                            >
-                              Sil
-                            </Button>
-                          </Stack>
-                        </TableCell>
-                      </TableRow>
-                      
-                      {/* DÖNÜŞ SATIRI */}
-                      <TableRow>
-                        <TableCell>{dayjs(rental.endDate).format('DD.MM.YY')}</TableCell>
-                        <TableCell>{dayjs(rental.endDate).format('HH:mm')}</TableCell>
-                        <TableCell sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>Peşin</TableCell>
-                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.advance || 0)}</TableCell>
-                        <TableCell sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>1. Ödeme</TableCell>
-                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.pay1 || 0)}</TableCell>
-                        <TableCell sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>2. Ödeme</TableCell>
-                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.pay2 || 0)}</TableCell>
-                        <TableCell sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>3. Ödeme</TableCell>
-                        <TableCell sx={{ textAlign: 'right' }}>{formatCurrency(rental.pay3 || 0)}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', fontWeight: 600, color: 'success.main' }} colSpan={2}>
-                          Toplam Ödenen
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'right', fontWeight: 600, color: 'success.main' }}>
-                          {formatCurrency(totalPaidTL)}
-                        </TableCell>
-                      </TableRow>
-                    </React.Fragment>
-                  );
-                })}
-            </TableBody>
-          </Table>
-        </Box>
-      </Paper>
-
+            
       
       {/* ANA İÇERİK - AKTİF KİRALAMALAR TABLOSU */}
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -1216,25 +1048,30 @@ export default function Dashboard() {
 
         {/* Aktif Kiralamalar Tablosu */}
         <TableContainer>
-          <Table size="small">
+          <Table size="small" sx={{ 
+            '& .MuiTableCell-root': { 
+              padding: '4px 8px',
+              fontSize: '0.75rem',
+              whiteSpace: 'nowrap'
+            } 
+          }}>
             <TableHead>
               <TableRow>
-                <TableCell><strong>Plaka</strong></TableCell>
-                <TableCell><strong>Müşteri</strong></TableCell>
-                <TableCell><strong>Başlangıç</strong></TableCell>
-                <TableCell><strong>Bitiş</strong></TableCell>
-                <TableCell align="center"><strong>Gün</strong></TableCell>
-                <TableCell align="right"><strong>Günlük</strong></TableCell>
-                <TableCell align="right"><strong>KM Farkı</strong></TableCell>
-                <TableCell align="right"><strong>Temizlik</strong></TableCell>
-                <TableCell align="right"><strong>HGS</strong></TableCell>
-                <TableCell align="right"><strong>Kaza/Sürtme</strong></TableCell>
-                <TableCell align="right"><strong>Yakıt</strong></TableCell>
-                <TableCell align="right"><strong>Toplam</strong></TableCell>
-                <TableCell align="right"><strong>Ödenen</strong></TableCell>
-                <TableCell align="right"><strong>Kalan</strong></TableCell>
-                <TableCell><strong>Durum</strong></TableCell>
-                <TableCell><strong>İşlemler</strong></TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 70 }}>Plaka</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 100 }}>Müşteri</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 80 }}>Tarih</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'center', minWidth: 40 }}>Gün</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 60 }}>Günlük</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 50 }}>KM</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 45 }}>HGS</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 50 }}>Temizlik</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 45 }}>Hasar</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 45 }}>Yakıt</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 70 }}>Toplam</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 70 }}>Ödenen</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 70 }}>Bakiye</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 60 }}>Durum</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 80 }}>İşlemler</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1309,24 +1146,18 @@ export default function Dashboard() {
                 
                 
                 return (
-                  <TableRow key={rental.id} hover>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {rental.vehicle?.plate}
-                      </Typography>
+                  <TableRow key={rental.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
+                    <TableCell sx={{ fontWeight: 600, color: 'info.main' }}>
+                      {rental.vehicle?.plate}
+                    </TableCell>
+                    <TableCell sx={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {rental.customer?.fullName || 'İsimsiz'}
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">
-                        {rental.customer?.fullName}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
+                      <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
                         {dayjs(rental.startDate).format('DD.MM.YYYY')}
                       </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
+                      <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
                         {dayjs(rental.endDate).format('DD.MM.YYYY')}
                       </Typography>
                     </TableCell>
@@ -1365,66 +1196,70 @@ export default function Dashboard() {
                         {formatCurrency(rental.fuel || 0)}
                       </Typography>
                     </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {formatCurrency(totalDueTL)}
-                      </Typography>
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>
+                      {formatCurrency(totalDueTL)}
                     </TableCell>
                     <TableCell align="right">
-                      <Typography variant="body2">
-                        {formatCurrency(totalPaidTL)}
-                      </Typography>
+                      {formatCurrency(totalPaidTL)}
                     </TableCell>
-                    <TableCell align="right">
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
-                          fontWeight: 600
-                        }}
-                      >
-                        {formatCurrency(balanceTL)}
-                      </Typography>
+                    <TableCell align="right" sx={{ 
+                        fontWeight: 600,
+                        color: balanceTL > 0 ? 'error.main' : balanceTL < 0 ? 'warning.main' : 'success.main'
+                      }}>
+                      {formatCurrency(balanceTL)}
                     </TableCell>
                     <TableCell>
                       <Chip 
                         label={
                           rental.status === 'ACTIVE' ? 'Aktif' :
                           rental.status === 'COMPLETED' ? 'Tamamlandı' :
-                          rental.status === 'CANCELLED' ? 'İptal Edildi' :
+                          rental.status === 'CANCELLED' ? 'İptal' :
                           rental.status
                         }
-                        color="default"
+                        color={
+                          rental.status === 'ACTIVE' ? 'success' :
+                          rental.status === 'COMPLETED' ? 'info' :
+                          rental.status === 'CANCELLED' ? 'error' :
+                          'default'
+                        }
                         size="small"
+                        sx={{ fontSize: '0.65rem', height: 20 }}
                       />
                     </TableCell>
                     <TableCell>
-                      <Stack direction="row" spacing={1}>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<EditIcon />}
-                          onClick={() => setEditRentalDialog({ open: true, rental })}
-                        >
-                          Düzenle
-                        </Button>
-                        <Tooltip title="İşlemler">
-                          <IconButton 
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Tooltip title="Düzenle">
+                          <IconButton
                             size="small"
-                            onClick={(e) => handleMenuOpen(e, rental)}
+                            onClick={() => setEditRentalDialog({ open: true, rental })}
+                            sx={{ padding: '2px', color: 'warning.main' }}
                           >
-                            <MoreVert />
+                            <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="warning"
-                          startIcon={<CheckCircle />}
-                          onClick={() => setCompleteDialog({ open: true, rental })}
-                        >
-                          Teslim Al
-                        </Button>
-                      </Stack>
+                        
+                        <Tooltip title="Detay">
+                          <IconButton
+                            size="small"
+                            onClick={() => navigate(`/rentals/${rental.id}`)}
+                            sx={{ padding: '2px', color: 'primary.main' }}
+                          >
+                            <Visibility fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+
+                        {rental.status === 'ACTIVE' && (
+                          <Tooltip title="Teslim Al">
+                            <IconButton
+                              size="small"
+                              onClick={() => setCompleteDialog({ open: true, rental })}
+                              sx={{ padding: '2px', color: 'success.main' }}
+                            >
+                              <CheckCircle fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Box>
                     </TableCell>
                   </TableRow>
                 );
@@ -1584,17 +1419,23 @@ export default function Dashboard() {
 
         {/* Boşta Olan Araçlar Tablosu */}
         <TableContainer>
-          <Table size="small">
+          <Table size="small" sx={{ 
+            '& .MuiTableCell-root': { 
+              padding: '4px 8px',
+              fontSize: '0.75rem',
+              whiteSpace: 'nowrap'
+            } 
+          }}>
             <TableHead>
               <TableRow>
-                <TableCell><strong>Plaka</strong></TableCell>
-                <TableCell><strong>Araç Adı</strong></TableCell>
-                <TableCell align="right"><strong>Toplam Fatura</strong></TableCell>
-                <TableCell align="right"><strong>Tahsil Edilen</strong></TableCell>
-                <TableCell align="right"><strong>Kalan Bakiye</strong></TableCell>
-                <TableCell align="center"><strong>Kiralama Sayısı</strong></TableCell>
-                <TableCell><strong>Durum</strong></TableCell>
-                <TableCell><strong>İşlemler</strong></TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 70 }}>Plaka</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 120 }}>Araç Adı</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 80 }}>Toplam Fatura</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 80 }}>Tahsil Edilen</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 80 }}>Kalan Bakiye</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'center', minWidth: 70 }}>Kiralama Sayısı</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 60 }}>Durum</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 80 }}>İşlemler</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1608,94 +1449,77 @@ export default function Dashboard() {
                   );
                 })
                 .map((vehicle) => (
-                <TableRow key={vehicle.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
-                      {vehicle.plate}
-                    </Typography>
+                <TableRow key={vehicle.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
+                  <TableCell sx={{ fontWeight: 600, color: 'success.main' }}>
+                    {vehicle.plate}
                   </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {vehicle.name || 'Araç Adı Belirtilmemiş'}
-                    </Typography>
+                  <TableCell sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {vehicle.name || 'Araç Adı Belirtilmemiş'}
                   </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      -
-                    </Typography>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>
+                    -
                   </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" color="info.main">
-                      -
-                    </Typography>
+                  <TableCell align="right" sx={{ color: 'info.main' }}>
+                    -
                   </TableCell>
-                  <TableCell align="right">
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
+                  <TableCell align="right" sx={{ 
                         fontWeight: 600,
                         color: 'text.secondary'
-                      }}
-                    >
-                      -
-                    </Typography>
+                      }}>
+                    -
                   </TableCell>
-                  <TableCell align="center">
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {vehicle._count?.rentals || 0}
-                    </Typography>
+                  <TableCell align="center" sx={{ fontWeight: 600 }}>
+                    {vehicle._count?.rentals || 0}
                   </TableCell>
                   <TableCell>
                     <Select
                       value={vehicle.status}
                       onChange={(e) => handleVehicleStatusChange(vehicle.id, e.target.value as 'IDLE' | 'RENTED' | 'RESERVED' | 'SERVICE')}
                       size="small"
-                      sx={{ minWidth: 120 }}
+                      sx={{ minWidth: 100, fontSize: '0.75rem', height: 32 }}
                     >
                       <MenuItem value="IDLE">
-                        <Chip label="Uygun" color="success" size="small" />
+                        <Chip label="Uygun" color="success" size="small" sx={{ fontSize: '0.65rem', height: 20 }} />
                       </MenuItem>
                       <MenuItem value="RESERVED">
-                        <Chip label="Rezerve" color="warning" size="small" />
+                        <Chip label="Rezerve" color="warning" size="small" sx={{ fontSize: '0.65rem', height: 20 }} />
                       </MenuItem>
                       <MenuItem value="SERVICE">
-                        <Chip label="Serviste" color="error" size="small" />
+                        <Chip label="Serviste" color="error" size="small" sx={{ fontSize: '0.65rem', height: 20 }} />
                       </MenuItem>
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <Stack direction="row" spacing={1}>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={<Visibility />}
-                        onClick={() => setVehicleDetailDialog({ open: true, vehicle })}
-                      >
-                        Detaylar
-                      </Button>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Tooltip title="Detaylar">
+                        <IconButton
+                          size="small"
+                          onClick={() => setVehicleDetailDialog({ open: true, vehicle })}
+                        >
+                          <Visibility fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                       
-                      <Button
-                        size="small"
-                        variant="contained"
-                        startIcon={<PersonAdd />}
-                        onClick={() => handleQuickRental(vehicle)}
-                        sx={{ 
-                          bgcolor: 'success.main', 
-                          '&:hover': { bgcolor: 'success.dark' }
-                        }}
-                      >
-                        Hızlı Kiralama
-                      </Button>
+                      <Tooltip title="Hızlı Kiralama">
+                        <IconButton
+                          size="small"
+                          color="success"
+                          onClick={() => handleQuickRental(vehicle)}
+                        >
+                          <PersonAdd fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                       
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => setVehicleDeleteDialog({ open: true, vehicle })}
-                        title="Aracı Sil"
-                      >
-                        <Delete />
-                      </IconButton>
-                    </Stack>
+                      <Tooltip title="Aracı Sil">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => setVehicleDeleteDialog({ open: true, vehicle })}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
