@@ -225,9 +225,9 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
     setStartDate(newStartDate);
     setValue('startDate', newStartDate.toDate(), { shouldValidate: false });
     
-    // Calculate end date based on current days
+    // Calculate end date based on current days (same as backend logic)
     const currentDays = watch('days') || 1;
-    const newEndDate = newStartDate.add(currentDays - 1, 'day'); // -1 because days include both start and end
+    const newEndDate = newStartDate.add(currentDays, 'day'); // Match backend calculation
     setEndDate(newEndDate);
     setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
   };
@@ -238,9 +238,9 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
     setEndDate(newEndDate);
     setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
     
-    // Calculate days based on date difference (inclusive)
+    // Calculate days based on date difference (same as backend)
     if (newEndDate.isAfter(startDate) || newEndDate.isSame(startDate, 'day')) {
-      const calculatedDays = newEndDate.diff(startDate, 'day') + 1; // +1 to include both start and end days
+      const calculatedDays = newEndDate.diff(startDate, 'day') || 1; // Remove +1 to match backend calculation
       setValue('days', calculatedDays, { shouldValidate: false });
     }
   };
@@ -250,10 +250,10 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
     
     setValue('days', newDays, { shouldValidate: false });
     
-    // Calculate end date based on new days
-    // newDays = 1 means same day (start and end same)
-    // newDays = 2 means start day + 1 day = 2 days total
-    const newEndDate = startDate.add(newDays - 1, 'day');
+    // Calculate end date based on new days (same as backend logic)
+    // newDays = 1 means end date is same as start date
+    // newDays = 2 means end date is start + 1 day
+    const newEndDate = startDate.add(newDays, 'day');
     setEndDate(newEndDate);
     setValue('endDate', newEndDate.toDate(), { shouldValidate: false });
   };
@@ -449,7 +449,6 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                     margin="normal"
                     onChange={(e) => {
                       const newDays = parseInt(e.target.value) || 0;
-                      field.onChange(newDays);
                       handleDaysChange(newDays);
                     }}
                     error={!!errors.days}
@@ -562,17 +561,6 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                 />
               </Grid>
             ))}
-
-            {/* Debt Fully Paid Warning */}
-            {isDebtFullyPaid && (
-              <Grid item xs={12}>
-                <Alert severity="success" sx={{ mt: 1 }}>
-                  <Typography variant="body2">
-                    💰 Bu kiralama tamamen ödenmiştir. Ek ödemeler (1-4. Ödeme) değiştirilemez.
-                  </Typography>
-                </Alert>
-              </Grid>
-            )}
 
             {/* Note */}
             <Grid item xs={12}>
