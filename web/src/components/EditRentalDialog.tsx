@@ -34,7 +34,7 @@ const rentalSchema = z.object({
   startDate: z.date(),
   endDate: z.date(),
   days: z.number().int().positive(),
-  dailyPrice: z.number().positive('Günlük ücret pozitif olmalıdır'),
+  totalAmount: z.number(),
   kmDiff: z.number().default(0),
   cleaning: z.number().default(0),
   hgs: z.number().default(0),
@@ -81,7 +81,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
     resolver: zodResolver(rentalSchema),
     defaultValues: {
       days: 1,
-      dailyPrice: 150, // 150 TRY
+      totalAmount: 150, // 150 TRY default total
       kmDiff: 0,
       cleaning: 0,
       hgs: 0,
@@ -134,7 +134,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
 
   // Calculate totals using WATCH VALUES for real-time updates with safe fallbacks
   const totalDueTRY = 
-    ((watchedValues?.days || 0) * (watchedValues?.dailyPrice || 0)) + 
+    (watchedValues?.totalAmount || 0) + 
     (watchedValues?.kmDiff || 0) + 
     (watchedValues?.cleaning || 0) + 
     (watchedValues?.hgs || 0) + 
@@ -202,8 +202,9 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
         return value; // Backend zaten TL gönderiyor
       };
       
-      // Günlük ücret zaten TL cinsinde geliyor
-      setValue('dailyPrice', rentalData.dailyPrice || 0);
+      // Toplam ödeme miktarını hesapla (gün * günlük ücret)
+      const calculatedTotal = (rentalData.days || 1) * (rentalData.dailyPrice || 0);
+      setValue('totalAmount', calculatedTotal);
       setValue('kmDiff', convertToTL(rentalData.kmDiff));
       setValue('cleaning', convertToTL(rentalData.cleaning));
       setValue('hgs', convertToTL(rentalData.hgs));
@@ -248,7 +249,16 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
   const handleDaysChange = (newDays: number) => {
     if (!startDate || newDays < 1) return;
     
+    // Mevcut toplam ödemeden günlük ücreti hesapla
+    const currentTotalAmount = watch('totalAmount') || 0;
+    const currentDays = watch('days') || 1;
+    const dailyRate = currentDays > 0 ? currentTotalAmount / currentDays : 0;
+    
+    // Yeni toplam ödemeyi hesapla
+    const newTotalAmount = dailyRate * newDays;
+    
     setValue('days', newDays, { shouldValidate: false });
+    setValue('totalAmount', newTotalAmount, { shouldValidate: false });
     
     // Calculate end date based on new days (same as backend logic)
     // newDays = 1 means end date is same as start date
@@ -272,7 +282,10 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
       if (data.vehicleId) payload.vehicleId = data.vehicleId;
       if (data.customerName) payload.customerName = data.customerName;
       if (data.customerPhone) payload.customerPhone = data.customerPhone;
-      if (data.dailyPrice !== undefined) payload.dailyPrice = data.dailyPrice;
+      // Toplam ödemeden günlük ücreti hesapla
+      if (data.totalAmount !== undefined && data.days) {
+        payload.dailyPrice = data.totalAmount / data.days;
+      }
       if (data.kmDiff !== undefined) payload.kmDiff = data.kmDiff;
       if (data.cleaning !== undefined) payload.cleaning = data.cleaning;
       if (data.hgs !== undefined) payload.hgs = data.hgs;
@@ -285,7 +298,8 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
       if (data.pay4 !== undefined) payload.pay4 = data.pay4;
       
       console.log('🚀 Update Payload Debug (TL values):', {
-        dailyPrice: payload.dailyPrice,
+        totalAmount: data.totalAmount,
+        calculatedDailyPrice: data.totalAmount && data.days ? data.totalAmount / data.days : 0,
         cleaning: payload.cleaning,
         hgs: payload.hgs
       });
@@ -468,21 +482,34 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
               />
             </Grid>
 
-            {/* Daily Price */}
+            {/* Total Amount */}
             <Grid item xs={12} md={6}>
               <Controller
-                name="dailyPrice"
+                name="totalAmount"
                 control={control}
                 render={({ field }) => (
                   <TextField
                     {...field}
+                    value={field.value === 0 ? '' : field.value}
                     fullWidth
-                    label="Günlük Ücret (TRY)"
+                    label="Toplam Ödeme (TRY)"
                     type="number"
                     margin="normal"
-                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                    error={!!errors.dailyPrice}
-                    helperText={errors.dailyPrice?.message}
+                    inputProps={{ 
+                      step: "any",
+                      min: undefined 
+                    }}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        field.onChange('');
+                      } else {
+                        const numValue = parseFloat(value);
+                        field.onChange(isNaN(numValue) ? '' : numValue);
+                      }
+                    }}
+                    error={!!errors.totalAmount}
+                    helperText={errors.totalAmount?.message}
                   />
                 )}
               />
