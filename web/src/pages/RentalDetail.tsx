@@ -298,15 +298,6 @@ export default function RentalDetail() {
                   </Typography>
                 </Grid>
                 
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Günlük Ücret
-                  </Typography>
-                  <Typography variant="body1">
-                    {formatCurrency(rental.dailyPrice)}
-                  </Typography>
-                </Grid>
-                
                 <Grid item xs={12}>
                   <Typography variant="body2" color="text.secondary">
                     Oluşturulma Tarihi
@@ -341,17 +332,6 @@ export default function RentalDetail() {
               <Divider sx={{ mb: 2 }} />
               
               <Grid container spacing={3}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'primary.50', borderRadius: 1 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Günlük Ücret
-                    </Typography>
-                    <Typography variant="h6" color="primary.main">
-                      {formatCurrency(rental.dailyPrice)}
-                    </Typography>
-                  </Box>
-                </Grid>
-                
                 <Grid item xs={12} sm={6} md={3}>
                   <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'success.50', borderRadius: 1 }}>
                     <Typography variant="body2" color="text.secondary">
