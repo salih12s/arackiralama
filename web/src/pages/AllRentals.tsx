@@ -128,7 +128,7 @@ export const AllRentals: React.FC = () => {
   const rentals: Rental[] = rentalsRes?.data?.data || [];
   const vehicles = vehiclesRes?.data || [];
 
-  // Filter rentals
+  // Filter and sort rentals
   const filteredRentals = rentals.filter(rental => {
     // Vehicle filter
     if (selectedVehicle && rental.vehicleId !== selectedVehicle) {
@@ -151,6 +151,11 @@ export const AllRentals: React.FC = () => {
     }
 
     return true;
+  }).sort((a, b) => {
+    // En yakın dönüş tarihi olan kiralar en üstte
+    const dateA = dayjs(a.endDate);
+    const dateB = dayjs(b.endDate);
+    return dateA.diff(dateB);
   });
 
   const getStatusColor = (status: string) => {
