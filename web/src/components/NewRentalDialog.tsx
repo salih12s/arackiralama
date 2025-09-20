@@ -34,7 +34,7 @@ const rentalSchema = z.object({
   startTime: z.string().default('09:00'),
   endDate: z.date(),
   days: z.number().int().min(1, 'Minimum 1 gün olmalıdır'),
-  dailyPrice: z.number().min(0, 'Günlük ücret negatif olamaz'),
+  totalAmount: z.number().min(0, 'Toplam tutar negatif olamaz'),
   kmDiff: z.number().min(0).default(0),
   cleaning: z.number().min(0).default(0),
   hgs: z.number().min(0).default(0),
@@ -103,7 +103,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
     resolver: zodResolver(rentalSchema),
     defaultValues: {
       days: 1,
-      dailyPrice: 150, // 150 TRY
+      totalAmount: 150, // 150 TRY
       startTime: '09:00',
       kmDiff: 0,
       cleaning: 0,
@@ -121,7 +121,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
   // Watch form values for calculations
   const watchedValues = watch([
     'days',
-    'dailyPrice',
+    'totalAmount',
     'kmDiff',
     'cleaning',
     'hgs',
@@ -135,8 +135,8 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
   ]);
 
   // Calculate totals (in TRY)
-  const [days, dailyPrice, kmDiff, cleaning, hgs, damage, fuel, upfront, pay1, pay2, pay3, pay4] = watchedValues;
-  const totalDueTRY = (days || 0) * (dailyPrice || 0) + (kmDiff || 0) + (cleaning || 0) + (hgs || 0) + (damage || 0) + (fuel || 0);
+  const [days, totalAmount, kmDiff, cleaning, hgs, damage, fuel, upfront, pay1, pay2, pay3, pay4] = watchedValues;
+  const totalDueTRY = (totalAmount || 0) + (kmDiff || 0) + (cleaning || 0) + (hgs || 0) + (damage || 0) + (fuel || 0);
   const totalPaidTRY = (upfront || 0) + (pay1 || 0) + (pay2 || 0) + (pay3 || 0) + (pay4 || 0);
   const balanceTRY = totalDueTRY - totalPaidTRY;
 
@@ -226,7 +226,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
           dayjs(`${endDate.format('YYYY-MM-DD')}T18:00:00`).toISOString() :
           dayjs(data.endDate).toISOString(),
         days: data.days,
-        dailyPrice: Math.round(data.dailyPrice * 100),
+        dailyPrice: Math.ceil(data.totalAmount / data.days * 100), // Calculate dailyPrice from totalAmount
         kmDiff: Math.round((data.kmDiff || 0) * 100),
         cleaning: Math.round((data.cleaning || 0) * 100),
         hgs: Math.round((data.hgs || 0) * 100),
@@ -538,20 +538,20 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
 
             <Grid item xs={6} md={3}>
               <Controller
-                name="dailyPrice"
+                name="totalAmount"
                 control={control}
                 render={({ field }) => (
                   <TextField
                     {...field}
                     fullWidth
-                    label="Günlük Ücret (TRY)"
+                    label="Toplam Ücret (TRY)"
                     type="number"
                     margin="normal"
                     inputProps={{ min: 0, step: 0.01 }}
                     onChange={(e) => handleNumericChange(field, e.target.value, false)}
                     onBlur={(e) => handleNumericBlur(field, e.target.value, false)}
-                    error={!!errors.dailyPrice}
-                    helperText={errors.dailyPrice?.message}
+                    error={!!errors.totalAmount}
+                    helperText={errors.totalAmount?.message}
                   />
                 )}
               />
