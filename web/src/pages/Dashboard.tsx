@@ -1087,6 +1087,19 @@ export default function Dashboard() {
                     rental.vehicle?.name?.toLowerCase().includes(filter)
                   );
                 })
+                .sort((a: Rental, b: Rental) => {
+                  // Bugünkü tarihe göre en yakın dönüş tarihi olan kiralar en üstte
+                  const today = dayjs();
+                  const dateA = dayjs(a.endDate);
+                  const dateB = dayjs(b.endDate);
+                  
+                  // Bugünkü tarihe göre mesafe hesapla (mutlak değer)
+                  const distanceA = Math.abs(dateA.diff(today, 'day'));
+                  const distanceB = Math.abs(dateB.diff(today, 'day'));
+                  
+                  // Yakın tarihler üstte olsun
+                  return distanceA - distanceB;
+                })
                 .map((rental: Rental) => {
                 // EditRentalDialog ile aynı hesaplama mantığı
                 // Toplam Ödenecek = (Gün × Günlük) + Ek Ücretler

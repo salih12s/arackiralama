@@ -484,7 +484,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                 value={endDate}
                 onChange={handleEndDateChange}
                 sx={{ width: '100%', mt: 2, mb: 1 }}
-                disabled
+                minDate={startDate || undefined}
               />
             </Grid>
 
