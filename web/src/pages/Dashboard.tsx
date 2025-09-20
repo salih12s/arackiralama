@@ -1000,7 +1000,145 @@ export default function Dashboard() {
         </Box>
       </Box>
 
-            
+         <Paper sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+            Boşta Olan Araçlar ({idleVehicles.length})
+          </Typography>
+        </Box>
+
+        {/* Araçlar Filtreleme */}
+        <TextField
+          size="small"
+          placeholder="Ara (plaka, araç adı, model...)"
+          value={vehiclesFilter}
+          onChange={(e) => setVehiclesFilter(e.target.value)}
+          sx={{ mb: 2, minWidth: 300 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search />
+              </InputAdornment>
+            ),
+          }}
+        />
+
+        {/* Boşta Olan Araçlar Tablosu */}
+        <TableContainer>
+          <Table size="small" sx={{ 
+            '& .MuiTableCell-root': { 
+              padding: '4px 8px',
+              fontSize: '0.75rem',
+              whiteSpace: 'nowrap'
+            } 
+          }}>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 70 }}>Plaka</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 120 }}>Araç Adı</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 80 }}>Toplam Fatura</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 80 }}>Tahsil Edilen</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 80 }}>Kalan Bakiye</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'center', minWidth: 70 }}>Kiralama Sayısı</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 60 }}>Durum</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 80 }}>İşlemler</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {idleVehicles
+                .filter((vehicle) => {
+                  if (!vehiclesFilter) return true;
+                  const filter = vehiclesFilter.toLowerCase();
+                  return (
+                    vehicle.plate?.toLowerCase().includes(filter) ||
+                    vehicle.name?.toLowerCase().includes(filter)
+                  );
+                })
+                .map((vehicle) => (
+                <TableRow key={vehicle.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
+                  <TableCell sx={{ fontWeight: 600, color: 'success.main' }}>
+                    {vehicle.plate}
+                  </TableCell>
+                  <TableCell sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {vehicle.name || 'Araç Adı Belirtilmemiş'}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>
+                    -
+                  </TableCell>
+                  <TableCell align="right" sx={{ color: 'info.main' }}>
+                    -
+                  </TableCell>
+                  <TableCell align="right" sx={{ 
+                        fontWeight: 600,
+                        color: 'text.secondary'
+                      }}>
+                    -
+                  </TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 600 }}>
+                    {vehicle._count?.rentals || 0}
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      value={vehicle.status}
+                      onChange={(e) => handleVehicleStatusChange(vehicle.id, e.target.value as 'IDLE' | 'RENTED' | 'RESERVED' | 'SERVICE')}
+                      size="small"
+                      sx={{ minWidth: 100, fontSize: '0.75rem', height: 32 }}
+                    >
+                      <MenuItem value="IDLE">
+                        <Chip label="Uygun" color="success" size="small" sx={{ fontSize: '0.65rem', height: 20 }} />
+                      </MenuItem>
+                      <MenuItem value="RESERVED">
+                        <Chip label="Rezerve" color="warning" size="small" sx={{ fontSize: '0.65rem', height: 20 }} />
+                      </MenuItem>
+                      <MenuItem value="SERVICE">
+                        <Chip label="Serviste" color="error" size="small" sx={{ fontSize: '0.65rem', height: 20 }} />
+                      </MenuItem>
+                    </Select>
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Tooltip title="Detaylar">
+                        <IconButton
+                          size="small"
+                          onClick={() => setVehicleDetailDialog({ open: true, vehicle })}
+                        >
+                          <Visibility fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      
+                      <Tooltip title="Hızlı Kiralama">
+                        <IconButton
+                          size="small"
+                          color="success"
+                          onClick={() => handleQuickRental(vehicle)}
+                        >
+                          <PersonAdd fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      
+                      <Tooltip title="Aracı Sil">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => setVehicleDeleteDialog({ open: true, vehicle })}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        {idleVehicles.length === 0 && (
+          <Alert severity="warning">
+            Şu anda boşta olan araç bulunmuyor.
+          </Alert>
+        )}
+      </Paper>    
       
       {/* ANA İÇERİK - AKTİF KİRALAMALAR TABLOSU */}
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -1168,7 +1306,10 @@ export default function Dashboard() {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
-                        {dayjs(rental.startDate).format('DD.MM.YYYY')}
+                        {dayjs(rental.startDate).format('DD.MM.YYYY')}{' '}
+                        <span style={{ color: '#1976d2', fontWeight: 600 }}>
+                          {dayjs(rental.startDate).format('HH:mm')}
+                        </span>
                       </Typography>
                       <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
                         {dayjs(rental.endDate).format('DD.MM.YYYY')}
@@ -1407,145 +1548,7 @@ export default function Dashboard() {
       </Paper>
 
       {/* BOŞTA OLAN ARAÇLAR */}
-      <Paper sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h5" sx={{ fontWeight: 600 }}>
-            Boşta Olan Araçlar ({idleVehicles.length})
-          </Typography>
-        </Box>
-
-        {/* Araçlar Filtreleme */}
-        <TextField
-          size="small"
-          placeholder="Ara (plaka, araç adı, model...)"
-          value={vehiclesFilter}
-          onChange={(e) => setVehiclesFilter(e.target.value)}
-          sx={{ mb: 2, minWidth: 300 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-          }}
-        />
-
-        {/* Boşta Olan Araçlar Tablosu */}
-        <TableContainer>
-          <Table size="small" sx={{ 
-            '& .MuiTableCell-root': { 
-              padding: '4px 8px',
-              fontSize: '0.75rem',
-              whiteSpace: 'nowrap'
-            } 
-          }}>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 70 }}>Plaka</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 120 }}>Araç Adı</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 80 }}>Toplam Fatura</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 80 }}>Tahsil Edilen</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'right', minWidth: 80 }}>Kalan Bakiye</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', textAlign: 'center', minWidth: 70 }}>Kiralama Sayısı</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 60 }}>Durum</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white', minWidth: 80 }}>İşlemler</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {idleVehicles
-                .filter((vehicle) => {
-                  if (!vehiclesFilter) return true;
-                  const filter = vehiclesFilter.toLowerCase();
-                  return (
-                    vehicle.plate?.toLowerCase().includes(filter) ||
-                    vehicle.name?.toLowerCase().includes(filter)
-                  );
-                })
-                .map((vehicle) => (
-                <TableRow key={vehicle.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
-                  <TableCell sx={{ fontWeight: 600, color: 'success.main' }}>
-                    {vehicle.plate}
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {vehicle.name || 'Araç Adı Belirtilmemiş'}
-                  </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
-                    -
-                  </TableCell>
-                  <TableCell align="right" sx={{ color: 'info.main' }}>
-                    -
-                  </TableCell>
-                  <TableCell align="right" sx={{ 
-                        fontWeight: 600,
-                        color: 'text.secondary'
-                      }}>
-                    -
-                  </TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 600 }}>
-                    {vehicle._count?.rentals || 0}
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={vehicle.status}
-                      onChange={(e) => handleVehicleStatusChange(vehicle.id, e.target.value as 'IDLE' | 'RENTED' | 'RESERVED' | 'SERVICE')}
-                      size="small"
-                      sx={{ minWidth: 100, fontSize: '0.75rem', height: 32 }}
-                    >
-                      <MenuItem value="IDLE">
-                        <Chip label="Uygun" color="success" size="small" sx={{ fontSize: '0.65rem', height: 20 }} />
-                      </MenuItem>
-                      <MenuItem value="RESERVED">
-                        <Chip label="Rezerve" color="warning" size="small" sx={{ fontSize: '0.65rem', height: 20 }} />
-                      </MenuItem>
-                      <MenuItem value="SERVICE">
-                        <Chip label="Serviste" color="error" size="small" sx={{ fontSize: '0.65rem', height: 20 }} />
-                      </MenuItem>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="Detaylar">
-                        <IconButton
-                          size="small"
-                          onClick={() => setVehicleDetailDialog({ open: true, vehicle })}
-                        >
-                          <Visibility fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      
-                      <Tooltip title="Hızlı Kiralama">
-                        <IconButton
-                          size="small"
-                          color="success"
-                          onClick={() => handleQuickRental(vehicle)}
-                        >
-                          <PersonAdd fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      
-                      <Tooltip title="Aracı Sil">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => setVehicleDeleteDialog({ open: true, vehicle })}
-                        >
-                          <Delete fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        {idleVehicles.length === 0 && (
-          <Alert severity="warning">
-            Şu anda boşta olan araç bulunmuyor.
-          </Alert>
-        )}
-      </Paper>
+     
 
       {/* REZERVE ARAÇLAR */}
       <Paper sx={{ p: 3, mb: 3 }}>
