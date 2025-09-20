@@ -15,7 +15,10 @@ import {
   Box,
   Alert,
   Autocomplete,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
+import { ArrowUpward } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -133,13 +136,16 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
   const currentRental = freshRentalResponse || rental;
 
   // Calculate totals using WATCH VALUES for real-time updates with safe fallbacks
-  const totalDueTRY = 
+  const totalDueTRYRaw = 
     (watchedValues?.totalAmount || 0) + 
     (watchedValues?.kmDiff || 0) + 
     (watchedValues?.cleaning || 0) + 
     (watchedValues?.hgs || 0) + 
     (watchedValues?.damage || 0) + 
     (watchedValues?.fuel || 0);
+  
+  // Otomatik üste yuvarla (4999.99 → 5000)
+  const totalDueTRY = Math.ceil(totalDueTRYRaw);
   
   // TL STANDARDI - Payments API'dan TL cinsinde gelir
   const totalPaid = Array.isArray(payments) ? payments.reduce((sum, payment) => sum + payment.amount, 0) : 0; // TL
@@ -568,19 +574,22 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                   render={({ field: formField }) => (
                     <TextField
                       {...formField}
+                      value={formField.value === 0 ? '' : formField.value}
                       fullWidth
                       label={field.label}
                       type="number"
                       margin="normal"
-                      disabled={isDebtFullyPaid && field.name !== 'upfront'} // Peşin hariç diğerleri disable
-                      inputProps={{ step: 0.01 }}
+                      inputProps={{ 
+                        step: 0.01,
+                        min: undefined 
+                      }}
                       onChange={(e) => {
                         const value = e.target.value;
                         if (value === '') {
                           formField.onChange('');
                         } else {
                           const numValue = parseFloat(value);
-                          formField.onChange(isNaN(numValue) ? 0 : numValue);
+                          formField.onChange(isNaN(numValue) ? '' : numValue);
                         }
                       }}
                     />
