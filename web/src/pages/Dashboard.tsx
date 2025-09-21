@@ -1226,17 +1226,23 @@ export default function Dashboard() {
                   );
                 })
                 .sort((a: Rental, b: Rental) => {
-                  // Güncel tarihe en yakın (bitmeye yakın) olanları üstte göster
-                  const today = dayjs();
-                  const dateA = dayjs(a.endDate);
-                  const dateB = dayjs(b.endDate);
-                  
-                  // Bugünkü tarihe göre mesafe hesapla (mutlak değer)
-                  const distanceA = Math.abs(dateA.diff(today, 'day'));
-                  const distanceB = Math.abs(dateB.diff(today, 'day'));
-                  
-                  // Yakın tarihler (bitmeye yakın) üstte olsun
-                  return distanceA - distanceB;
+                  // Gelecekte bitecekler (bugünden sonra) üstte, geçmişte kalanlar aşağıda
+                  const today = dayjs().startOf('day');
+                  const dateA = dayjs(a.endDate).startOf('day');
+                  const dateB = dayjs(b.endDate).startOf('day');
+
+                  const isAFuture = dateA.isAfter(today) || dateA.isSame(today);
+                  const isBFuture = dateB.isAfter(today) || dateB.isSame(today);
+
+                  // İkisi de gelecekteyse, en yakın olan üstte
+                  if (isAFuture && isBFuture) {
+                    return dateA.diff(dateB);
+                  }
+                  // Sadece biri gelecekteyse, o üstte
+                  if (isAFuture && !isBFuture) return -1;
+                  if (!isAFuture && isBFuture) return 1;
+                  // İkisi de geçmişteyse, en yeni (en az gecikmiş) üstte
+                  return dateB.diff(dateA);
                 })
                 .map((rental: Rental) => {
                 // EditRentalDialog ile aynı hesaplama mantığı
