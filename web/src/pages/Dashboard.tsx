@@ -1226,11 +1226,17 @@ export default function Dashboard() {
                   );
                 })
                 .sort((a: Rental, b: Rental) => {
-                  // Sadece dönüş tarihine göre sırala (en yakın tarih üstte)
+                  // Güncel tarihe en yakın (bitmeye yakın) olanları üstte göster
+                  const today = dayjs();
                   const dateA = dayjs(a.endDate);
                   const dateB = dayjs(b.endDate);
                   
-                  return dateA.isBefore(dateB) ? -1 : dateA.isAfter(dateB) ? 1 : 0;
+                  // Bugünkü tarihe göre mesafe hesapla (mutlak değer)
+                  const distanceA = Math.abs(dateA.diff(today, 'day'));
+                  const distanceB = Math.abs(dateB.diff(today, 'day'));
+                  
+                  // Yakın tarihler (bitmeye yakın) üstte olsun
+                  return distanceA - distanceB;
                 })
                 .map((rental: Rental) => {
                 // EditRentalDialog ile aynı hesaplama mantığı

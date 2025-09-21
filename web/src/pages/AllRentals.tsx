@@ -152,11 +152,25 @@ export const AllRentals: React.FC = () => {
 
     return true;
   }).sort((a, b) => {
-    // Sadece dönüş tarihine göre sırala (en yakın tarih üstte)
+    // Önce status'e göre sırala: ACTIVE kiralar üstte, COMPLETED/RETURNED aşağıda
+    const statusPriorityA = a.status === 'ACTIVE' ? 0 : 1;
+    const statusPriorityB = b.status === 'ACTIVE' ? 0 : 1;
+    
+    if (statusPriorityA !== statusPriorityB) {
+      return statusPriorityA - statusPriorityB;
+    }
+    
+    // Aynı status içinde bugünkü tarihe göre en yakın dönüş tarihi olan kiralar en üstte
+    const today = dayjs();
     const dateA = dayjs(a.endDate);
     const dateB = dayjs(b.endDate);
     
-    return dateA.isBefore(dateB) ? -1 : dateA.isAfter(dateB) ? 1 : 0;
+    // Bugünkü tarihe göre mesafe hesapla (mutlak değer)
+    const distanceA = Math.abs(dateA.diff(today, 'day'));
+    const distanceB = Math.abs(dateB.diff(today, 'day'));
+    
+    // Yakın tarihler üstte olsun
+    return distanceA - distanceB;
   });
 
   const getStatusColor = (status: string) => {
