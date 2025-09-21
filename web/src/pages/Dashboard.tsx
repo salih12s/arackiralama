@@ -1226,17 +1226,11 @@ export default function Dashboard() {
                   );
                 })
                 .sort((a: Rental, b: Rental) => {
-                  // Bugünkü tarihe göre en yakın dönüş tarihi olan kiralar en üstte
-                  const today = dayjs();
+                  // Sadece dönüş tarihine göre sırala (en yakın tarih üstte)
                   const dateA = dayjs(a.endDate);
                   const dateB = dayjs(b.endDate);
                   
-                  // Bugünkü tarihe göre mesafe hesapla (mutlak değer)
-                  const distanceA = Math.abs(dateA.diff(today, 'day'));
-                  const distanceB = Math.abs(dateB.diff(today, 'day'));
-                  
-                  // Yakın tarihler üstte olsun
-                  return distanceA - distanceB;
+                  return dateA.isBefore(dateB) ? -1 : dateA.isAfter(dateB) ? 1 : 0;
                 })
                 .map((rental: Rental) => {
                 // EditRentalDialog ile aynı hesaplama mantığı
@@ -1312,7 +1306,10 @@ export default function Dashboard() {
                         </span>
                       </Typography>
                       <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
-                        {dayjs(rental.endDate).format('DD.MM.YYYY')}
+                        {dayjs(rental.endDate).format('DD.MM.YYYY')}{' '}
+                        <span style={{ color: '#d32f2f', fontWeight: 600 }}>
+                          {dayjs(rental.endDate).format('HH:mm')}
+                        </span>
                       </Typography>
                     </TableCell>
                     <TableCell align="center">

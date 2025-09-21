@@ -33,6 +33,7 @@ const rentalSchema = z.object({
   startDate: z.date(),
   startTime: z.string().default('09:00'),
   endDate: z.date(),
+  endTime: z.string().default('18:00'),
   days: z.number().int().min(1, 'Minimum 1 gün olmalıdır'),
   totalAmount: z.number().min(0, 'Toplam tutar negatif olamaz'),
   kmDiff: z.number().min(0).default(0),
@@ -105,6 +106,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
       days: 1,
       totalAmount: 150, // 150 TRY
       startTime: '09:00',
+      endTime: '18:00',
       kmDiff: 0,
       cleaning: 0,
       hgs: 0,
@@ -222,8 +224,8 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
         startDate: startDate && startTime ? 
           dayjs(`${startDate.format('YYYY-MM-DD')}T${startTime}:00`).toISOString() :
           dayjs(data.startDate).toISOString(),
-        endDate: endDate ? 
-          dayjs(`${endDate.format('YYYY-MM-DD')}T18:00:00`).toISOString() :
+        endDate: endDate && data.endTime ? 
+          dayjs(`${endDate.format('YYYY-MM-DD')}T${data.endTime}:00`).toISOString() :
           dayjs(data.endDate).toISOString(),
         days: data.days,
         dailyPrice: Math.ceil(data.totalAmount / data.days * 100), // Calculate dailyPrice from totalAmount
@@ -239,6 +241,15 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
         pay4: Math.round((data.pay4 || 0) * 100),
         note: data.note,
       };
+      
+      console.log('🚀 New Rental Payload - Date/Time Debug:', {
+        endTime: data.endTime,
+        endDate: endDate?.format('YYYY-MM-DD'),
+        constructedEndDate: endDate && data.endTime ? 
+          dayjs(`${endDate.format('YYYY-MM-DD')}T${data.endTime}:00`).format('YYYY-MM-DD HH:mm') : 'fallback',
+        finalEndDateISO: payload.endDate
+      });
+      
       return rentalsApi.create(payload);
     },
     onSuccess: () => {
@@ -476,26 +487,42 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <DatePicker
-                label="Bitiş Tarihi"
-                value={endDate}
-                onChange={handleEndDateChange}
-                minDate={startDate || undefined}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    margin: 'normal',
-                    sx: {
-                      '& .MuiInputLabel-root': {
-                        fontSize: '1rem',
-                      },
-                      '& .MuiInputBase-input': {
-                        fontSize: '1rem',
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <DatePicker
+                  label="Bitiş Tarihi"
+                  value={endDate}
+                  onChange={handleEndDateChange}
+                  minDate={startDate || undefined}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      margin: 'normal',
+                      sx: {
+                        '& .MuiInputLabel-root': {
+                          fontSize: '1rem',
+                        },
+                        '& .MuiInputBase-input': {
+                          fontSize: '1rem',
+                        }
                       }
-                    }
-                  },
-                }}
-              />
+                    },
+                  }}
+                />
+                <Controller
+                  name="endTime"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      label="Dönüş Saati"
+                      type="time"
+                      margin="normal"
+                      sx={{ minWidth: 120 }}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  )}
+                />
+              </Box>
             </Grid>
 
             {/* Days and Daily Price */}
@@ -547,11 +574,17 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                     label="Toplam Ücret (TRY)"
                     type="number"
                     margin="normal"
-                    inputProps={{ min: 0, step: 0.01 }}
+                    inputProps={{ min: 0, step: 10 }}
                     onChange={(e) => handleNumericChange(field, e.target.value, false)}
-                    onBlur={(e) => handleNumericBlur(field, e.target.value, false)}
+                    onBlur={(e) => {
+                      // Yuvarlama sistemi: 10'lara yuvarla
+                      const value = parseFloat(e.target.value) || 0;
+                      const roundedValue = Math.round(value / 10) * 10;
+                      field.onChange(roundedValue);
+                      handleNumericBlur(field, roundedValue.toString(), false);
+                    }}
                     error={!!errors.totalAmount}
-                    helperText={errors.totalAmount?.message}
+                    helperText={errors.totalAmount?.message || "Otomatik olarak 10'lara yuvarlanır"}
                   />
                 )}
               />

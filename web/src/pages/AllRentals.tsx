@@ -152,25 +152,11 @@ export const AllRentals: React.FC = () => {
 
     return true;
   }).sort((a, b) => {
-    // Önce status'e göre sırala: ACTIVE kiralar üstte, COMPLETED/RETURNED aşağıda
-    const statusPriorityA = a.status === 'ACTIVE' ? 0 : 1;
-    const statusPriorityB = b.status === 'ACTIVE' ? 0 : 1;
-    
-    if (statusPriorityA !== statusPriorityB) {
-      return statusPriorityA - statusPriorityB;
-    }
-    
-    // Aynı status içinde bugünkü tarihe göre en yakın dönüş tarihi olan kiralar en üstte
-    const today = dayjs();
+    // Sadece dönüş tarihine göre sırala (en yakın tarih üstte)
     const dateA = dayjs(a.endDate);
     const dateB = dayjs(b.endDate);
     
-    // Bugünkü tarihe göre mesafe hesapla (mutlak değer)
-    const distanceA = Math.abs(dateA.diff(today, 'day'));
-    const distanceB = Math.abs(dateB.diff(today, 'day'));
-    
-    // Yakın tarihler üstte olsun
-    return distanceA - distanceB;
+    return dateA.isBefore(dateB) ? -1 : dateA.isAfter(dateB) ? 1 : 0;
   });
 
   const getStatusColor = (status: string) => {
@@ -615,9 +601,14 @@ export const AllRentals: React.FC = () => {
                             {dayjs(rental.startDate).format('HH:mm')}
                           </Typography>
                         </Box>
-                        <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
-                          {formatDate(rental.endDate)}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
+                            {formatDate(rental.endDate)}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3, color: 'error.main', fontWeight: 500 }}>
+                            {dayjs(rental.endDate).format('HH:mm')}
+                          </Typography>
+                        </Box>
                       </Box>
                     </TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600 }}>

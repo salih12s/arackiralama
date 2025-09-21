@@ -36,6 +36,7 @@ const rentalSchema = z.object({
   customerPhone: z.string().optional(),
   startDate: z.date(),
   endDate: z.date(),
+  endTime: z.string().default('18:00'),
   days: z.number().int().positive(),
   totalAmount: z.number(),
   kmDiff: z.number().default(0),
@@ -200,6 +201,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
       setValue('customerPhone', rentalData.customer?.phone || rentalData.customerPhone || '');
       setValue('startDate', startDateObj.toDate());
       setValue('endDate', endDateObj.toDate());
+      setValue('endTime', '18:00'); // Default end time since it's not stored in the database
       setValue('days', rentalData.days);
       
       // Backend'den TL cinsinde geliyor, direkt kullan
@@ -277,9 +279,15 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
   const updateRentalMutation = useMutation({
     mutationFn: (data: RentalFormData) => {
       // Backend'in beklediği format için uygun payload oluştur
+      
+      // Bitiş tarihini saatiyle birlikte güncelle
+      const endDateTime = dayjs(data.endDate);
+      const [hours, minutes] = data.endTime.split(':');
+      const updatedEndDate = endDateTime.hour(parseInt(hours)).minute(parseInt(minutes)).second(0);
+      
       const payload: Partial<any> = {
         startDate: dayjs(data.startDate).toISOString(),
-        endDate: dayjs(data.endDate).toISOString(),
+        endDate: updatedEndDate.toISOString(),
         days: data.days,
         note: data.note,
       };
@@ -307,7 +315,10 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
         totalAmount: data.totalAmount,
         calculatedDailyPrice: data.totalAmount && data.days ? data.totalAmount / data.days : 0,
         cleaning: payload.cleaning,
-        hgs: payload.hgs
+        hgs: payload.hgs,
+        endTime: data.endTime,
+        originalEndDate: dayjs(data.endDate).format('YYYY-MM-DD HH:mm'),
+        updatedEndDate: updatedEndDate.format('YYYY-MM-DD HH:mm')
       });
       
       return rentalsApi.update(rentalId!, payload);
@@ -448,12 +459,14 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
 
             {/* Date Selection */}
             <Grid item xs={12} md={6}>
-              <DatePicker
-                label="Başlangıç Tarihi"
-                value={startDate}
-                onChange={handleStartDateChange}
-                sx={{ width: '100%', mt: 2, mb: 1 }}
-              />
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <DatePicker
+                  label="Başlangıç Tarihi"
+                  value={startDate}
+                  onChange={handleStartDateChange}
+                  sx={{ width: '100%', mt: 2, mb: 1 }}
+                />
+              </Box>
             </Grid>
 
             <Grid item xs={12} md={3}>
@@ -479,13 +492,29 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
             </Grid>
 
             <Grid item xs={12} md={3}>
-              <DatePicker
-                label="Bitiş Tarihi"
-                value={endDate}
-                onChange={handleEndDateChange}
-                sx={{ width: '100%', mt: 2, mb: 1 }}
-                minDate={startDate || undefined}
-              />
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <DatePicker
+                  label="Bitiş Tarihi"
+                  value={endDate}
+                  onChange={handleEndDateChange}
+                  sx={{ width: '100%', mt: 2, mb: 1 }}
+                  minDate={startDate || undefined}
+                />
+                <Controller
+                  name="endTime"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      label="Dönüş Saati"
+                      type="time"
+                      margin="normal"
+                      sx={{ minWidth: 120 }}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  )}
+                />
+              </Box>
             </Grid>
 
             {/* Total Amount */}
@@ -502,7 +531,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                     type="number"
                     margin="normal"
                     inputProps={{ 
-                      step: "any",
+                      step: 10,
                       min: undefined 
                     }}
                     onChange={(e) => {
@@ -514,8 +543,14 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                         field.onChange(isNaN(numValue) ? '' : numValue);
                       }
                     }}
+                    onBlur={(e) => {
+                      // Yuvarlama sistemi: 10'lara yuvarla
+                      const value = parseFloat(e.target.value) || 0;
+                      const roundedValue = Math.round(value / 10) * 10;
+                      field.onChange(roundedValue);
+                    }}
                     error={!!errors.totalAmount}
-                    helperText={errors.totalAmount?.message}
+                    helperText={errors.totalAmount?.message || "Otomatik olarak 10'lara yuvarlanır"}
                   />
                 )}
               />

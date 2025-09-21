@@ -378,7 +378,7 @@ router.post('/:id/complete', async (req, res) => {
         data: {
           status: 'COMPLETED',
           balance, // Keep the balance for history
-          completedAt: new Date()
+          completedAt: new Date() // Sadece teslim alma zamanını kaydet
         },
         include: {
           vehicle: true,
