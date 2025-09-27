@@ -152,25 +152,12 @@ export const AllRentals: React.FC = () => {
 
     return true;
   }).sort((a, b) => {
-    // Önce status'e göre sırala: ACTIVE kiralar üstte, COMPLETED/RETURNED aşağıda
-    const statusPriorityA = a.status === 'ACTIVE' ? 0 : 1;
-    const statusPriorityB = b.status === 'ACTIVE' ? 0 : 1;
+    // En son oluşturulan kiralar en üstte (chronological order - newest first)
+    const dateA = dayjs(a.createdAt);
+    const dateB = dayjs(b.createdAt);
     
-    if (statusPriorityA !== statusPriorityB) {
-      return statusPriorityA - statusPriorityB;
-    }
-    
-    // Aynı status içinde bugünkü tarihe göre en yakın dönüş tarihi olan kiralar en üstte
-    const today = dayjs();
-    const dateA = dayjs(a.endDate);
-    const dateB = dayjs(b.endDate);
-    
-    // Bugünkü tarihe göre mesafe hesapla (mutlak değer)
-    const distanceA = Math.abs(dateA.diff(today, 'day'));
-    const distanceB = Math.abs(dateB.diff(today, 'day'));
-    
-    // Yakın tarihler üstte olsun
-    return distanceA - distanceB;
+    // En yeni tarih üstte (descending order)
+    return dateB.diff(dateA);
   });
 
   const getStatusColor = (status: string) => {
@@ -204,10 +191,9 @@ export const AllRentals: React.FC = () => {
   };
 
   const calculateBalance = (rental: Rental) => {
-    // UnpaidDebtsDetail mantığı ile hesaplama
-    const days = rental.days || 0;
-    const dailyPrice = rental.dailyPrice || 0;
-    const totalPrice = days * dailyPrice;
+    // Note'dan orijinal toplam tutarı oku
+    const noteMatch = rental.note?.match(/ORIGINAL_TOTAL:(\d+)/);
+    const originalTotalTL = noteMatch ? parseInt(noteMatch[1]) / 100 : (rental.dailyPrice * rental.days);
     
     // Ek ücretler
     const kmPrice = rental.kmDiff || 0;
@@ -216,8 +202,8 @@ export const AllRentals: React.FC = () => {
     const damageFee = rental.damage || 0;
     const fuelCost = rental.fuel || 0;
     
-    // Toplam tutar
-    const totalAmount = totalPrice + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
+    // Toplam tutar - orijinal değeri kullan
+    const totalAmount = originalTotalTL + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
     
     // Ödemeler
     const installmentPayments = (rental.upfront || 0) + (rental.pay1 || 0) + (rental.pay2 || 0) + (rental.pay3 || 0) + (rental.pay4 || 0);
@@ -447,16 +433,15 @@ export const AllRentals: React.FC = () => {
                 <Typography variant="caption" color="text.secondary">Toplam Gelir</Typography>
                 <Typography variant="h6" color="success.dark" sx={{ fontWeight: 700, fontSize: '1rem' }}>
                   {formatCurrency(filteredRentals.reduce((sum, r) => {
-                    // UnpaidDebtsDetail mantığı ile gerçek zamanlı hesaplama
-                    const days = r.days || 0;
-                    const dailyPrice = r.dailyPrice || 0;
-                    const totalPrice = days * dailyPrice;
+                    // Note'dan orijinal toplam tutarı oku
+                    const noteMatch = r.note?.match(/ORIGINAL_TOTAL:(\d+)/);
+                    const originalTotalTL = noteMatch ? parseInt(noteMatch[1]) / 100 : (r.dailyPrice * r.days);
                     const kmPrice = r.kmDiff || 0;
                     const hgsFee = r.hgs || 0;
                     const cleaningFee = r.cleaning || 0;
                     const damageFee = r.damage || 0;
                     const fuelCost = r.fuel || 0;
-                    const totalAmount = totalPrice + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
+                    const totalAmount = originalTotalTL + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
                     return sum + totalAmount;
                   }, 0))}
                 </Typography>
@@ -481,16 +466,15 @@ export const AllRentals: React.FC = () => {
                 <Typography variant="h6" color="warning.dark" sx={{ fontWeight: 700, fontSize: '1rem' }}>
                   {formatCurrency((() => {
                     const totalRevenue = filteredRentals.reduce((sum, r) => {
-                      // UnpaidDebtsDetail mantığı ile gerçek zamanlı hesaplama
-                      const days = r.days || 0;
-                      const dailyPrice = r.dailyPrice || 0;
-                      const totalPrice = days * dailyPrice;
+                      // Note'dan orijinal toplam tutarı oku
+                      const noteMatch = r.note?.match(/ORIGINAL_TOTAL:(\d+)/);
+                      const originalTotalTL = noteMatch ? parseInt(noteMatch[1]) / 100 : (r.dailyPrice * r.days);
                       const kmPrice = r.kmDiff || 0;
                       const hgsFee = r.hgs || 0;
                       const cleaningFee = r.cleaning || 0;
                       const damageFee = r.damage || 0;
                       const fuelCost = r.fuel || 0;
-                      const totalAmount = totalPrice + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
+                      const totalAmount = originalTotalTL + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
                       return sum + totalAmount;
                     }, 0);
                     const totalPaid = filteredRentals.reduce((sum, r) => {
@@ -560,10 +544,9 @@ export const AllRentals: React.FC = () => {
             </TableHead>
             <TableBody>
               {filteredRentals.map((rental) => {
-                // UnpaidDebtsDetail mantığı ile gerçek zamanlı hesaplama
-                const days = rental.days || 0;
-                const dailyPrice = rental.dailyPrice || 0;  // TL cinsinden
-                const totalPrice = days * dailyPrice;
+                // Note'dan orijinal toplam tutarı oku
+                const noteMatch = rental.note?.match(/ORIGINAL_TOTAL:(\d+)/);
+                const originalTotalTL = noteMatch ? parseInt(noteMatch[1]) / 100 : (rental.dailyPrice * rental.days);
                 
                 // Ek ücretler - API'dan TL cinsinde geliyor
                 const kmPrice = rental.kmDiff || 0;
@@ -572,8 +555,8 @@ export const AllRentals: React.FC = () => {
                 const damageFee = rental.damage || 0;
                 const fuelCost = rental.fuel || 0;
                 
-                // Toplam tutar hesaplama
-                const totalAmount = totalPrice + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
+                // Toplam tutar hesaplama - orijinal değeri kullan
+                const totalAmount = originalTotalTL + kmPrice + hgsFee + cleaningFee + damageFee + fuelCost;
                 
                 // Ödemeler - TL cinsinden
                 const advancePayment = rental.upfront || 0;
@@ -607,35 +590,34 @@ export const AllRentals: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
-                            {formatDate(rental.startDate)}
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3, color: 'primary.main', fontWeight: 500 }}>
-                            {dayjs(rental.startDate).format('HH:mm')}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
-                            {formatDate(rental.endDate)}
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3, color: 'error.main', fontWeight: 500 }}>
-                            {dayjs(rental.endDate).format('HH:mm')}
-                          </Typography>
-                        </Box>
+                        <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
+                          {formatDate(rental.startDate)}
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
+                          {formatDate(rental.endDate)}
+                        </Typography>
                       </Box>
                     </TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600 }}>
                       {rental.days}
                     </TableCell>
                     <TableCell align="right">
-                      {formatCurrency(rental.dailyPrice)}
+                      {formatCurrency(Math.round(rental.dailyPrice / 10) * 10)}
                     </TableCell>
                     <TableCell align="right">
                       {formatCurrency(rental.kmDiff || 0)}
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 600, backgroundColor: '#f5f5f5' }}>
-                      {formatCurrency((rental.dailyPrice * (rental.days || 0)) + (rental.kmDiff || 0))}
+                      {formatCurrency((() => {
+                        // Note'dan orijinal toplam tutarı oku
+                        const noteMatch = rental.note?.match(/ORIGINAL_TOTAL:(\d+)/);
+                        if (noteMatch) {
+                          const originalTotal = parseInt(noteMatch[1]) / 100; // Kuruştan TL'ye
+                          return originalTotal + ((rental.kmDiff || 0) / 100);
+                        }
+                        // Eski kayıtlar için standart hesaplama
+                        return (rental.dailyPrice * (rental.days || 0)) + (rental.kmDiff || 0);
+                      })())}
                     </TableCell>
                     <TableCell align="right">
                       {formatCurrency(rental.hgs || 0)}
@@ -688,11 +670,17 @@ export const AllRentals: React.FC = () => {
                       />
                     </TableCell>
                     <TableCell sx={{ maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      <Tooltip title={rental.note || 'Not bulunmuyor'} arrow>
-                        <span style={{ cursor: rental.note ? 'help' : 'default' }}>
-                          {rental.note || '-'}
-                        </span>
-                      </Tooltip>
+                      {(() => {
+                        // ORIGINAL_TOTAL kısmını gizle, sadece kullanıcı notunu göster
+                        const displayNote = rental.note?.replace(/ORIGINAL_TOTAL:\d+\|?/, '') || '';
+                        return (
+                          <Tooltip title={displayNote || 'Not bulunmuyor'} arrow>
+                            <span style={{ cursor: displayNote ? 'help' : 'default' }}>
+                              {displayNote || '-'}
+                            </span>
+                          </Tooltip>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', gap: 0.5 }}>

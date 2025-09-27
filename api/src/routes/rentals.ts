@@ -24,6 +24,7 @@ const createRentalSchema = z.object({
   endDate: z.string().datetime(),
   days: z.number().int().positive().optional(),
   dailyPrice: z.number().int().positive(),
+  originalTotal: z.number().int().optional(),
   kmDiff: z.number().int().default(0),
   cleaning: z.number().int().default(0),
   hgs: z.number().int().default(0),
@@ -219,7 +220,7 @@ router.post('/', async (req, res) => {
           pay3: data.pay3,
           pay4: data.pay4,
           balance,
-          note: data.note
+          note: data.originalTotal ? `ORIGINAL_TOTAL:${data.originalTotal}|${data.note || ''}` : data.note
         },
         include: {
           vehicle: true,

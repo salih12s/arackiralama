@@ -908,7 +908,10 @@ export default function Dashboard() {
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.8rem', sm: '0.9rem' } }}>
               {(allRentalsRes?.data?.data || []).filter((rental: any) => {
-                const totalDue = (rental.days || 0) * (rental.dailyPrice || 0) + 
+                // Note'dan orijinal toplam tutarı oku
+                const noteMatch = rental.note?.match(/ORIGINAL_TOTAL:(\d+)/);
+                const originalTotalTL = noteMatch ? parseInt(noteMatch[1]) / 100 : (rental.dailyPrice * rental.days);
+                const totalDue = originalTotalTL + 
                   (rental.kmDiff || 0) + (rental.hgs || 0) + (rental.damage || 0) + 
                   (rental.fuel || 0) + (rental.cleaning || 0);
                 const totalPaid = (rental.payments || []).reduce((sum: number, payment: any) => sum + payment.amount, 0) +
@@ -1245,10 +1248,12 @@ export default function Dashboard() {
                   return dateB.diff(dateA);
                 })
                 .map((rental: Rental) => {
-                // EditRentalDialog ile aynı hesaplama mantığı
-                // Toplam Ödenecek = (Gün × Günlük) + Ek Ücretler
+                // Note'dan orijinal toplam tutarı oku
+                const noteMatch = rental.note?.match(/ORIGINAL_TOTAL:(\d+)/);
+                const originalTotalTL = noteMatch ? parseInt(noteMatch[1]) / 100 : (rental.dailyPrice * rental.days);
+                // Toplam Ödenecek = Orijinal Toplam + Ek Ücretler
                 const totalDueTL = 
-                  (rental.days * rental.dailyPrice) + 
+                  originalTotalTL + 
                   (rental.kmDiff || 0) + 
                   (rental.cleaning || 0) + 
                   (rental.hgs || 0) + 
@@ -1276,7 +1281,7 @@ export default function Dashboard() {
                   calculation: {
                     dailyPrice: rental.dailyPrice,
                     days: rental.days,
-                    dailyTotal: rental.days * rental.dailyPrice,
+                    dailyTotal: originalTotalTL,
                     kmDiff: rental.kmDiff,
                     cleaning: rental.cleaning,
                     hgs: rental.hgs,
@@ -1312,16 +1317,10 @@ export default function Dashboard() {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
-                        {dayjs(rental.startDate).format('DD.MM.YYYY')}{' '}
-                        <span style={{ color: '#1976d2', fontWeight: 600 }}>
-                          {dayjs(rental.startDate).format('HH:mm')}
-                        </span>
+                        {dayjs(rental.startDate).format('DD.MM.YYYY')}
                       </Typography>
                       <Typography variant="body2" sx={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
-                        {dayjs(rental.endDate).format('DD.MM.YYYY')}{' '}
-                        <span style={{ color: '#d32f2f', fontWeight: 600 }}>
-                          {dayjs(rental.endDate).format('HH:mm')}
-                        </span>
+                        {dayjs(rental.endDate).format('DD.MM.YYYY')}
                       </Typography>
                     </TableCell>
                     <TableCell align="center">
@@ -1331,7 +1330,7 @@ export default function Dashboard() {
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="body2">
-                        {formatCurrency(rental.dailyPrice)}
+                        {formatCurrency(Math.round(rental.dailyPrice / 10) * 10)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
@@ -1486,7 +1485,7 @@ export default function Dashboard() {
                   <TableCell>{reservation.customerName}</TableCell>
                   <TableCell>{reservation.licensePlate}</TableCell>
                   <TableCell>{dayjs(reservation.reservationDate).format('DD.MM.YYYY')}</TableCell>
-                  <TableCell>{dayjs(reservation.reservationDate).format('HH:mm')}</TableCell>
+                  <TableCell>{dayjs(reservation.reservationDate).format('DD.MM.YYYY')}</TableCell>
                   <TableCell>{reservation.rentalDuration} gün</TableCell>
                   <TableCell>
                     <Chip
@@ -1965,8 +1964,10 @@ export default function Dashboard() {
             const totalDueTL = detailDialog.rental.totalDue / 100;
             const remainingBalance = totalDueTL - totalAllPaid;
             
-            // Araç geliri - ESKİ HALİNE GETİR
-            const vehicleRevenue = (detailDialog.rental.days * detailDialog.rental.dailyPrice) + (detailDialog.rental.kmDiff || 0);
+            // Araç geliri - orijinal toplam tutarı kullan
+            const noteMatch = detailDialog.rental.note?.match(/ORIGINAL_TOTAL:(\d+)/);
+            const originalTotalTL = noteMatch ? parseInt(noteMatch[1]) / 100 : (detailDialog.rental.days * detailDialog.rental.dailyPrice);
+            const vehicleRevenue = originalTotalTL + (detailDialog.rental.kmDiff || 0);
 
             return (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -2189,7 +2190,7 @@ export default function Dashboard() {
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                           <Typography variant="body2" color="text.secondary">Temel Tutar:</Typography>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {formatCurrency(detailDialog.rental.days * detailDialog.rental.dailyPrice)}
+                            {formatCurrency(originalTotalTL)}
                           </Typography>
                         </Box>
                         

@@ -36,7 +36,6 @@ const rentalSchema = z.object({
   customerPhone: z.string().optional(),
   startDate: z.date(),
   endDate: z.date(),
-  endTime: z.string().default('18:00'),
   days: z.number().int().positive(),
   totalAmount: z.number(),
   kmDiff: z.number().default(0),
@@ -201,7 +200,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
       setValue('customerPhone', rentalData.customer?.phone || rentalData.customerPhone || '');
       setValue('startDate', startDateObj.toDate());
       setValue('endDate', endDateObj.toDate());
-      setValue('endTime', '18:00'); // Default end time since it's not stored in the database
+
       setValue('days', rentalData.days);
       
       // Backend'den TL cinsinde geliyor, direkt kullan
@@ -210,9 +209,10 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
         return value; // Backend zaten TL gönderiyor
       };
       
-      // Toplam ödeme miktarını hesapla (gün * günlük ücret)
-      const calculatedTotal = (rentalData.days || 1) * (rentalData.dailyPrice || 0);
-      setValue('totalAmount', calculatedTotal);
+      // Orijinal toplam tutarı note'dan oku, yoksa hesapla
+      const noteMatch = rentalData.note?.match(/ORIGINAL_TOTAL:(\d+)/);
+      const originalTotal = noteMatch ? parseInt(noteMatch[1]) / 100 : (rentalData.days || 1) * (rentalData.dailyPrice || 0);
+      setValue('totalAmount', originalTotal);
       setValue('kmDiff', convertToTL(rentalData.kmDiff));
       setValue('cleaning', convertToTL(rentalData.cleaning));
       setValue('hgs', convertToTL(rentalData.hgs));
@@ -257,13 +257,13 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
   const handleDaysChange = (newDays: number) => {
     if (!startDate || newDays < 1) return;
     
-    // Mevcut toplam ödemeden günlük ücreti hesapla
+    // Mevcut toplam ödemeden günlük ücreti hesapla (10'un katlarına yuvarlama ile)
     const currentTotalAmount = watch('totalAmount') || 0;
     const currentDays = watch('days') || 1;
-    const dailyRate = currentDays > 0 ? currentTotalAmount / currentDays : 0;
+    const dailyRate = currentDays > 0 ? Math.round(currentTotalAmount / currentDays / 10) * 10 : 0;
     
-    // Yeni toplam ödemeyi hesapla
-    const newTotalAmount = dailyRate * newDays;
+    // Yeni toplam ödemeyi hesapla (yuvarlama ile)
+    const newTotalAmount = Math.round(dailyRate * newDays);
     
     setValue('days', newDays, { shouldValidate: false });
     setValue('totalAmount', newTotalAmount, { shouldValidate: false });
@@ -280,10 +280,8 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
     mutationFn: (data: RentalFormData) => {
       // Backend'in beklediği format için uygun payload oluştur
       
-      // Bitiş tarihini saatiyle birlikte güncelle
-      const endDateTime = dayjs(data.endDate);
-      const [hours, minutes] = data.endTime.split(':');
-      const updatedEndDate = endDateTime.hour(parseInt(hours)).minute(parseInt(minutes)).second(0);
+      // Bitiş tarihini güncelle
+      const updatedEndDate = dayjs(data.endDate);
       
       const payload: Partial<any> = {
         startDate: dayjs(data.startDate).toISOString(),
@@ -296,9 +294,9 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
       if (data.vehicleId) payload.vehicleId = data.vehicleId;
       if (data.customerName) payload.customerName = data.customerName;
       if (data.customerPhone) payload.customerPhone = data.customerPhone;
-      // Toplam ödemeden günlük ücreti hesapla
+      // Toplam ödemeden günlük ücreti hesapla (10'un katlarına yuvarlama ile)
       if (data.totalAmount !== undefined && data.days) {
-        payload.dailyPrice = data.totalAmount / data.days;
+        payload.dailyPrice = Math.round((data.totalAmount / data.days) / 10) * 10 * 100;
       }
       if (data.kmDiff !== undefined) payload.kmDiff = data.kmDiff;
       if (data.cleaning !== undefined) payload.cleaning = data.cleaning;
@@ -316,8 +314,6 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
         calculatedDailyPrice: data.totalAmount && data.days ? data.totalAmount / data.days : 0,
         cleaning: payload.cleaning,
         hgs: payload.hgs,
-        endTime: data.endTime,
-        originalEndDate: dayjs(data.endDate).format('YYYY-MM-DD HH:mm'),
         updatedEndDate: updatedEndDate.format('YYYY-MM-DD HH:mm')
       });
       
@@ -500,20 +496,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
                   sx={{ width: '100%', mt: 2, mb: 1 }}
                   minDate={startDate || undefined}
                 />
-                <Controller
-                  name="endTime"
-                  control={control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      label="Dönüş Saati"
-                      type="time"
-                      margin="normal"
-                      sx={{ minWidth: 120 }}
-                      InputLabelProps={{ shrink: true }}
-                    />
-                  )}
-                />
+
               </Box>
             </Grid>
 

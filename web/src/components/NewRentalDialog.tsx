@@ -31,9 +31,7 @@ const rentalSchema = z.object({
   vehicleId: z.string().min(1, 'Araç seçimi gereklidir'),
   customerName: z.string().min(1, 'Müşteri adı gereklidir'),
   startDate: z.date(),
-  startTime: z.string().default('09:00'),
   endDate: z.date(),
-  endTime: z.string().default('18:00'),
   days: z.number().int().min(1, 'Minimum 1 gün olmalıdır'),
   totalAmount: z.number().min(0, 'Toplam tutar negatif olamaz'),
   kmDiff: z.number().min(0).default(0),
@@ -61,7 +59,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
   const queryClient = useQueryClient();
   const [startDate, setStartDate] = useState<Dayjs | null>(dayjs());
   const [endDate, setEndDate] = useState<Dayjs | null>(dayjs().add(1, 'day'));
-  const [startTime, setStartTime] = useState('09:00');
+
   
   // Hesaplama alanları (sadece görsel hesaplama için)
   const [calculationTotalAmount, setCalculationTotalAmount] = useState<string>('');
@@ -105,8 +103,8 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
     defaultValues: {
       days: 1,
       totalAmount: 150, // 150 TRY
-      startTime: '09:00',
-      endTime: '18:00',
+
+
       kmDiff: 0,
       cleaning: 0,
       hgs: 0,
@@ -211,7 +209,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
     if (open) {
       const now = dayjs();
       const currentTime = now.format('HH:mm');
-      setStartTime(currentTime);
+
     }
   }, [open, setValue]);
 
@@ -221,14 +219,15 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
       const payload = {
         vehicleId: data.vehicleId,
         customerName: data.customerName,
-        startDate: startDate && startTime ? 
-          dayjs(`${startDate.format('YYYY-MM-DD')}T${startTime}:00`).toISOString() :
+        startDate: startDate ? 
+          dayjs(`${startDate.format('YYYY-MM-DD')}T09:00:00`).toISOString() :
           dayjs(data.startDate).toISOString(),
-        endDate: endDate && data.endTime ? 
-          dayjs(`${endDate.format('YYYY-MM-DD')}T${data.endTime}:00`).toISOString() :
+        endDate: endDate ? 
+          dayjs(`${endDate.format('YYYY-MM-DD')}T18:00:00`).toISOString() :
           dayjs(data.endDate).toISOString(),
         days: data.days,
-        dailyPrice: Math.ceil(data.totalAmount / data.days * 100), // Calculate dailyPrice from totalAmount
+        dailyPrice: Math.round((data.totalAmount / data.days) / 10) * 10 * 100, // Rounded to nearest 10
+        originalTotal: Math.round(data.totalAmount * 100), // Hesaplamalar için sakla
         kmDiff: Math.round((data.kmDiff || 0) * 100),
         cleaning: Math.round((data.cleaning || 0) * 100),
         hgs: Math.round((data.hgs || 0) * 100),
@@ -242,11 +241,8 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
         note: data.note,
       };
       
-      console.log('🚀 New Rental Payload - Date/Time Debug:', {
-        endTime: data.endTime,
+      console.log('🚀 New Rental Payload - Date Debug:', {
         endDate: endDate?.format('YYYY-MM-DD'),
-        constructedEndDate: endDate && data.endTime ? 
-          dayjs(`${endDate.format('YYYY-MM-DD')}T${data.endTime}:00`).format('YYYY-MM-DD HH:mm') : 'fallback',
         finalEndDateISO: payload.endDate
       });
       
@@ -272,7 +268,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
       reset();
       setStartDate(dayjs());
       setEndDate(dayjs().add(1, 'day'));
-      setStartTime('09:00');
+
       setCalculationTotalAmount('');
       setCalculationDailyRate('');
       setCalculationDays('1');
@@ -387,15 +383,15 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                       const days = e.target.value;
                       setCalculationDays(days);
                       
-                      // Toplam tutar varsa günlük ücreti hesapla
+                      // Toplam tutar varsa günlük ücreti hesapla (10'un katlarına yuvarlama ile)
                       if (calculationTotalAmount && days && parseInt(days) > 0) {
-                        const dailyRate = (parseFloat(calculationTotalAmount) / parseInt(days)).toFixed(2);
-                        setCalculationDailyRate(dailyRate);
+                        const dailyRate = Math.round(parseFloat(calculationTotalAmount) / parseInt(days) / 10) * 10;
+                        setCalculationDailyRate(dailyRate.toString());
                       }
-                      // Günlük ücret varsa toplam tutarı hesapla
+                      // Günlük ücret varsa toplam tutarı hesapla (yuvarlama ile)
                       else if (calculationDailyRate && days && parseInt(days) > 0) {
-                        const totalAmount = (parseFloat(calculationDailyRate) * parseInt(days)).toFixed(2);
-                        setCalculationTotalAmount(totalAmount);
+                        const totalAmount = Math.round(parseFloat(calculationDailyRate) * parseInt(days));
+                        setCalculationTotalAmount(totalAmount.toString());
                       }
                     }}
                     inputProps={{ min: 1, step: 1 }}
@@ -416,8 +412,8 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                       
                       const days = parseInt(calculationDays) || 1;
                       if (totalAmount && days > 0) {
-                        const dailyRate = (parseFloat(totalAmount) / days).toFixed(2);
-                        setCalculationDailyRate(dailyRate);
+                        const dailyRate = Math.round(parseFloat(totalAmount) / days / 10) * 10;
+                        setCalculationDailyRate(dailyRate.toString());
                       } else {
                         setCalculationDailyRate('');
                       }
@@ -436,8 +432,8 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                       
                       const days = parseInt(calculationDays) || 1;
                       if (dailyRate && days > 0) {
-                        const totalAmount = (parseFloat(dailyRate) * days).toFixed(2);
-                        setCalculationTotalAmount(totalAmount);
+                        const totalAmount = Math.round(parseFloat(dailyRate) * days);
+                        setCalculationTotalAmount(totalAmount.toString());
                       } else {
                         setCalculationTotalAmount('');
                       }
@@ -474,15 +470,6 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                     },
                   }}
                 />
-                <TextField
-                  label="Saat"
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  margin="normal"
-                  sx={{ minWidth: 120 }}
-                  InputLabelProps={{ shrink: true }}
-                />
               </Box>
             </Grid>
 
@@ -508,20 +495,7 @@ export default function NewRentalDialog({ open, onClose, preselectedVehicle }: N
                     },
                   }}
                 />
-                <Controller
-                  name="endTime"
-                  control={control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      label="Dönüş Saati"
-                      type="time"
-                      margin="normal"
-                      sx={{ minWidth: 120 }}
-                      InputLabelProps={{ shrink: true }}
-                    />
-                  )}
-                />
+
               </Box>
             </Grid>
 
