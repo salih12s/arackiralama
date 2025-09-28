@@ -78,6 +78,8 @@ interface RentalData {
   extraPayments: number;
   // Açıklama alanı
   description?: string;
+  // Orijinal toplam tutar ve kullanıcı notu
+  note?: string;
 }
 
 export const UnpaidDebtsDetail: React.FC = () => {
@@ -109,7 +111,8 @@ export const UnpaidDebtsDetail: React.FC = () => {
     payment3: 0,
     payment4: 0,
     rentalType: 'NEW' as 'NEW' | 'EXTENSION',
-    description: ''
+    description: '',
+    note: '' // Orijinal note'u da sakla
   });
 
   // Data for dropdowns
@@ -215,10 +218,12 @@ export const UnpaidDebtsDetail: React.FC = () => {
           console.log('Found vehicle:', vehicle); // Debug için
           console.log('Customer data:', rental.customer); // Debug için
           
-          // Calculate values - API'dan TL cinsinde geliyor, display için kuruşa çevir
+          // Orijinal toplam tutarı note'dan oku
+          const noteMatch = rental.note?.match(/ORIGINAL_TOTAL:(\d+)/);
+          const originalTotalTL = noteMatch ? parseInt(noteMatch[1]) / 100 : (rental.days * rental.dailyPrice);
           const days = rental.days || 0;
-          const dailyPrice = rental.dailyPrice || 0;  // TL cinsinde
-          const totalPrice = days * dailyPrice;
+          const dailyPrice = rental.dailyPrice || 0;
+          const totalPrice = originalTotalTL;
           
           // KM bilgileri - Schema'da kmDiff var, bu KM ücreti 
           const kmDiff = rental.kmDiff || 0; 
@@ -289,8 +294,8 @@ export const UnpaidDebtsDetail: React.FC = () => {
             actualFuelCost: fuelCost, // Gerçek yakıt ücreti
             // Ek ödemeler (taksit dışı)
             extraPayments: extraPayments,
-            // Açıklama alanı
-            description: rental.note || ''
+            // Açıklama alanı - ORIGINAL_TOTAL kısmını gizle
+            description: rental.note?.replace(/ORIGINAL_TOTAL:\d+\|?/, '') || ''
           };
         });
 
@@ -363,7 +368,8 @@ export const UnpaidDebtsDetail: React.FC = () => {
         payment3: rental.payment3,          // TL cinsinden direkt kullan
         payment4: rental.payment4,          // TL cinsinden direkt kullan
         rentalType: (rental.rentalType || 'NEW') as 'NEW' | 'EXTENSION',
-        description: rental.description || ''
+        description: rental.description?.replace(/ORIGINAL_TOTAL:\d+\|?/, '') || '',
+        note: rental.note || '' // Orijinal note'u da sakla
       });
       console.log('Edit form set:', editForm); // Debug için
       setEditModalOpen(true);
@@ -589,7 +595,7 @@ export const UnpaidDebtsDetail: React.FC = () => {
                 <TableCell sx={{ minWidth: 50, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center', fontSize: '0.6rem' }}>
                   Tür
                 </TableCell>
-                <TableCell sx={{ minWidth: 100, fontWeight: 'bold', bgcolor: 'grey.100', fontSize: '0.6rem' }}>
+                <TableCell sx={{ minWidth: 80, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center', fontSize: '0.6rem' }}>
                   Açıklama
                 </TableCell>
                 <TableCell sx={{ minWidth: 60, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center', fontSize: '0.6rem' }}>
@@ -644,16 +650,12 @@ export const UnpaidDebtsDetail: React.FC = () => {
                     sx={{ 
                       fontWeight: 600,
                       color: (() => {
-                        // Gerçek zamanlı bakiye hesaplaması
-                        const totalDue = (rental.dailyPrice * rental.days) + 
-                          (rental.kmPrice || 0) + (rental.hgsFee || 0) + (rental.damageFee || 0) + 
-                          (rental.actualFuelCost || 0) + (rental.fuelCost || 0);
+                        // Toplam sütunuyla aynı değeri kullan
+                        const totalDue = rental.totalAmount;
                         
-                        // Taksitler + peşin + ek ödemeler
+                        // Sadece taksitler + peşin (ek ödemeler dahil etme)
                         const totalPaid = (rental.advancePayment || 0) + (rental.payment1 || 0) + 
-                          (rental.payment2 || 0) + (rental.payment3 || 0) + (rental.payment4 || 0) +
-                          (rental.totalPaid - ((rental.advancePayment || 0) + (rental.payment1 || 0) + 
-                          (rental.payment2 || 0) + (rental.payment3 || 0) + (rental.payment4 || 0)));
+                          (rental.payment2 || 0) + (rental.payment3 || 0) + (rental.payment4 || 0);
                         
                         const balance = totalDue - totalPaid;
                         return balance > 0 ? 'error.main' : 'success.main';
@@ -661,16 +663,12 @@ export const UnpaidDebtsDetail: React.FC = () => {
                     }}
                   >
                     {(() => {
-                      // Gerçek zamanlı bakiye hesaplaması - 1,2,3,4. ödemeler + ek ödemeler dahil
-                      const totalDue = (rental.dailyPrice * rental.days) + 
-                        (rental.kmPrice || 0) + (rental.hgsFee || 0) + (rental.damageFee || 0) + 
-                        (rental.actualFuelCost || 0) + (rental.fuelCost || 0);
+                      // Toplam sütunuyla aynı değeri kullan
+                      const totalDue = rental.totalAmount;
                       
-                      // Taksitler + peşin + ek ödemeler
+                      // Sadece taksitler + peşin (ek ödemeler dahil etme)
                       const totalPaid = (rental.advancePayment || 0) + (rental.payment1 || 0) + 
-                        (rental.payment2 || 0) + (rental.payment3 || 0) + (rental.payment4 || 0) +
-                        (rental.totalPaid - ((rental.advancePayment || 0) + (rental.payment1 || 0) + 
-                        (rental.payment2 || 0) + (rental.payment3 || 0) + (rental.payment4 || 0)));
+                        (rental.payment2 || 0) + (rental.payment3 || 0) + (rental.payment4 || 0);
                       
                       const balance = totalDue - totalPaid;
                       return formatCurrency(balance);
@@ -1072,35 +1070,19 @@ export const UnpaidDebtsDetail: React.FC = () => {
                   <Grid container spacing={2}>
                     <Grid item xs={4}>
                       <Typography variant="body2" color="text.secondary">
-                        Toplam Tutar: {formatCurrency(
-                          ((editForm.days || 0) * editForm.dailyPrice) + 
-                          editForm.kmPrice + editForm.hgsFee + editForm.damageFee + 
-                          editForm.actualFuelCost + editForm.fuelCost
-                        )}
+                        Toplam Tutar: {formatCurrency(editingRental?.totalAmount || 0)}
                       </Typography>
                     </Grid>
                     <Grid item xs={4}>
                       <Typography variant="body2" color="text.secondary">
                         Toplam Ödenen: {formatCurrency(
                           (() => {
-                            // Taksit ödemelerini hesapla
-                            const installmentPayments = (editForm.advancePayment || 0) + 
-                                                       editForm.payment1 + 
-                                                       editForm.payment2 + 
-                                                       editForm.payment3 + 
-                                                       editForm.payment4;
-                            
-                            // Ek ödemeleri hesapla (editingRental'dan)
-                            const extraPayments = editingRental && editingRental.totalPaid ? 
-                              editingRental.totalPaid - (
-                                (editingRental.advancePayment || 0) + 
-                                (editingRental.payment1 || 0) + 
-                                (editingRental.payment2 || 0) + 
-                                (editingRental.payment3 || 0) + 
-                                (editingRental.payment4 || 0)
-                              ) : 0;
-                            
-                            return installmentPayments + (extraPayments > 0 ? extraPayments : 0);
+                            // Sadece taksit ödemelerini hesapla
+                            return (editForm.advancePayment || 0) + 
+                                   editForm.payment1 + 
+                                   editForm.payment2 + 
+                                   editForm.payment3 + 
+                                   editForm.payment4;
                           })()
                         )}
                       </Typography>
@@ -1109,29 +1091,13 @@ export const UnpaidDebtsDetail: React.FC = () => {
                       <Typography variant="body2" color="text.secondary" fontWeight="bold">
                         Bakiye: {formatCurrency(
                           (() => {
-                            // Toplam tutar
-                            const totalDue = ((editForm.days || 0) * editForm.dailyPrice) + 
-                                           editForm.kmPrice + editForm.hgsFee + editForm.damageFee + 
-                                           editForm.actualFuelCost + editForm.fuelCost;
-                            
-                            // Taksit ödemelerini hesapla
-                            const installmentPayments = (editForm.advancePayment || 0) + 
-                                                       editForm.payment1 + 
-                                                       editForm.payment2 + 
-                                                       editForm.payment3 + 
-                                                       editForm.payment4;
-                            
-                            // Ek ödemeleri hesapla (editingRental'dan)
-                            const extraPayments = editingRental && editingRental.totalPaid ? 
-                              editingRental.totalPaid - (
-                                (editingRental.advancePayment || 0) + 
-                                (editingRental.payment1 || 0) + 
-                                (editingRental.payment2 || 0) + 
-                                (editingRental.payment3 || 0) + 
-                                (editingRental.payment4 || 0)
-                              ) : 0;
-                            
-                            const totalPaid = installmentPayments + (extraPayments > 0 ? extraPayments : 0);
+                            // Toplam tutar - Sadece taksit ödemeleri
+                            const totalDue = editingRental?.totalAmount || 0;
+                            const totalPaid = (editForm.advancePayment || 0) + 
+                                            editForm.payment1 + 
+                                            editForm.payment2 + 
+                                            editForm.payment3 + 
+                                            editForm.payment4;
                             
                             return totalDue - totalPaid;
                           })()

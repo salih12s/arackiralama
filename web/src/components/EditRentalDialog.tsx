@@ -223,7 +223,9 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
       setValue('pay2', convertToTL(rentalData.pay2));
       setValue('pay3', convertToTL(rentalData.pay3));
       setValue('pay4', convertToTL(rentalData.pay4));
-      setValue('note', rentalData.note || '');
+      // ORIGINAL_TOTAL kısmını gizle, sadece kullanıcı notunu göster
+      const displayNote = rentalData.note?.replace(/ORIGINAL_TOTAL:\d+\|?/, '') || '';
+      setValue('note', displayNote);
     }
   }, [rentalData, setValue, rental]);
 
@@ -296,7 +298,7 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
       if (data.customerPhone) payload.customerPhone = data.customerPhone;
       // Toplam ödemeden günlük ücreti hesapla (10'un katlarına yuvarlama ile)
       if (data.totalAmount !== undefined && data.days) {
-        payload.dailyPrice = Math.round((data.totalAmount / data.days) / 10) * 10 * 100;
+        payload.dailyPrice = Math.round((data.totalAmount / data.days) / 10) * 10;
       }
       if (data.kmDiff !== undefined) payload.kmDiff = data.kmDiff;
       if (data.cleaning !== undefined) payload.cleaning = data.cleaning;
@@ -308,6 +310,13 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
       if (data.pay2 !== undefined) payload.pay2 = data.pay2;
       if (data.pay3 !== undefined) payload.pay3 = data.pay3;
       if (data.pay4 !== undefined) payload.pay4 = data.pay4;
+      
+      // Orijinal toplam tutarı note'a ekle
+      if (data.note !== undefined && data.totalAmount !== undefined) {
+        const originalTotalInCents = Math.round(data.totalAmount * 100);
+        const existingNote = data.note.replace(/ORIGINAL_TOTAL:\d+\|?/, '');
+        payload.note = existingNote ? `ORIGINAL_TOTAL:${originalTotalInCents}|${existingNote}` : `ORIGINAL_TOTAL:${originalTotalInCents}`;
+      }
       
       console.log('🚀 Update Payload Debug (TL values):', {
         totalAmount: data.totalAmount,
