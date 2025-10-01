@@ -31,6 +31,8 @@ import {
   Person,
   Warning,
   Menu as MenuIcon,
+  AttachMoney,
+  Note,
 } from '@mui/icons-material';
 import dayjs from 'dayjs';
 
@@ -127,6 +129,13 @@ export default function Layout({ children }: LayoutProps) {
         queryClient.invalidateQueries({ queryKey: ['vehicles'] });
         queryClient.invalidateQueries({ queryKey: ['customers'] });
         break;
+      case '/vehicle-expenses':
+        queryClient.invalidateQueries({ queryKey: ['vehicle-expenses'] });
+        queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+        break;
+      case '/notes':
+        queryClient.invalidateQueries({ queryKey: ['notes'] });
+        break;
     }
     navigate(path);
   };
@@ -135,9 +144,12 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/', label: 'Ana Sayfa', icon: <DashboardIcon fontSize="small" /> },
     { path: '/rentals', label: 'Kiralama Yönetimi', icon: <Receipt fontSize="small" /> },
     { path: '/vehicles', label: 'Tanımlamalar', icon: <DirectionsCar fontSize="small" /> },
+  
     { path: '/reports', label: 'Raporlar', icon: <Assessment fontSize="small" /> },
     { path: '/debtor-details', label: 'Borçlu Kişiler', icon: <Person fontSize="small" /> },
     { path: '/unpaid-debts', label: 'Ödenmeyen Borçlar Detay', icon: <Warning fontSize="small" /> },
+      { path: '/vehicle-expenses', label: 'Araç Gider Tablosu', },
+    { path: '/notes', label: 'NOTLAR', icon: <Note fontSize="small" /> },
     { path: '/backup', label: 'Yedekleme', icon: <Backup fontSize="small" /> },
   ];
 

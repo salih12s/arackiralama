@@ -13,6 +13,8 @@ import analyticsRoutes from './routes/analytics';
 import backupRoutes from './routes/backup';
 import customerRoutes from './routes/customers';
 import reservationRoutes from './routes/reservations';
+import vehicleExpenseRoutes from './routes/vehicleExpenses';
+import noteRoutes from './routes/notes';
 
 // Load environment variables
 dotenv.config();
@@ -106,6 +108,8 @@ app.use('/api/rentals', rentalRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/reservations', reservationRoutes);
+app.use('/api/vehicle-expenses', vehicleExpenseRoutes);
+app.use('/api/notes', noteRoutes);
 app.use('/api/stats', reportRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/analytics', analyticsRoutes);

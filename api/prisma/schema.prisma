@@ -61,6 +61,7 @@ model Vehicle {
   rentals               Rental[]
   consignmentDeductions ConsignmentDeduction[]
   reservations          Reservation[]
+  expenses              VehicleExpense[]
 
   @@map("vehicles")
 }
@@ -188,4 +189,32 @@ model Reservation {
   vehicle     Vehicle           @relation(fields: [vehicleId], references: [id])
 
   @@map("reservations")
+}
+
+// Araç Giderleri Tablosu
+model VehicleExpense {
+  id          String   @id @default(cuid())
+  date        DateTime
+  vehicleId   String   @map("vehicle_id")
+  expenseType String   @map("expense_type") // LASTİK, BAKIM, ONARIM, vb.
+  location    String   // İşin yapıldığı yer
+  amount      Float    // Tutar (TL cinsinden)
+  description String?  // Açıklama
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  @@map("vehicle_expenses")
+}
+
+// Notlar Tablosu
+model Note {
+  id        String   @id @default(cuid())
+  rowIndex  Int      @map("row_index") // Satır numarası
+  content   String   // Not içeriği
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("notes")
 }
