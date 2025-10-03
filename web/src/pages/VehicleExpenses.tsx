@@ -40,12 +40,27 @@ interface Vehicle {
   active?: boolean;
 }
 
-
+const EXPENSE_TYPES = [
+  'YAĞ BAKIM',
+  'ELEKTRİK',
+  'AKÜ',
+  'LASTİK',
+  'ŞANZUMAN',
+  'KLİMA',
+  'FREN',
+  'GENEL BAKIM',
+  'DÖŞEME',
+  'ARIZA',
+  'SİGORTA',
+  'KASKO',
+  'DİĞER'
+];
 
 export default function VehicleExpenses() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<VehicleExpense | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterExpenseType, setFilterExpenseType] = useState('');
   const [formData, setFormData] = useState({
     date: dayjs(),
     vehicleId: '',
@@ -71,10 +86,12 @@ export default function VehicleExpenses() {
 
   const vehicles: Vehicle[] = Array.isArray(vehiclesData) ? vehiclesData : ((vehiclesData as any)?.data || []);
 
-  // Filter expenses by plate number
+  // Filter expenses by plate number and expense type
   const filteredExpenses = expenses
     .filter(expense => {
-      return expense.vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase());
+      const plateMatch = expense.vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase());
+      const typeMatch = !filterExpenseType || expense.expenseType === filterExpenseType;
+      return plateMatch && typeMatch;
     })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // En yeni önce
 
@@ -201,7 +218,7 @@ export default function VehicleExpenses() {
 
         {/* Search Section */}
         <Paper sx={{ p: 2, mb: 3 }}>
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
             <TextField
               label="Plaka Ara"
               variant="outlined"
@@ -209,13 +226,35 @@ export default function VehicleExpenses() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Plaka giriniz..."
-              sx={{ minWidth: 250 }}
+              sx={{ minWidth: 200 }}
             />
 
-            {searchTerm && (
+            <TextField
+              select
+              label="Gider Türü Filtresi"
+              variant="outlined"
+              size="small"
+              value={filterExpenseType}
+              onChange={(e) => setFilterExpenseType(e.target.value)}
+              sx={{ minWidth: 200 }}
+            >
+              <MenuItem value="">
+                Tümü
+              </MenuItem>
+              {EXPENSE_TYPES.map((type) => (
+                <MenuItem key={type} value={type}>
+                  {type}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            {(searchTerm || filterExpenseType) && (
               <Button
                 variant="outlined"
-                onClick={() => setSearchTerm('')}
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilterExpenseType('');
+                }}
                 size="small"
               >
                 Temizle
@@ -377,12 +416,22 @@ export default function VehicleExpenses() {
               </TextField>
 
               <TextField
+                select
                 label="Gider Türü"
                 value={formData.expenseType}
                 onChange={(e) => setFormData(prev => ({ ...prev, expenseType: e.target.value }))}
                 fullWidth
                 required
-              />
+              >
+                <MenuItem value="">
+                  Gider Türü Seçin
+                </MenuItem>
+                {EXPENSE_TYPES.map((type) => (
+                  <MenuItem key={type} value={type}>
+                    {type}
+                  </MenuItem>
+                ))}
+              </TextField>
 
               <TextField
                 label="İşin Yapıldığı Yer"
