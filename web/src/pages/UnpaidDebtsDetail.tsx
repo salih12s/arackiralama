@@ -36,6 +36,8 @@ import {
 import Layout from '../components/Layout';
 import { rentalsApi, vehiclesApi, customersApi } from '../api/client';
 import { formatCurrency } from '../utils/currency';
+import { formatDate } from '../utils/format';
+import { getStatusColor, getStatusText, StatusType } from '../utils/status';
 
 interface RentalData {
   id: string;
@@ -309,34 +311,8 @@ export const UnpaidDebtsDetail: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ACTIVE': return 'primary';
-      case 'COMPLETED': return 'success';
-      case 'RETURNED': return 'success';
-      case 'CANCELLED': return 'error';
-      case 'RESERVED': return 'warning';
-      default: return 'default';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'ACTIVE': return 'KIRADA';
-      case 'COMPLETED': return 'TAMAMLANDI';
-      case 'RETURNED': return 'TESLİM EDİLDİ';
-      case 'CANCELLED': return 'İPTAL';
-      case 'RESERVED': return 'REZERVE';
-      default: return status;
-    }
-  };
-
   const handlePrint = () => {
     window.print();
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('tr-TR');
   };
 
   const handleExport = () => {
@@ -676,8 +652,8 @@ export const UnpaidDebtsDetail: React.FC = () => {
                   </TableCell>
                   <TableCell align="center">
                     <Chip
-                      label={getStatusText(rental.status)}
-                      color={getStatusColor(rental.status)}
+                      label={getStatusText(rental.status as StatusType)}
+                      color={getStatusColor(rental.status as StatusType)}
                       size="small"
                       variant="outlined"
                       sx={{ fontSize: '0.65rem', height: 20 }}

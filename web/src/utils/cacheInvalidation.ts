@@ -30,8 +30,6 @@ export const invalidateAllRentalCaches = (queryClient: QueryClient) => {
   
   // Müşteri cache'leri
   queryClient.invalidateQueries({ queryKey: ['customers'] });
-  
-  console.log('🔄 Tüm cache\'ler yenilendi - sayfalar senkronize');
 };
 
 /**
@@ -43,8 +41,6 @@ export const invalidateRentalCache = (queryClient: QueryClient, rentalId: string
   
   // Tüm cache'leri de yenile ki diğer sayfalar güncellenen veriyi görsün
   invalidateAllRentalCaches(queryClient);
-  
-  console.log(`🔄 Kiralama ${rentalId} cache'i yenilendi`);
 };
 
 /**
@@ -61,6 +57,4 @@ export const clearAndRefreshCaches = (queryClient: QueryClient) => {
     queryClient.refetchQueries({ queryKey: ['vehicles'] });
     queryClient.refetchQueries({ queryKey: ['customers'] });
   }, 100);
-  
-  console.log('🔄 Tüm cache temizlendi ve kritik veriler yenileniyor');
 };

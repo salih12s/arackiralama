@@ -18,9 +18,6 @@ const api = axios.create({
   timeout: 30000, // Increase timeout
 });
 
-console.log('🔧 API Base URL:', getApiBaseUrl());
-console.log('🔧 Environment:', import.meta.env.DEV ? 'Development' : 'Production');
-
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
@@ -39,7 +36,6 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.log('🚨 API Error:', error.response?.status, error.response?.data);
     if (error.response?.status === 401 || error.response?.status === 403) {
       // Remove token and redirect to login
       localStorage.removeItem('token');
@@ -83,17 +79,11 @@ export interface Customer {
   id: string;
   fullName: string;
   phone?: string;
-}
-
-export interface Customer {
-  id: string;
-  fullName: string;
-  phone?: string;
   email?: string;
   address?: string;
   identityNumber?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   rentalCount?: number;
 }
 
@@ -115,10 +105,6 @@ export interface Reservation {
 }
 
 export interface Rental {
-  customerName: any;
-  customerPhone: any;
-  vehicleName: any;
-  vehiclePlate: any;
   id: string;
   vehicleId: string;
   customerId: string;
@@ -150,6 +136,11 @@ export interface Rental {
   vehicle: Vehicle;
   customer: Customer;
   payments: Payment[];
+  // Flattened fields returned by some API endpoints
+  customerName?: string;
+  customerPhone?: string;
+  vehicleName?: string;
+  vehiclePlate?: string;
 }
 
 export interface Payment {

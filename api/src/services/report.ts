@@ -103,11 +103,6 @@ export async function getDashboardStats(month?: number, year?: number): Promise<
     // Bu ay için kaç gün düşüyor hesapla
     const daysInCurrentMonth = calculateDaysInMonth(startDate, endDate, targetMonth, targetYear);
     
-    console.log(`🔍 Rental Debug - ${rental.id}:`);
-    console.log(`  Start: ${startDate.toISOString().split('T')[0]}, End: ${endDate.toISOString().split('T')[0]}`);
-    console.log(`  Days in ${targetMonth}/${targetYear}: ${daysInCurrentMonth}`);
-    console.log(`  Daily rate: ${rental.dailyPrice}, Total days: ${rental.days}`);
-    
     if (daysInCurrentMonth > 0) {
       // Bu aya düşen kısmı hesapla
       const dailyRate = rental.dailyPrice || 0;
@@ -120,9 +115,6 @@ export async function getDashboardStats(month?: number, year?: number): Promise<
       }
       
       monthBilled += monthlyPortion + additionalCosts;
-      
-      console.log(`  Monthly portion: ${monthlyPortion}, Additional costs: ${additionalCosts}`);
-      console.log(`  Total billed for this month: ${monthlyPortion + additionalCosts}`);
       
       // Ödemeler için de aynı oranı uygula
       const paymentSum = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
@@ -333,8 +325,6 @@ export async function getDebtorReport(): Promise<{ customerId: string; customerN
     }
   });
 
-  console.log(`🔍 Found ${rentals.length} rentals for debt calculation`);
-
   // Müşteri bazında borç toplamı
   const customerDebtMap = new Map<string, { customerName: string; totalDebt: number }>();
 
@@ -362,15 +352,6 @@ export async function getDebtorReport(): Promise<{ customerId: string; customerN
     // Bakiye hesaplama
     const actualBalance = totalAmount - totalPaid;
     
-    console.log(`🔍 Rental ${rental.id}:`, {
-      totalAmount,
-      installmentPayments,
-      extraPayments,
-      totalPaid,
-      actualBalance,
-      customer: rental.customer.fullName
-    });
-    
     if (actualBalance > 0) {
       const customerId = rental.customer.id;
       const customerName = rental.customer.fullName;
@@ -393,9 +374,7 @@ export async function getDebtorReport(): Promise<{ customerId: string; customerN
     totalDebt: data.totalDebt // TL cinsinden döndürülür
   }));
 
-  console.log(`🔍 Final debtors result:`, debtorList);
-
-  return debtorList.sort((a, b) => b.totalDebt - a.totalDebt); // Borcu fazla olandan aza sırala
+  return debtorList.sort((a, b) => b.totalDebt - a.totalDebt);
 }
 
 // Financial Dashboard fonksiyonu

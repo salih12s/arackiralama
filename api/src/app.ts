@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 
 import { basicAuth } from './middleware/basicAuth';
+import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth';
 import vehicleRoutes from './routes/vehicles';
 import rentalRoutes from './routes/rentals';
@@ -41,25 +42,16 @@ if (process.env.ALLOWED_ORIGIN && process.env.ALLOWED_ORIGIN !== '*') {
   allowlist.add(process.env.ALLOWED_ORIGIN);
 }
 
-// Debug: Log incoming origins
 app.use((req, res, next) => {
-  console.log("CORS DEBUG => Origin:", req.headers.origin, "Method:", req.method, "Path:", req.path);
   res.header("Vary", "Origin");
   next();
 });
 
 app.use(cors({
   origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return cb(null, true);
-    
-    // Allow all origins if ALLOWED_ORIGIN is *
     if (process.env.ALLOWED_ORIGIN === '*') return cb(null, true);
-    
-    // Check if origin is in allowlist
-    const allowed = allowlist.has(origin);
-    console.log(`CORS Check: ${origin} → ${allowed ? 'ALLOWED' : 'BLOCKED'}`);
-    cb(null, allowed);
+    cb(null, allowlist.has(origin));
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -121,12 +113,6 @@ app.use('*', (req, res) => {
 });
 
 // Global error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ 
-    error: 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { details: err.message })
-  });
-});
+app.use(errorHandler);
 
 export default app;

@@ -6,7 +6,8 @@ import {
   GridToolbar
 } from '@mui/x-data-grid';
 import { Box } from '@mui/material';
-import { formatDate, Rental } from '../api/client';
+import { Rental } from '../api/client';
+import { formatDate } from '../utils/format';
 import { formatCurrency } from '../utils/currency';
 import StatusChip from './StatusChip';
 

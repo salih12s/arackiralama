@@ -30,6 +30,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { Dayjs } from 'dayjs';
 
 import Layout from '../components/Layout';
+import { formatDate } from '../utils/format';
 import { vehicleExpensesApi, VehicleExpense, CreateVehicleExpenseData } from '../api/vehicleExpenses';
 import { vehiclesApi } from '../api/vehicles';
 
@@ -193,9 +194,7 @@ export default function VehicleExpenses() {
     })} TL`;
   };
 
-  const formatDate = (dateString: string) => {
-    return dayjs(dateString).format('DD.MM.YYYY');
-  };
+
 
   if (isLoading) return <Layout><Typography>Yükleniyor...</Typography></Layout>;
   if (error) return <Layout><Alert severity="error">Veriler yüklenirken hata oluştu</Alert></Layout>;

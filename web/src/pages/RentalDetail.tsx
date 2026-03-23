@@ -33,6 +33,7 @@ import Layout from '../components/Layout';
 import AddPaymentDialog from '../components/AddPaymentDialog';
 import { rentalsApi } from '../api/client';
 import { formatCurrency } from '../utils/currency';
+import { getStatusColor, getStatusText } from '../utils/status';
 
 export default function RentalDetail() {
   const { id } = useParams<{ id: string }>();
@@ -85,25 +86,7 @@ export default function RentalDetail() {
     },
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ACTIVE': return 'success';
-      case 'RETURNED': return 'default';
-      case 'CANCELLED': return 'error';
-      case 'COMPLETED': return 'info';
-      default: return 'default';
-    }
-  };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'ACTIVE': return 'Aktif';
-      case 'RETURNED': return 'Teslim Edildi';
-      case 'CANCELLED': return 'İptal Edildi';
-      case 'COMPLETED': return 'Teslim Edildi';
-      default: return status;
-    }
-  };
 
   const handleReturnRental = () => {
     if (rental) {

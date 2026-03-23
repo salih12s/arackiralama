@@ -47,6 +47,8 @@ import dayjs from 'dayjs';
 import Layout from '../components/Layout';
 import { rentalsApi, vehiclesApi, Rental } from '../api/client';
 import { formatCurrency } from '../utils/currency';
+import { formatDate, formatDateTime } from '../utils/format';
+import { getStatusColor, getStatusText } from '../utils/status';
 import AddPaymentDialog from '../components/AddPaymentDialog';
 import EditRentalDialog from '../components/EditRentalDialog';
 import NewRentalDialog from '../components/NewRentalDialog';
@@ -160,35 +162,7 @@ export const AllRentals: React.FC = () => {
     return dateB.diff(dateA);
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ACTIVE': return 'primary';
-      case 'COMPLETED': return 'success'; // COMPLETED'ı RETURNED gibi göster
-      case 'RETURNED': return 'success';
-      case 'CANCELLED': return 'error';
-      case 'RESERVED': return 'warning';
-      default: return 'default';
-    }
-  };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'ACTIVE': return 'KIRADA';
-      case 'COMPLETED': return 'TESLİM EDİLDİ'; // COMPLETED'ı RETURNED gibi göster
-      case 'RETURNED': return 'TESLİM EDİLDİ';
-      case 'CANCELLED': return 'İPTAL';
-      case 'RESERVED': return 'REZERVE';
-      default: return status;
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return dayjs(dateString).format('DD.MM.YYYY');
-  };
-
-  const formatDateTime = (dateString: string) => {
-    return dayjs(dateString).format('DD.MM.YYYY HH:mm');
-  };
 
   const calculateBalance = (rental: Rental) => {
     // Note'dan orijinal toplam tutarı oku

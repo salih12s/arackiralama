@@ -40,6 +40,7 @@ import {
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { backupApi, formatDate, vehiclesApi, rentalsApi } from '../api/client';
 import { formatCurrency } from '../utils/currency';
+import { getVehicleStatusText, getStatusText } from '../utils/status';
 import Layout from '../components/Layout';
 
 export default function Backup() {
@@ -130,10 +131,7 @@ export default function Backup() {
       const vehiclesData = vehicles.map(vehicle => ({
         'Plaka': vehicle.plate,
         'Araç Adı': vehicle.name,
-        'Durum': vehicle.status === 'IDLE' ? 'Boşta' : 
-                vehicle.status === 'RENTED' ? 'Kirada' :
-                vehicle.status === 'RESERVED' ? 'Rezerve' : 
-                vehicle.status === 'SERVICE' ? 'Serviste' : vehicle.status,
+        'Durum': getVehicleStatusText(vehicle.status),
         'Toplam Gelir': vehicle.performance?.totalRevenue ? vehicle.performance.totalRevenue / 100 : 0,
         'Tahsil Edilen': vehicle.performance?.totalCollected ? vehicle.performance.totalCollected / 100 : 0,
         'Kalan Borç': vehicle.performance?.totalBalance ? vehicle.performance.totalBalance / 100 : 0,
@@ -160,9 +158,7 @@ export default function Backup() {
           'Toplam Tutar': rental.totalDue / 100,
           'Ödenen Tutar': totalPaid / 100,
           'Kalan Borç': actualBalance / 100,
-          'Durum': rental.status === 'ACTIVE' ? 'Aktif' :
-                  rental.status === 'COMPLETED' ? 'Tamamlandı' :
-                  rental.status === 'CANCELLED' ? 'İptal Edildi' : rental.status,
+          'Durum': getStatusText(rental.status),
           'Not': rental.note || '',
         };
       });
@@ -221,10 +217,7 @@ export default function Backup() {
       const vehicleTableData = vehicles.slice(0, 10).map(vehicle => [
         vehicle.plate || '',
         vehicle.name || '',
-        vehicle.status === 'IDLE' ? 'Boşta' : 
-        vehicle.status === 'RENTED' ? 'Kirada' :
-        vehicle.status === 'RESERVED' ? 'Rezerve' : 
-        vehicle.status === 'SERVICE' ? 'Serviste' : vehicle.status,
+        getVehicleStatusText(vehicle.status),
         '₺0', // Günlük fiyat bilgisi araç modelinde yok
         (vehicle._count?.rentals || 0).toString()
       ]);
