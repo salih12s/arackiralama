@@ -1,30 +1,14 @@
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Button,
-  Box,
-  Typography,
-  Alert,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  InputAdornment,
-  Paper,
-  Grid,
-  Chip,
-  Stack,
-  Divider,
-} from '@mui/material';
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, InputAdornment, Stack, TextField, Typography } from '@mui/material';
+import { AccountBalanceOutlined, CheckCircleOutline, CreditCardOutlined, PaymentsOutlined } from '@mui/icons-material';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { rentalsApi, Rental, Payment } from '../api/client';
 import { formatCurrency } from '../utils/currency';
+import { getDisplayNote, getRentalFinancials } from '../utils/rentalFinancials';
 import { invalidateAllRentalCaches } from '../utils/cacheInvalidation';
+import { a, monoSx } from '../admin/theme';
+import { BalanceHero, DialogHeader, FormSection, SegmentedControl, SummaryPanel, SummaryRow, dialogBodySx, fieldGrid } from '../admin/dialogParts';
 
 interface AddPaymentDialogProps {
   open: boolean;
@@ -32,212 +16,101 @@ interface AddPaymentDialogProps {
   rental: Rental | null;
 }
 
+type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER';
+
 interface PaymentFormData {
   amount: string;
-  method: 'CASH' | 'CARD' | 'TRANSFER';
+  method: PaymentMethod;
   paidAt: string;
   paidTime: string;
 }
 
-export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDialogProps) {
-  const now = new Date();
-  const [formData, setFormData] = useState<PaymentFormData>({
-    amount: '',
-    method: 'CASH',
-    paidAt: now.toISOString().split('T')[0],
-    paidTime: now.toTimeString().slice(0, 5), // HH:MM format
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+const methodLabel = (method: PaymentMethod) => (method === 'CASH' ? 'Nakit' : method === 'CARD' ? 'Kart' : 'Havale');
 
+function initialForm(): PaymentFormData {
+  const now = new Date();
+  return { amount: '', method: 'CASH', paidAt: dayjs(now).format('YYYY-MM-DD'), paidTime: now.toTimeString().slice(0, 5) };
+}
+
+export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDialogProps) {
+  const [formData, setFormData] = useState<PaymentFormData>(initialForm);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
 
-  // Fresh rental data getir - prop'taki rental eski olabilir
+  // Güncel kiralama (prop'taki eski olabilir)
   const { data: freshRentalResponse } = useQuery({
     queryKey: ['rental', rental?.id],
-    queryFn: async () => {
-      if (!rental) return null;
-      const response = await rentalsApi.getById(rental.id);
-      console.log('🔄 Fresh rental data loaded:', response.data || response);
-      return response;
-    },
+    queryFn: async () => (rental ? rentalsApi.getById(rental.id) : null),
     enabled: open && !!rental,
-    staleTime: 0, // Her açılışta fresh data
+    staleTime: 0,
     gcTime: 0,
   });
-
-  // Fresh rental data kullan, yoksa prop'taki rental'ı kullan
   const currentRental = freshRentalResponse?.data || rental;
-  
-  console.log('💰 AddPaymentDialog rental comparison:', {
-    propRental: rental ? {
-      id: rental.id,
-      totalDue: rental.totalDue,
-      balance: rental.balance,
-      upfront: rental.upfront,
-      pay1: rental.pay1,
-      pay2: rental.pay2,
-      pay3: rental.pay3,
-      pay4: rental.pay4
-    } : null,
-    freshRental: currentRental ? {
-      id: currentRental.id,
-      totalDue: currentRental.totalDue,
-      balance: currentRental.balance,
-      upfront: currentRental.upfront,
-      pay1: currentRental.pay1,
-      pay2: currentRental.pay2,
-      pay3: currentRental.pay3,
-      pay4: currentRental.pay4
-    } : null
-  });
 
-  // Ödeme geçmişini getir
+  // Ödeme geçmişi
   const { data: paymentsResponse } = useQuery({
     queryKey: ['rental-payments', rental?.id],
-    queryFn: async () => {
-      if (!rental) return { data: [] };
-      return await rentalsApi.getPayments(rental.id);
-    },
+    queryFn: async () => (rental ? rentalsApi.getPayments(rental.id) : { data: [] }),
     enabled: open && !!rental,
-    staleTime: 0, // Hemen stale olsun, her açılışta fresh data getirsin
-    gcTime: 0, // Cache'de tutma, her seferinde yeniden fetch et
+    staleTime: 0,
+    gcTime: 0,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
   });
-
   const payments: Payment[] = paymentsResponse?.data || [];
 
-  // DOĞRU HESAPLAMA MANTIĞI - Dashboard ile aynı
-  // Toplam = (Günlük × Gün) + KM + Temizlik + HGS + Kaza + Yakıt
-  const totalDueCalculated = currentRental ? 
-    (currentRental.days * currentRental.dailyPrice) + 
-    (currentRental.kmDiff || 0) + 
-    (currentRental.cleaning || 0) + 
-    (currentRental.hgs || 0) + 
-    (currentRental.damage || 0) + 
-    (currentRental.fuel || 0) : 0;
-  
-  // TL STANDARDI - Her şey TL cinsinde hesaplanır
-  const totalPaid = Array.isArray(payments) ? payments.reduce((sum, payment) => sum + payment.amount, 0) : 0; // TL
-  
-  // Planlı ödemeler API'dan TL cinsinde gelir
-  const paidFromRental = currentRental ? ((currentRental.upfront || 0) + (currentRental.pay1 || 0) + (currentRental.pay2 || 0) + (currentRental.pay3 || 0) + (currentRental.pay4 || 0)) : 0;
-  const totalAllPaid = totalPaid + paidFromRental; // TL
-  
-  // Doğru totalDue kullan ve floating point hatasını önle
-  const remainingBalance = Math.max(0, Math.round((totalDueCalculated - totalAllPaid) * 100) / 100); // TL
+  // Kiralamalar, detay ve borç sayfalarıyla aynı hesap (özgün toplam dahil); ek ödemeler güncel listeden
+  const fin = currentRental ? getRentalFinancials({ ...currentRental, payments }) : null;
+  const totalDue = fin?.totalAmount || 0;
+  const totalAllPaid = fin?.totalPaid || 0;
+  const remainingBalance = Math.max(0, Math.round(((fin?.balance || 0)) * 100) / 100);
+  const vehicleRevenue = fin ? fin.rentBase + fin.extras.kmDiff : 0;
+  const isDebtFullyPaid = remainingBalance <= 0;
 
-  console.log('💰 AddPaymentDialog calculations:', {
-    totalDueCalculated,
-    totalPaid,
-    paidFromRental, 
-    totalAllPaid,
-    remainingBalance,
-    paymentsCount: payments?.length
-  });
-
-  console.log('🔍 Current rental details:', {
-    id: currentRental?.id,
-    upfront: currentRental?.upfront,
-    pay1: currentRental?.pay1,
-    pay2: currentRental?.pay2,
-    pay3: currentRental?.pay3,
-    pay4: currentRental?.pay4,
-    days: currentRental?.days,
-    dailyPrice: currentRental?.dailyPrice,
-    kmDiff: currentRental?.kmDiff,
-    cleaning: currentRental?.cleaning,
-    hgs: currentRental?.hgs,
-    damage: currentRental?.damage,
-    fuel: currentRental?.fuel
-  });
-
-  console.log('💵 Payments data:', payments);
-
-  // Araç geliri: sadece gün × fiyat + KM (TL cinsinde)
-  const vehicleRevenue = currentRental ? (currentRental.days * currentRental.dailyPrice) + (currentRental.kmDiff || 0) : 0;
-
-  // Real-time hesaplama için input amount'u parse et
-  const currentInputAmount = formData.amount ? parseFloat(formData.amount.replace(',', '.')) || 0 : 0;
-  const inputAmount = currentInputAmount;
-  const balanceAfterPayment = Math.max(0, Math.round((remainingBalance - inputAmount) * 100) / 100); // TL cinsinden hesapla, floating point hatasını önle
+  const inputAmount = formData.amount ? parseFloat(formData.amount.replace(',', '.')) || 0 : 0;
+  const balanceAfterPayment = Math.max(0, Math.round((remainingBalance - inputAmount) * 100) / 100);
 
   const addPaymentMutation = useMutation({
-    mutationFn: (data: { amount: number; method: 'CASH' | 'CARD' | 'TRANSFER'; paidAt: string }) => 
-      rentalsApi.addPayment(currentRental!.id, data),
+    mutationFn: (data: { amount: number; method: PaymentMethod; paidAt: string }) => rentalsApi.addPayment(currentRental!.id, data),
     onSuccess: async () => {
-      // Önce payments query'sini anında yenile
       await queryClient.refetchQueries({ queryKey: ['rental-payments', currentRental!.id] });
-      
-      // Sonra tüm cache'leri invalidate et
       invalidateAllRentalCaches(queryClient);
-      
       onClose();
       resetForm();
     },
-    onError: (error: any) => {
-      console.error('Payment creation error:', error);
-    },
+    onError: (error: any) => console.error('Payment creation error:', error),
   });
 
   const resetForm = () => {
-    const now = new Date();
-    setFormData({
-      amount: '',
-      method: 'CASH',
-      paidAt: now.toISOString().split('T')[0],
-      paidTime: now.toTimeString().slice(0, 5),
-    });
+    setFormData(initialForm());
     setErrors({});
   };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-
-    // Eğer kiralama tamamen ödenmişse ödeme yapılamaz  
     if (remainingBalance <= 0) {
       newErrors.amount = 'Bu kiralama zaten tamamen ödenmiş. Ek ödeme yapılamaz.';
       setErrors(newErrors);
       return false;
     }
-
-    // Amount validation
     if (!formData.amount) {
       newErrors.amount = 'Ödeme tutarı gereklidir';
     } else {
-      // Handle Turkish decimal separator (replace comma with dot)
-      const normalizedAmount = formData.amount.replace(',', '.');
-      const amount = parseFloat(normalizedAmount);
-      
-      if (isNaN(amount) || amount <= 0) {
-        newErrors.amount = 'Geçerli bir tutar giriniz';
-      } else if (amount > remainingBalance) { // remainingBalance TL cinsinden
-        newErrors.amount = `Maksimum ödeme tutarı: ${formatCurrency(remainingBalance)}`;
-      }
+      const amount = parseFloat(formData.amount.replace(',', '.'));
+      if (isNaN(amount) || amount <= 0) newErrors.amount = 'Geçerli bir tutar girin';
+      else if (amount > remainingBalance) newErrors.amount = `En fazla ${formatCurrency(remainingBalance)} alınabilir`;
     }
-
-    if (!formData.method) {
-      newErrors.method = 'Ödeme yöntemi gereklidir';
-    }
-
+    if (!formData.method) newErrors.method = 'Ödeme yöntemi gereklidir';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!rental) return;
-
-    if (!validateForm()) return;
-
+    if (!rental || !validateForm()) return;
     try {
-      // Handle Turkish decimal separator (replace comma with dot)
-      const normalizedAmount = formData.amount.replace(',', '.');
-      const amountTL = parseFloat(normalizedAmount);
-      
       await addPaymentMutation.mutateAsync({
-        amount: amountTL, // TL olarak gönder
+        amount: parseFloat(formData.amount.replace(',', '.')),
         method: formData.method,
         paidAt: new Date(`${formData.paidAt}T${formData.paidTime}:00`).toISOString(),
       });
@@ -251,515 +124,152 @@ export default function AddPaymentDialog({ open, onClose, rental }: AddPaymentDi
     onClose();
   };
 
-  const handleChange = (field: keyof PaymentFormData) => (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string } }
-  ) => {
-    let value = event.target.value;
-    
-    // Amount formatını özel olarak işle
-    if (field === 'amount') {
-      // Sadece rakam, virgül ve nokta karakterlerine izin ver
-      value = value.replace(/[^\d.,]/g, '');
-      
-      // Virgülü noktaya çevir (Türk formatından Amerikan formatına)
-      value = value.replace(',', '.');
-    }
-    
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
-
-    // Clear field error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: '',
-      }));
-    }
+  const setAmount = (value: string) => {
+    // Yalnızca rakam, virgül ve nokta; virgül ondalık ayırıcıya çevrilir
+    const cleaned = value.replace(/[^\d.,]/g, '').replace(',', '.');
+    setFormData((prev) => ({ ...prev, amount: cleaned }));
+    if (errors.amount) setErrors((prev) => ({ ...prev, amount: '' }));
   };
 
-  // Check if debt is fully paid
-  const isDebtFullyPaid = remainingBalance <= 0;
+  const planSteps = currentRental
+    ? [
+        { label: 'Peşin', amount: currentRental.upfront || 0 },
+        { label: '1. ödeme', amount: currentRental.pay1 || 0 },
+        { label: '2. ödeme', amount: currentRental.pay2 || 0 },
+        { label: '3. ödeme', amount: currentRental.pay3 || 0 },
+        { label: '4. ödeme', amount: currentRental.pay4 || 0 },
+      ].filter((step) => step.amount > 0)
+    : [];
+  const note = getDisplayNote(currentRental?.note);
+  const half = Math.round((remainingBalance / 2) * 100) / 100;
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={handleClose} 
-      maxWidth="lg" 
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="md"
       fullWidth
-      PaperProps={{
-        sx: {
-          maxHeight: '90vh',
-          height: 'auto'
-        }
-      }}
+      PaperProps={{ sx: { m: { xs: 1.5, sm: 3 }, width: { xs: 'calc(100% - 24px)', sm: 'calc(100% - 48px)' }, maxHeight: { xs: 'calc(100% - 24px)', sm: '92vh' } } }}
     >
-      <form onSubmit={handleSubmit}>
-        <DialogTitle>
-          Ödeme Ekle
-          {rental && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Kiralama: {rental.customer?.fullName} - {rental.vehicle?.plate}
-            </Typography>
+      <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
+        <DialogHeader
+          title="Ödeme al"
+          subtitle={rental ? <>{rental.customer?.fullName} · <Box component="span" sx={monoSx}>{rental.vehicle?.plate}</Box></> : undefined}
+          onClose={handleClose}
+          disabled={addPaymentMutation.isPending}
+        />
+
+        <DialogContent sx={{ px: { xs: 2.5, sm: 3 }, py: 3 }}>
+          {addPaymentMutation.isError && (
+            <Alert severity="error" sx={{ mb: 2.5 }}>{(addPaymentMutation.error as any)?.response?.data?.error || 'Ödeme kaydedilemedi.'}</Alert>
           )}
-        </DialogTitle>
 
-        <DialogContent sx={{ maxHeight: '70vh', overflow: 'auto' }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            {rental && (
-              <Alert severity={remainingBalance <= 0 ? "success" : "info"} sx={{ mb: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Hesaplama Özeti
-                </Typography>
-                
-                {/* Temel Mali Bilgiler Grid */}
-                <Grid container spacing={2} sx={{ mb: 2 }}>
-                  <Grid item xs={6} sm={2.4}>
-                    <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'success.100', borderRadius: 1 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Toplam Ödenecek
-                      </Typography>
-                      <Typography variant="h6" color="success.dark" sx={{ fontWeight: 700 }}>
-                        {formatCurrency(totalDueCalculated)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6} sm={2.4}>
-                    <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'info.100', borderRadius: 1 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Toplam Ödenen
-                      </Typography>
-                      <Typography variant="h6" color="info.dark" sx={{ fontWeight: 700 }}>
-                        {formatCurrency(totalAllPaid)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6} sm={2.4}>
-                    <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'warning.100', borderRadius: 1 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Araç Geliri
-                      </Typography>
-                      <Typography variant="h6" color="warning.dark" sx={{ fontWeight: 700 }}>
-                        {formatCurrency(vehicleRevenue)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6} sm={2.4}>
-                    <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'primary.100', borderRadius: 1 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Kapora
-                      </Typography>
-                      <Typography variant="h6" color="primary.dark" sx={{ fontWeight: 700 }}>
-                        {formatCurrency((currentRental?.upfront || 0))}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6} sm={2.4}>
-                    <Box sx={{ textAlign: 'center', p: 1, bgcolor: remainingBalance > 0 ? 'error.100' : 'success.100', borderRadius: 1 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Kalan Bakiye
-                      </Typography>
-                      <Typography variant="h6" color={remainingBalance > 0 ? 'error.dark' : 'success.dark'} sx={{ fontWeight: 700 }}>
-                        {formatCurrency(remainingBalance)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-
-                {/* Ek Maliyetler */}
-                {((currentRental?.kmDiff || 0) > 0 || (currentRental?.cleaning || 0) > 0 || (currentRental?.hgs || 0) > 0 || (currentRental?.damage || 0) > 0 || (currentRental?.fuel || 0) > 0) && (
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
-                      Ek Maliyetler
-                    </Typography>
-                    <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                      {(currentRental?.kmDiff || 0) > 0 && (
-                        <Chip label={`KM Farkı: ${formatCurrency(currentRental?.kmDiff || 0)}`} size="small" variant="outlined" />
-                      )}
-                      {(currentRental?.cleaning || 0) > 0 && (
-                        <Chip label={`Temizlik: ${formatCurrency(currentRental?.cleaning || 0)}`} size="small" variant="outlined" />
-                      )}
-                      {(currentRental?.hgs || 0) > 0 && (
-                        <Chip label={`HGS: ${formatCurrency(currentRental?.hgs || 0)}`} size="small" variant="outlined" />
-                      )}
-                      {(currentRental?.damage || 0) > 0 && (
-                        <Chip label={`Hasar: ${formatCurrency(currentRental?.damage || 0)}`} size="small" variant="outlined" />
-                      )}
-                      {(currentRental?.fuel || 0) > 0 && (
-                        <Chip label={`Yakıt: ${formatCurrency(currentRental?.fuel || 0)}`} size="small" variant="outlined" />
-                      )}
-                    </Stack>
-                  </Box>
-                )}
-
-                {/* Real-time Hesaplama */}
-                {currentInputAmount > 0 && (
-                  <Box sx={{ mt: 2, p: 1.5, bgcolor: 'rgba(255,255,255,0.7)', borderRadius: 1, border: '2px dashed', borderColor: balanceAfterPayment <= 0 ? 'success.main' : 'warning.main' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      💡 Bu ödeme sonrası durum:
-                    </Typography>
-                    <Typography variant="body1" sx={{ mt: 0.5, color: balanceAfterPayment <= 0 ? 'success.main' : 'warning.main', fontWeight: 700 }}>
-                      Kalan bakiye: {formatCurrency(balanceAfterPayment)}
-                      {balanceAfterPayment <= 0 && <span style={{color: 'green'}}> 🎉 Borç tamamen kapanacak!</span>}
-                    </Typography>
-                  </Box>
-                )}
-
-                {/* Borç kapanmış durumu */}
-                {remainingBalance <= 0 && (
-                  <Box sx={{ mt: 2, p: 1.5, bgcolor: 'success.50', borderRadius: 1, border: '2px solid', borderColor: 'success.main' }}>
-                    <Typography variant="body1" sx={{ fontWeight: 700, color: 'success.dark', textAlign: 'center' }}>
-                      🎉 Bu kiralamanın borcu tamamen ödendi!
-                    </Typography>
-                  </Box>
-                )}
-              </Alert>
-            )}
-
-            {/* Kiralama Detayları */}
-            {rental && (
-              <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
-                <Typography variant="h6" gutterBottom>
-                  Kiralama Detayları
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-          
-
-                {/* Mali Durum */}
-                <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
-                  Mali Durum
-                </Typography>
-                <Grid container spacing={2} sx={{ mb: 2 }}>
-                  <Grid item xs={3}>
-                    <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'success.50', borderRadius: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Toplam Tutar
-                      </Typography>
-                      <Typography variant="body1" color="success.main" sx={{ fontWeight: 600 }}>
-                        {formatCurrency(totalDueCalculated)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={3}>
-                    <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'info.50', borderRadius: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Toplam Ödenen
-                      </Typography>
-                      <Typography variant="body1" color="info.main" sx={{ fontWeight: 600 }}>
-                        {formatCurrency(totalAllPaid)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={3}>
-                    <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'primary.50', borderRadius: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Kapora
-                      </Typography>
-                      <Typography variant="body1" color="primary.main" sx={{ fontWeight: 600 }}>
-                        {formatCurrency((rental.upfront || 0))}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={3}>
-                    <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: remainingBalance > 0 ? 'error.50' : 'success.50', borderRadius: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Kalan Bakiye
-                      </Typography>
-                      <Typography variant="body1" color={remainingBalance > 0 ? 'error.main' : 'success.main'} sx={{ fontWeight: 600 }}>
-                        {formatCurrency(remainingBalance)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-
-                {/* Ödeme Planı Detayları */}
-                {(rental.upfront > 0 || rental.pay1 > 0 || rental.pay2 > 0 || rental.pay3 > 0 || rental.pay4 > 0) && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      Ödeme Planı Detayları
-                    </Typography>
-                    <Grid container spacing={1}>
-                      {/* Peşin Ödeme */}
-                      {rental.upfront > 0 && (
-                        <Grid item xs={6} sm={4}>
-                          <Box sx={{ p: 1.5, border: 1, borderColor: 'primary.main', borderRadius: 1, bgcolor: 'primary.50' }}>
-                            <Typography variant="body2" color="text.secondary">
-                              Peşin Ödeme
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                              {formatCurrency(rental.upfront)}
-                            </Typography>
-                            <Typography variant="caption" color="success.main">
-                              ✓ Ödenmiş
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      )}
-                      
-                      {/* 1. Ödeme */}
-                      {rental.pay1 > 0 && (
-                        <Grid item xs={6} sm={4}>
-                          <Box sx={{ p: 1.5, border: 1, borderColor: 'secondary.main', borderRadius: 1, bgcolor: 'secondary.50' }}>
-                            <Typography variant="body2" color="text.secondary">
-                              1. Ödeme
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                              {formatCurrency(rental.pay1)}
-                            </Typography>
-                            {rental.payDate1 && (
-                              <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-                                {dayjs(rental.payDate1).format('DD/MM/YYYY')}
-                              </Typography>
-                            )}
-                            <Typography variant="caption" color="success.main">
-                              ✓ Ödenmiş
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      )}
-
-                      {/* 2. Ödeme */}
-                      {rental.pay2 > 0 && (
-                        <Grid item xs={6} sm={4}>
-                          <Box sx={{ p: 1.5, border: 1, borderColor: 'info.main', borderRadius: 1, bgcolor: 'info.50' }}>
-                            <Typography variant="body2" color="text.secondary">
-                              2. Ödeme
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                              {formatCurrency(rental.pay2)}
-                            </Typography>
-                            {rental.payDate2 && (
-                              <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-                                {dayjs(rental.payDate2).format('DD/MM/YYYY')}
-                              </Typography>
-                            )}
-                            <Typography variant="caption" color="success.main">
-                              ✓ Ödenmiş
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      )}
-
-                      {/* 3. Ödeme */}
-                      {rental.pay3 > 0 && (
-                        <Grid item xs={6} sm={4}>
-                          <Box sx={{ p: 1.5, border: 1, borderColor: 'warning.main', borderRadius: 1, bgcolor: 'warning.50' }}>
-                            <Typography variant="body2" color="text.secondary">
-                              3. Ödeme
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                              {formatCurrency(rental.pay3)}
-                            </Typography>
-                            {rental.payDate3 && (
-                              <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-                                {dayjs(rental.payDate3).format('DD/MM/YYYY')}
-                              </Typography>
-                            )}
-                            <Typography variant="caption" color="success.main">
-                              ✓ Ödenmiş
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      )}
-
-                      {/* 4. Ödeme */}
-                      {rental.pay4 > 0 && (
-                        <Grid item xs={6} sm={4}>
-                          <Box sx={{ p: 1.5, border: 1, borderColor: 'error.main', borderRadius: 1, bgcolor: 'error.50' }}>
-                            <Typography variant="body2" color="text.secondary">
-                              4. Ödeme
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                              {formatCurrency(rental.pay4)}
-                            </Typography>
-                            {rental.payDate4 && (
-                              <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-                                {dayjs(rental.payDate4).format('DD/MM/YYYY')}
-                              </Typography>
-                            )}
-                            <Typography variant="caption" color="success.main">
-                              ✓ Ödenmiş
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      )}
-                    </Grid>
-                  </Box>
-                )}
-
-                {/* Ek Ödemeler */}
-                {rental.payments && rental.payments.length > 0 && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      Ek Ödemeler
-                    </Typography>
-                    <Stack direction="row" spacing={1} flexWrap="wrap">
-                      {rental.payments.map((payment: any) => (
-                        <Chip
-                          key={payment.id}
-                          label={`${formatCurrency(payment.amount)} (${payment.method === 'CASH' ? 'Nakit' : payment.method === 'CARD' ? 'Kart' : 'Transfer'}) - ${dayjs(payment.paidAt).format('DD/MM/YYYY HH:mm')}`}
-                          size="small"
-                          color="success"
-                          variant="outlined"
-                          sx={{ mb: 0.5 }}
-                        />
-                      ))}
-                    </Stack>
-                  </Box>
-                )}
-
-                {/* Ek Maliyetler */}
-                {(rental.kmDiff > 0 || rental.cleaning > 0 || rental.hgs > 0 || rental.damage > 0 || rental.fuel > 0) && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      Ek Maliyetler
-                    </Typography>
-                    <Grid container spacing={1}>
-                      {rental.kmDiff > 0 && (
-                        <Grid item xs={6} sm={4}>
-                          <Box sx={{ p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                            <Typography variant="body2" color="text.secondary">
-                              KM Farkı
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                              {formatCurrency(rental.kmDiff)}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      )}
-                      {rental.cleaning > 0 && (
-                        <Grid item xs={6} sm={4}>
-                          <Box sx={{ p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                            <Typography variant="body2" color="text.secondary">
-                              Temizlik
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                              {formatCurrency(rental.cleaning)}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      )}
-                      {rental.hgs > 0 && (
-                        <Grid item xs={6} sm={4}>
-                          <Box sx={{ p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                            <Typography variant="body2" color="text.secondary">
-                              HGS
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                              {formatCurrency(rental.hgs)}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      )}
-                      {rental.damage > 0 && (
-                        <Grid item xs={6} sm={4}>
-                          <Box sx={{ p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                            <Typography variant="body2" color="text.secondary">
-                              Hasar
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                              {formatCurrency(rental.damage)}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      )}
-                      {rental.fuel > 0 && (
-                        <Grid item xs={6} sm={4}>
-                          <Box sx={{ p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                            <Typography variant="body2" color="text.secondary">
-                              Yakıt
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                              {formatCurrency(rental.fuel)}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      )}
-                    </Grid>
-                  </Box>
-                )}
-
-                {rental.note && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      Notlar
-                    </Typography>
-                    <Typography variant="body2" sx={{ p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                      {rental.note}
-                    </Typography>
-                  </Box>
-                )}
-              </Paper>
-            )}
-
-            {/* Disable form if debt is fully paid */}
-            {isDebtFullyPaid ? (
-              <Alert severity="success">
-                Bu kiralamanın borcu tamamen ödenmiştir. Yeni ödeme eklenemez.
-              </Alert>
-            ) : (
-              <>
-                <TextField
-                  label="Ödeme Tutarı"
-                  type="text"
-                  value={formData.amount}
-                  onChange={handleChange('amount')}
-                  error={!!errors.amount}
-                  helperText={errors.amount || `Maksimum: ${formatCurrency(remainingBalance)}`}
-                  fullWidth
-                  required
-                  placeholder="Örnek: 2.200,00 veya 1500"
-                  InputProps={{
-                    startAdornment: <InputAdornment position="start">₺</InputAdornment>,
-                  }}
-                />
-
-                <FormControl fullWidth required error={!!errors.method}>
-                  <InputLabel>Ödeme Yöntemi</InputLabel>
-                  <Select
-                    value={formData.method}
-                    onChange={handleChange('method')}
-                    label="Ödeme Yöntemi"
-                  >
-                    <MenuItem value="CASH">Nakit</MenuItem>
-                    <MenuItem value="CARD">Kart</MenuItem>
-                    <MenuItem value="TRANSFER">Havale</MenuItem>
-                  </Select>
-                </FormControl>
-
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <TextField
-                    label="Ödeme Tarihi"
-                    type="date"
-                    value={formData.paidAt}
-                    onChange={handleChange('paidAt')}
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
-                  />
-                  <TextField
-                    label="Saat"
-                    type="time"
-                    value={formData.paidTime}
-                    onChange={handleChange('paidTime')}
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
-                  />
+          <Box sx={dialogBodySx}>
+            <Box sx={{ minWidth: 0 }}>
+              {isDebtFullyPaid ? (
+                <Box sx={{ py: 5, px: 3, textAlign: 'center', borderRadius: '14px', bgcolor: a.successSoft, display: 'grid', justifyItems: 'center', gap: 1 }}>
+                  <CheckCircleOutline sx={{ fontSize: 40, color: a.success }} />
+                  <Typography sx={{ fontWeight: 800, fontSize: 17 }}>Borç tamamen ödendi</Typography>
+                  <Typography sx={{ color: a.muted, fontSize: 14, maxWidth: 340 }}>Bu kiralama için alınacak ödeme kalmadı. Yeni ödeme eklenemez.</Typography>
                 </Box>
-              </>
-            )}
+              ) : (
+                <>
+                  <FormSection step={1} title="Tutar" hint={`En fazla ${formatCurrency(remainingBalance)}`}>
+                    <TextField
+                      autoFocus
+                      fullWidth
+                      value={formData.amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      error={!!errors.amount}
+                      helperText={errors.amount || 'Virgül veya nokta ile kuruş girebilirsiniz'}
+                      placeholder="0,00"
+                      inputProps={{ inputMode: 'decimal', 'aria-label': 'Ödeme tutarı', style: { ...monoSx, fontSize: 24, fontWeight: 500 } }}
+                      InputProps={{ startAdornment: <InputAdornment position="start"><Box component="span" sx={{ ...monoSx, fontSize: 22, color: a.muted }}>₺</Box></InputAdornment> }}
+                      sx={{ '& .MuiOutlinedInput-root': { minHeight: 64 } }}
+                    />
+                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1.5 }}>
+                      <Button size="small" variant="outlined" onClick={() => setAmount(String(remainingBalance))}>Kalanın tamamı · {formatCurrency(remainingBalance)}</Button>
+                      {half > 0 && <Button size="small" variant="outlined" onClick={() => setAmount(String(half))}>Yarısı · {formatCurrency(half)}</Button>}
+                    </Stack>
+                  </FormSection>
+
+                  <FormSection step={2} title="Ödeme yöntemi">
+                    <SegmentedControl
+                      label="Ödeme yöntemi"
+                      value={formData.method}
+                      onChange={(method) => setFormData((prev) => ({ ...prev, method }))}
+                      options={[
+                        { value: 'CASH', label: 'Nakit', icon: <PaymentsOutlined /> },
+                        { value: 'CARD', label: 'Kart', icon: <CreditCardOutlined /> },
+                        { value: 'TRANSFER', label: 'Havale', icon: <AccountBalanceOutlined /> },
+                      ]}
+                    />
+                  </FormSection>
+
+                  <FormSection step={3} title="Ödeme zamanı">
+                    <Box sx={fieldGrid({ xs: 2 })}>
+                      <TextField label="Tarih" type="date" value={formData.paidAt} onChange={(e) => setFormData((prev) => ({ ...prev, paidAt: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} />
+                      <TextField label="Saat" type="time" value={formData.paidTime} onChange={(e) => setFormData((prev) => ({ ...prev, paidTime: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} />
+                    </Box>
+                  </FormSection>
+
+                  {inputAmount > 0 && (
+                    <Box sx={{ mt: 3, p: 2, borderRadius: '12px', border: `1px dashed ${balanceAfterPayment <= 0 ? a.success : a.line}`, bgcolor: balanceAfterPayment <= 0 ? a.successSoft : 'transparent' }}>
+                      <Typography sx={{ fontSize: 13, color: a.muted }}>Bu ödemeden sonra</Typography>
+                      <Typography sx={{ fontWeight: 700, color: balanceAfterPayment <= 0 ? a.success : a.ink }}>
+                        {balanceAfterPayment <= 0 ? 'Borç tamamen kapanacak' : <>Kalan bakiye <Box component="span" sx={monoSx}>{formatCurrency(balanceAfterPayment)}</Box></>}
+                      </Typography>
+                    </Box>
+                  )}
+                </>
+              )}
+            </Box>
+
+            <SummaryPanel title="Kiralama">
+              <SummaryRow label="Genel toplam" value={formatCurrency(totalDue)} strong />
+              {fin && <SummaryRow label={`Kira bedeli (${currentRental?.days || 0} gün)`} value={formatCurrency(fin.rentBase)} muted />}
+              {fin && fin.extras.kmDiff > 0 && <SummaryRow label="KM farkı" value={formatCurrency(fin.extras.kmDiff)} muted />}
+              {fin && fin.extras.cleaning > 0 && <SummaryRow label="Temizlik" value={formatCurrency(fin.extras.cleaning)} muted />}
+              {fin && fin.extras.hgs > 0 && <SummaryRow label="HGS" value={formatCurrency(fin.extras.hgs)} muted />}
+              {fin && fin.extras.damage > 0 && <SummaryRow label="Hasar" value={formatCurrency(fin.extras.damage)} muted />}
+              {fin && fin.extras.fuel > 0 && <SummaryRow label="Yakıt" value={formatCurrency(fin.extras.fuel)} muted />}
+              <SummaryRow label="Araç geliri" value={formatCurrency(vehicleRevenue)} muted />
+              <SummaryRow label="Ödenen" value={formatCurrency(totalAllPaid)} tone="success" />
+              <BalanceHero balance={remainingBalance} total={totalDue} paid={totalAllPaid} />
+
+              {(planSteps.length > 0 || payments.length > 0) && (
+                <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px solid ${a.line}` }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: a.muted, mb: 0.75 }}>Alınan ödemeler</Typography>
+                  {planSteps.map((step) => (
+                    <Stack key={step.label} direction="row" justifyContent="space-between" sx={{ py: 0.4 }}>
+                      <Typography sx={{ fontSize: 12.5, color: a.muted }}>{step.label}</Typography>
+                      <Typography sx={{ ...monoSx, fontSize: 12.5 }}>{formatCurrency(step.amount)}</Typography>
+                    </Stack>
+                  ))}
+                  {payments.map((payment) => (
+                    <Stack key={payment.id} direction="row" justifyContent="space-between" sx={{ py: 0.4 }}>
+                      <Typography sx={{ fontSize: 12.5, color: a.muted }}>{dayjs(payment.paidAt).format('DD.MM.YY')} · {methodLabel(payment.method)}</Typography>
+                      <Typography sx={{ ...monoSx, fontSize: 12.5, color: a.success }}>{formatCurrency(payment.amount)}</Typography>
+                    </Stack>
+                  ))}
+                </Box>
+              )}
+
+              {note && (
+                <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px solid ${a.line}` }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: a.muted, mb: 0.5 }}>Not</Typography>
+                  <Typography sx={{ fontSize: 13, whiteSpace: 'pre-line' }}>{note}</Typography>
+                </Box>
+              )}
+            </SummaryPanel>
           </Box>
         </DialogContent>
 
-        <DialogActions>
-          <Button onClick={handleClose}>İptal</Button>
+        <DialogActions sx={{ px: { xs: 2.5, sm: 3 }, py: 2, gap: 1, borderTop: `1px solid ${a.lineSoft}` }}>
+          <Button variant="outlined" onClick={handleClose}>{isDebtFullyPaid ? 'Kapat' : 'Vazgeç'}</Button>
           {!isDebtFullyPaid && (
-            <Button 
-              type="submit" 
-              variant="contained"
-              disabled={addPaymentMutation.isPending}
-            >
-              {addPaymentMutation.isPending ? 'Kaydediliyor...' : 'Ödeme Ekle'}
+            <Button type="submit" variant="contained" disabled={addPaymentMutation.isPending}>
+              {addPaymentMutation.isPending ? 'Kaydediliyor…' : inputAmount > 0 ? `${formatCurrency(inputAmount)} ödeme al` : 'Ödemeyi kaydet'}
             </Button>
           )}
         </DialogActions>

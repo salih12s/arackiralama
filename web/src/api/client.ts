@@ -40,8 +40,8 @@ api.interceptors.response.use(
       // Remove token and redirect to login
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      if (!window.location.pathname.startsWith('/panel/login')) {
+        window.location.href = '/panel/login';
       }
     }
     return Promise.reject(error);
@@ -65,6 +65,20 @@ export interface Vehicle {
   active: boolean;
   status: 'IDLE' | 'RENTED' | 'RESERVED' | 'SERVICE';
   createdAt: string;
+  // Vitrin alanları (kiralama sitesi + panel listeleri)
+  description?: string | null;
+  imageUrl?: string | null;
+  showOnSite?: boolean;
+  year?: number | null;
+  fuelType?: string | null;
+  transmission?: string | null;
+  seats?: number | null;
+  dailyRate?: number | null; // kuruş
+  category?: string | null;
+  archivedAt?: string | null;
+  deletedAt?: string | null;
+  updatedAt?: string;
+  images?: VehicleImage[];
   _count?: {
     rentals: number;
   };
@@ -74,6 +88,19 @@ export interface Vehicle {
     totalBalance: number; // in kuruş
   };
 }
+
+export interface VehicleImage {
+  id: string;
+  vehicleId: string;
+  imageUrl: string;
+  storageKey?: string | null;
+  altText?: string | null;
+  sortOrder: number;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 
 export interface Customer {
   id: string;
@@ -98,6 +125,10 @@ export interface Reservation {
   rentalDuration: number;
   note?: string;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
+  reservationCode?: string | null;
+  source?: 'WEB' | 'ADMIN' | string | null;
+  quotedAmount?: number | null;
+  pickupLocation?: string | null;
   createdAt: string;
   updatedAt: string;
   customer: Customer;
@@ -207,12 +238,52 @@ export const vehiclesApi = {
     return api.get<Vehicle[]>(`/vehicles${queryString ? `?${queryString}` : ''}`);
   },
   getById: (id: string) => api.get<Vehicle>(`/vehicles/${id}`),
-  create: (data: { plate: string; name?: string }) =>
-    api.post<Vehicle>('/vehicles', data),
-  update: (id: string, data: Partial<Vehicle>) =>
-    api.patch<Vehicle>(`/vehicles/${id}`, data),
+  create: (data: {
+    plate: string;
+    name?: string;
+    category?: string | null;
+    year?: number | null;
+    fuelType?: string | null;
+    transmission?: string | null;
+    seats?: number | null;
+    dailyRateTL?: number | null;
+    description?: string | null;
+    imageUrl?: string | null;
+    showOnSite?: boolean;
+  }) => api.post<Vehicle>('/vehicles', data),
+  update: (id: string, data: Partial<{
+    plate: string;
+    name: string;
+    category: string | null;
+    year: number | null;
+    fuelType: string | null;
+    transmission: string | null;
+    seats: number | null;
+    dailyRateTL: number | null;
+    description: string | null;
+    imageUrl: string | null;
+    showOnSite: boolean;
+    active: boolean;
+    status: Vehicle['status'];
+  }>) => api.patch<Vehicle>(`/vehicles/${id}`, data),
   delete: (id: string) => api.delete(`/vehicles/${id}`),
+  archive: (id: string) => api.post<{ data: Vehicle }>(`/vehicles/${id}/archive`),
+  restore: (id: string) => api.post<{ data: Vehicle }>(`/vehicles/${id}/restore`),
+  uploadImages: (id: string, files: File[], onUploadProgress?: (progress: number) => void) => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+    return api.post<{ data: VehicleImage[] }>(`/vehicles/${id}/images`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (event) => onUploadProgress?.(event.total ? Math.round((event.loaded * 100) / event.total) : 0),
+    });
+  },
+  addImageUrl: (id: string, imageUrl: string, altText?: string) => api.post<{ data: VehicleImage }>(`/vehicles/${id}/images/url`, { imageUrl, altText }),
+  updateImage: (vehicleId: string, imageId: string, data: { altText?: string | null; sortOrder?: number }) => api.patch<{ data: VehicleImage }>(`/vehicles/${vehicleId}/images/${imageId}`, data),
+  setPrimaryImage: (vehicleId: string, imageId: string) => api.patch<{ data: VehicleImage }>(`/vehicles/${vehicleId}/images/${imageId}/primary`),
+  reorderImages: (vehicleId: string, ids: string[]) => api.patch<{ data: VehicleImage[] }>(`/vehicles/${vehicleId}/images/reorder`, { ids }),
+  deleteImage: (vehicleId: string, imageId: string) => api.delete(`/vehicles/${vehicleId}/images/${imageId}`),
 };
+
 
 // Rentals API
 export const rentalsApi = {
@@ -222,6 +293,7 @@ export const rentalsApi = {
     customer?: string;
     from?: string;
     to?: string;
+    status?: string;
     page?: number;
     limit?: number;
     include?: string[];

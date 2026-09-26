@@ -1,38 +1,42 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Box,
-  Paper,
-  Typography,
-  Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
   Alert,
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
+  InputAdornment,
   MenuItem,
-  Chip,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-} from '@mui/icons-material';
+import { Add as AddIcon, Close as CloseIcon, DeleteOutline, EditOutlined, ReceiptLongOutlined } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { Dayjs } from 'dayjs';
 
-import Layout from '../components/Layout';
-import { formatDate } from '../utils/format';
 import { vehicleExpensesApi, VehicleExpense, CreateVehicleExpenseData } from '../api/vehicleExpenses';
 import { vehiclesApi } from '../api/vehicles';
+import { formatCurrency } from '../utils/currency';
+import { a, monoSx } from '../admin/theme';
+import {
+  ConfirmDialog,
+  DataTable,
+  EmptyState,
+  KpiTile,
+  PageHeader,
+  Plate,
+  RowActions,
+  SearchField,
+  StatusBadge,
+  Sub,
+  Toolbar,
+  panelSx, kpiRow3Sx } from '../admin/ui';
 
 interface Vehicle {
   id: string;
@@ -57,9 +61,12 @@ const EXPENSE_TYPES = [
   'DİĞER'
 ];
 
+const typeLabel = (value: string) => value.toLocaleLowerCase('tr-TR').replace(/(^|\s)\S/g, (c) => c.toLocaleUpperCase('tr-TR'));
+
 export default function VehicleExpenses() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<VehicleExpense | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<VehicleExpense | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterExpenseType, setFilterExpenseType] = useState('');
   const [formData, setFormData] = useState({
@@ -70,37 +77,35 @@ export default function VehicleExpenses() {
     amount: 0,
     description: '',
   });
-  
+
   const queryClient = useQueryClient();
 
-  // Fetch expenses
   const { data: expenses = [], isLoading, error } = useQuery({
     queryKey: ['vehicle-expenses'],
     queryFn: vehicleExpensesApi.getAll,
   });
 
-  // Fetch vehicles for dropdown
+  // Ayrı anahtar: bu modül düz dizi döndürür; ['vehicles'] önbelleğini diğer sayfalarla paylaşmasın.
   const { data: vehiclesData } = useQuery({
-    queryKey: ['vehicles'],
+    queryKey: ['vehicles', 'expense-options'],
     queryFn: () => vehiclesApi.getAll(),
   });
 
   const vehicles: Vehicle[] = Array.isArray(vehiclesData) ? vehiclesData : ((vehiclesData as any)?.data || []);
 
-  // Filter expenses by plate number and expense type
-  const filteredExpenses = expenses
-    .filter(expense => {
-      const plateMatch = expense.vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase());
-      const typeMatch = !filterExpenseType || expense.expenseType === filterExpenseType;
-      return plateMatch && typeMatch;
-    })
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // En yeni önce
+  const filteredExpenses = useMemo(() => {
+    const query = searchTerm.toLocaleLowerCase('tr-TR');
+    return expenses
+      .filter((expense) => {
+        const plateMatch = expense.vehicle.plate.toLocaleLowerCase('tr-TR').includes(query) || (expense.vehicle.name || '').toLocaleLowerCase('tr-TR').includes(query);
+        const typeMatch = !filterExpenseType || expense.expenseType === filterExpenseType;
+        return plateMatch && typeMatch;
+      })
+      .sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime());
+  }, [expenses, searchTerm, filterExpenseType]);
 
-  // Create expense mutation
   const createMutation = useMutation({
-    mutationFn: async (data: CreateVehicleExpenseData) => {
-      return vehicleExpensesApi.create(data);
-    },
+    mutationFn: async (data: CreateVehicleExpenseData) => vehicleExpensesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vehicle-expenses'] });
       setModalOpen(false);
@@ -108,11 +113,8 @@ export default function VehicleExpenses() {
     },
   });
 
-  // Update expense mutation
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<CreateVehicleExpenseData> }) => {
-      return vehicleExpensesApi.update(id, data);
-    },
+    mutationFn: async ({ id, data }: { id: string; data: Partial<CreateVehicleExpenseData> }) => vehicleExpensesApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vehicle-expenses'] });
       setModalOpen(false);
@@ -121,23 +123,16 @@ export default function VehicleExpenses() {
     },
   });
 
-  // Delete expense mutation
   const deleteMutation = useMutation({
     mutationFn: vehicleExpensesApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vehicle-expenses'] });
+      setDeleteTarget(null);
     },
   });
 
   const resetForm = () => {
-    setFormData({
-      date: dayjs(),
-      vehicleId: '',
-      expenseType: '',
-      location: '',
-      amount: 0,
-      description: '',
-    });
+    setFormData({ date: dayjs(), vehicleId: '', expenseType: '', location: '', amount: 0, description: '' });
   };
 
   const handleOpenModal = (expense?: VehicleExpense) => {
@@ -173,313 +168,160 @@ export default function VehicleExpenses() {
       amount: formData.amount,
       description: formData.description || undefined,
     };
-
-    if (editingExpense) {
-      updateMutation.mutate({ id: editingExpense.id, data: submitData });
-    } else {
-      createMutation.mutate(submitData);
-    }
+    if (editingExpense) updateMutation.mutate({ id: editingExpense.id, data: submitData });
+    else createMutation.mutate(submitData);
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('Bu gideri silmek istediğinizden emin misiniz?')) {
-      deleteMutation.mutate(id);
-    }
-  };
+  // Özet: filtrelenen kayıtlar üzerinden
+  const total = filteredExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+  const thisMonth = filteredExpenses
+    .filter((expense) => dayjs(expense.date).isSame(dayjs(), 'month'))
+    .reduce((sum, expense) => sum + (expense.amount || 0), 0);
+  const topVehicle = useMemo(() => {
+    const byPlate = new Map<string, number>();
+    for (const expense of filteredExpenses) byPlate.set(expense.vehicle.plate, (byPlate.get(expense.vehicle.plate) || 0) + (expense.amount || 0));
+    return [...byPlate.entries()].sort((x, y) => y[1] - x[1])[0];
+  }, [filteredExpenses]);
 
-  const formatCurrency = (amount: number) => {
-    return `${amount.toLocaleString('tr-TR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })} TL`;
-  };
+  const hasFilter = Boolean(searchTerm || filterExpenseType);
+  const saving = createMutation.isPending || updateMutation.isPending;
+  const formInvalid = !formData.vehicleId || !formData.expenseType || !formData.location || !formData.amount || formData.amount <= 0;
 
-
-
-  if (isLoading) return <Layout><Typography>Yükleniyor...</Typography></Layout>;
-  if (error) return <Layout><Alert severity="error">Veriler yüklenirken hata oluştu</Alert></Layout>;
+  const actionsFor = (expense: VehicleExpense) => [
+    { label: 'Düzenle', icon: <EditOutlined />, onClick: () => handleOpenModal(expense) },
+    { label: 'Sil', icon: <DeleteOutline />, danger: true, onClick: () => { deleteMutation.reset(); setDeleteTarget(expense); } },
+  ];
 
   return (
-    <Layout>
-      <Box sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" component="h1" fontWeight="bold">
-            Araç Gider Tablosu
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenModal()}
-          >
-            Yeni Gider Ekle
-          </Button>
-        </Box>
+    <>
+      <PageHeader
+        title="Araç giderleri"
+        subtitle="Bakım, onarım ve sigorta harcamaları."
+        actions={<Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenModal()}>Gider ekle</Button>}
+      />
 
-        {/* Search Section */}
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-            <TextField
-              label="Plaka Ara"
-              variant="outlined"
-              size="small"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Plaka giriniz..."
-              sx={{ minWidth: 200 }}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>Veriler yüklenirken hata oluştu</Alert>}
+
+      <Box sx={kpiRow3Sx}>
+        <KpiTile label="Toplam gider" loading={isLoading} value={formatCurrency(total)} meta={`${filteredExpenses.length} kayıt${hasFilter ? ' · filtreli' : ''}`} />
+        <KpiTile label={`${dayjs().format('MMMM')} ayı`} loading={isLoading} value={formatCurrency(thisMonth)} meta="Bu ay yapılan harcama" />
+        <KpiTile label="En çok harcanan" loading={isLoading} value={topVehicle ? topVehicle[0] : '—'} meta={topVehicle ? formatCurrency(topVehicle[1]) : 'Kayıt yok'} />
+      </Box>
+
+      <Box sx={panelSx}>
+        <Toolbar>
+          <SearchField value={searchTerm} onChange={setSearchTerm} placeholder="Plaka veya araç ara" sx={{ width: { xs: '100%', sm: 240 } }} />
+          <TextField select value={filterExpenseType} onChange={(e) => setFilterExpenseType(e.target.value)} SelectProps={{ displayEmpty: true }} inputProps={{ 'aria-label': 'Gider türü' }} sx={{ width: { xs: '100%', sm: 200 } }}>
+            <MenuItem value="">Tüm gider türleri</MenuItem>
+            {EXPENSE_TYPES.map((type) => <MenuItem key={type} value={type}>{typeLabel(type)}</MenuItem>)}
+          </TextField>
+          {hasFilter && <Button size="small" onClick={() => { setSearchTerm(''); setFilterExpenseType(''); }} sx={{ color: a.muted }}>Temizle</Button>}
+        </Toolbar>
+
+        <DataTable
+          rows={filteredExpenses}
+          rowKey={(expense) => expense.id}
+          loading={isLoading}
+          onRowClick={(expense) => handleOpenModal(expense)}
+          empty={
+            <EmptyState
+              icon={<ReceiptLongOutlined />}
+              title={expenses.length === 0 ? 'Henüz gider kaydı yok' : 'Filtreye uygun gider yok'}
+              subtitle={expenses.length === 0 ? 'İlk gideri "Gider ekle" ile kaydedin.' : 'Filtreleri temizlemeyi deneyin.'}
             />
+          }
+          columns={[
+            { key: 'date', header: 'Tarih', render: (expense) => <Box component="span" sx={{ ...monoSx, fontSize: 13 }}>{dayjs(expense.date).format('DD.MM.YYYY')}</Box> },
+            { key: 'vehicle', header: 'Araç', render: (expense) => <><Plate value={expense.vehicle.plate} size="sm" /><Sub>{expense.vehicle.name}</Sub></> },
+            { key: 'type', header: 'Tür', render: (expense) => <StatusBadge label={typeLabel(expense.expenseType)} tone="neutral" /> },
+            { key: 'location', header: 'Yapıldığı yer', hideBelow: 'md', render: (expense) => expense.location },
+            { key: 'amount', header: 'Tutar', align: 'right', render: (expense) => <Box component="span" sx={{ ...monoSx, fontWeight: 600 }}>{formatCurrency(expense.amount)}</Box> },
+            {
+              key: 'description',
+              header: 'Açıklama',
+              hideBelow: 'lg',
+              render: (expense) => expense.description ? (
+                <Tooltip title={expense.description}>
+                  <Typography sx={{ fontSize: 13, color: a.muted, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{expense.description}</Typography>
+                </Tooltip>
+              ) : <Box component="span" sx={{ color: a.subtle }}>—</Box>,
+            },
+            { key: 'actions', header: '', align: 'right', width: 56, render: (expense) => <RowActions items={actionsFor(expense)} /> },
+          ]}
+          mobileRow={(expense) => (
+            <Stack spacing={0.6}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Plate value={expense.vehicle.plate} size="sm" />
+                  <StatusBadge label={typeLabel(expense.expenseType)} tone="neutral" />
+                </Stack>
+                <RowActions items={actionsFor(expense)} />
+              </Stack>
+              <Stack direction="row" justifyContent="space-between" alignItems="baseline">
+                <Typography sx={{ fontSize: 13, color: a.muted }}>{dayjs(expense.date).format('DD.MM.YYYY')} · {expense.location}</Typography>
+                <Box component="span" sx={{ ...monoSx, fontWeight: 600 }}>{formatCurrency(expense.amount)}</Box>
+              </Stack>
+            </Stack>
+          )}
+        />
+      </Box>
 
-            <TextField
-              select
-              label="Gider Türü Filtresi"
-              variant="outlined"
-              size="small"
-              value={filterExpenseType}
-              onChange={(e) => setFilterExpenseType(e.target.value)}
-              sx={{ minWidth: 200 }}
-            >
-              <MenuItem value="">
-                Tümü
-              </MenuItem>
-              {EXPENSE_TYPES.map((type) => (
-                <MenuItem key={type} value={type}>
-                  {type}
-                </MenuItem>
+      <Dialog open={modalOpen} onClose={handleCloseModal} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {editingExpense ? 'Gideri düzenle' : 'Yeni gider'}
+          <IconButton onClick={handleCloseModal} size="small" aria-label="Kapat"><CloseIcon fontSize="small" /></IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {(createMutation.isError || updateMutation.isError) && <Alert severity="error" sx={{ mb: 2 }}>Gider kaydedilemedi. Bilgileri kontrol edip tekrar deneyin.</Alert>}
+          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, pt: 1 }}>
+            <DatePicker
+              label="Tarih"
+              value={formData.date}
+              onChange={(newValue: Dayjs | null) => setFormData((prev) => ({ ...prev, date: newValue || dayjs() }))}
+              slotProps={{ textField: { fullWidth: true, size: 'small' } }}
+            />
+            <TextField select label="Araç" value={formData.vehicleId} onChange={(e) => setFormData((prev) => ({ ...prev, vehicleId: e.target.value }))} fullWidth required>
+              {[...vehicles].sort((x, y) => x.plate.localeCompare(y.plate)).map((vehicle) => (
+                <MenuItem key={vehicle.id} value={vehicle.id}>{vehicle.plate}{vehicle.name ? ` · ${vehicle.name}` : ''}</MenuItem>
               ))}
             </TextField>
-
-            {(searchTerm || filterExpenseType) && (
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  setSearchTerm('');
-                  setFilterExpenseType('');
-                }}
-                size="small"
-              >
-                Temizle
-              </Button>
-            )}
+            <TextField select label="Gider türü" value={formData.expenseType} onChange={(e) => setFormData((prev) => ({ ...prev, expenseType: e.target.value }))} fullWidth required>
+              {EXPENSE_TYPES.map((type) => <MenuItem key={type} value={type}>{typeLabel(type)}</MenuItem>)}
+            </TextField>
+            <TextField
+              label="Tutar"
+              type="number"
+              value={formData.amount || ''}
+              onChange={(e) => setFormData((prev) => ({ ...prev, amount: Number(e.target.value) || 0 }))}
+              fullWidth
+              required
+              inputProps={{ min: 0, step: 0.01, inputMode: 'decimal' }}
+              InputProps={{ endAdornment: <InputAdornment position="end">₺</InputAdornment> }}
+            />
+            <TextField label="İşin yapıldığı yer" value={formData.location} onChange={(e) => setFormData((prev) => ({ ...prev, location: e.target.value }))} fullWidth required sx={{ gridColumn: '1 / -1' }} />
+            <TextField label="Açıklama" value={formData.description} onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))} fullWidth multiline minRows={3} sx={{ gridColumn: '1 / -1' }} />
           </Box>
-        </Paper>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button variant="outlined" onClick={handleCloseModal}>Vazgeç</Button>
+          <Button onClick={handleSubmit} variant="contained" disabled={formInvalid || saving}>
+            {saving ? 'Kaydediliyor…' : editingExpense ? 'Kaydet' : 'Gider ekle'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-        <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-          <TableContainer sx={{ maxHeight: '70vh' }}>
-            <Table stickyHeader size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ width: '10%', backgroundColor: '#0D3282', color: 'white' }}>
-                    <strong>TARİH</strong>
-                  </TableCell>
-                  <TableCell sx={{ width: '12%', backgroundColor: '#0D3282', color: 'white' }}>
-                    <strong>ARAÇ PLAKA</strong>
-                  </TableCell>
-                  <TableCell sx={{ width: '15%', backgroundColor: '#0D3282', color: 'white' }}>
-                    <strong>GİDER TÜRÜ</strong>
-                  </TableCell>
-                  <TableCell sx={{ width: '15%', backgroundColor: '#0D3282', color: 'white' }}>
-                    <strong>İŞİN YAPILDIĞI YER</strong>
-                  </TableCell>
-                  <TableCell sx={{ width: '10%', backgroundColor: '#0D3282', color: 'white' }}>
-                    <strong>TUTAR TL</strong>
-                  </TableCell>
-                  <TableCell sx={{ width: '28%', backgroundColor: '#0D3282', color: 'white' }}>
-                    <strong>AÇIKLAMA</strong>
-                  </TableCell>
-                  <TableCell sx={{ width: '10%', backgroundColor: '#0D3282', color: 'white' }}>
-                    <strong>İŞLEMLER</strong>
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredExpenses.map((expense) => (
-                  <TableRow key={expense.id} hover>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
-                        {formatDate(expense.date)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 'medium', fontSize: '0.85rem' }}>
-                        {expense.vehicle.plate}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
-                        {expense.expenseType}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
-                        {expense.location}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 'medium', fontSize: '0.85rem' }}>
-                        {formatCurrency(expense.amount)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
-                          fontSize: '0.8rem',
-                          wordBreak: 'break-word',
-                          maxWidth: '300px'
-                        }}
-                      >
-                        {expense.description || '-'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleOpenModal(expense)}
-                          color="primary"
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDelete(expense.id)}
-                          color="error"
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filteredExpenses.length === 0 && expenses.length > 0 && (
-                  <TableRow>
-                    <TableCell colSpan={7} align="center">
-                      <Typography variant="body2" color="textSecondary">
-                        Arama kriterlerinize uygun gider bulunamadı.
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-                {expenses.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={7} align="center">
-                      <Typography variant="body2" color="textSecondary">
-                        Henüz gider kaydı bulunmamaktadır.
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-
-        {/* Add/Edit Modal */}
-        <Dialog open={modalOpen} onClose={handleCloseModal} maxWidth="md" fullWidth>
-          <DialogTitle>
-            {editingExpense ? 'Gider Düzenle' : 'Yeni Gider Ekle'}
-          </DialogTitle>
-          <DialogContent>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-              <DatePicker
-                label="Tarih"
-                value={formData.date}
-                onChange={(newValue: Dayjs | null) => 
-                  setFormData(prev => ({ ...prev, date: newValue || dayjs() }))
-                }
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    variant: 'outlined',
-                  },
-                }}
-              />
-
-              <TextField
-                select
-                label="Araç Plakası"
-                value={formData.vehicleId}
-                onChange={(e) => setFormData(prev => ({ ...prev, vehicleId: e.target.value }))}
-                fullWidth
-                required
-              >
-                <MenuItem value="">
-                  Araç Seçin
-                </MenuItem>
-                {vehicles
-                  .sort((a, b) => a.plate.localeCompare(b.plate))
-                  .map((vehicle) => (
-                  <MenuItem key={vehicle.id} value={vehicle.id}>
-                    {vehicle.plate} {vehicle.name && `- ${vehicle.name}`}
-                  </MenuItem>
-                ))}
-              </TextField>
-
-              <TextField
-                select
-                label="Gider Türü"
-                value={formData.expenseType}
-                onChange={(e) => setFormData(prev => ({ ...prev, expenseType: e.target.value }))}
-                fullWidth
-                required
-              >
-                <MenuItem value="">
-                  Gider Türü Seçin
-                </MenuItem>
-                {EXPENSE_TYPES.map((type) => (
-                  <MenuItem key={type} value={type}>
-                    {type}
-                  </MenuItem>
-                ))}
-              </TextField>
-
-              <TextField
-                label="İşin Yapıldığı Yer"
-                value={formData.location}
-                onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                fullWidth
-                required
-              />
-
-              <TextField
-                label="Tutar (TL)"
-                type="number"
-                value={formData.amount || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, amount: Number(e.target.value) || 0 }))}
-                fullWidth
-                required
-                inputProps={{ min: 0, step: 0.01 }}
-              />
-
-              <TextField
-                label="Açıklama"
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                fullWidth
-                multiline
-                rows={3}
-              />
-            </Box>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseModal}>İptal</Button>
-            <Button
-              onClick={handleSubmit}
-              variant="contained"
-              disabled={
-                !formData.vehicleId ||
-                !formData.expenseType ||
-                !formData.location ||
-                !formData.amount ||
-                formData.amount <= 0 ||
-                createMutation.isPending ||
-                updateMutation.isPending
-              }
-            >
-              {editingExpense ? 'Güncelle' : 'Ekle'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Box>
-    </Layout>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        danger
+        title="Gideri sil"
+        body={<><strong>{deleteTarget?.vehicle.plate}</strong> için {deleteTarget ? dayjs(deleteTarget.date).format('DD.MM.YYYY') : ''} tarihli {deleteTarget ? formatCurrency(deleteTarget.amount) : ''} tutarındaki gider silinecek.</>}
+        confirmLabel="Sil"
+        pendingLabel="Siliniyor…"
+        pending={deleteMutation.isPending}
+        error={deleteMutation.isError ? 'Gider silinemedi.' : undefined}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+        onClose={() => setDeleteTarget(null)}
+      />
+    </>
   );
 }

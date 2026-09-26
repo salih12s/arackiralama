@@ -1,193 +1,92 @@
-import {
-  Box,
-  Typography,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Grid,
-  Alert,
-  LinearProgress,
-} from '@mui/material';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import Layout from '../components/Layout';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Alert, Avatar, Box, Button, Skeleton, Stack, Typography } from '@mui/material';
+import { ArrowForward, CheckCircleOutline } from '@mui/icons-material';
+import { useQuery } from '@tanstack/react-query';
 import { reportsApi } from '../api/reports';
 import { formatCurrency } from '../utils/currency';
+import { a, ease, monoSx } from '../admin/theme';
+import { EmptyState, KpiTile, PageHeader, SearchField, Toolbar, panelSx, kpiRow3Sx } from '../admin/ui';
+
+/** /reports/debtors kuruş döndürür; ekranda en yakın 10 TL'ye yuvarlanır. */
+const toTL = (kurus: number) => Math.round((kurus / 100) / 10) * 10;
 
 export default function DebtorDetails() {
-  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [search, setSearch] = useState('');
 
-  // Fetch debtors data
-  const { data: debtorsData, isLoading: debtorsLoading, error: debtorsError, refetch } = useQuery({
+  const { data: debtorsData, isLoading, error } = useQuery({
     queryKey: ['debtors'],
-    queryFn: async () => {
-      console.log('🔄 Fetching debtors...');
-      const result = await reportsApi.getDebtors();
-      console.log('📋 Debtors API response:', result);
-      return result;
-    },
-    staleTime: 0, // Cache'i devre dışı bırak
-    gcTime: 0, // Garbage collection süresini sıfırla
+    queryFn: () => reportsApi.getDebtors(),
+    staleTime: 0,
+    gcTime: 0,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
   });
 
-
-  // API'den dönen veriyi güvenli şekilde işle - artık TL cinsinden geliyor
-  const debtors = Array.isArray(debtorsData) ? debtorsData.map((debtor: any) => ({
-    ...debtor,
-    totalDebt: debtor.totalDebt // TL cinsinden direkt kullan
-  })) : [];
-  const totalDebt = debtors.reduce((sum: number, debtor: any) => sum + (debtor.totalDebt || 0), 0);
-  
-  console.log('🔍 Debtors Debug:', { debtorsData, debtors, totalDebt });
-
-  if (debtorsError) {
-    console.error('❌ Debtors API Error:', debtorsError);
-    return (
-      <Layout title="Borçlu Müşteri Detayları">
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 8 }}>
-          <Alert severity="error" sx={{ mb: 2 }}>
-            Borçlu müşteri verileri yüklenirken hata oluştu: {debtorsError?.message}
-          </Alert>
-        </Box>
-      </Layout>
-    );
-  }
-
-  if (debtorsLoading) {
-    return (
-      <Layout title="Borçlu Müşteri Detayları">
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 8 }}>
-          <LinearProgress sx={{ width: '50%', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary">
-            Borçlu müşteri verileri yükleniyor...
-          </Typography>
-        </Box>
-      </Layout>
-    );
-  }
+  const debtors = useMemo(
+    () => (Array.isArray(debtorsData) ? debtorsData : []).map((debtor: any) => ({ id: debtor.customerId as string, name: debtor.customerName as string, debt: toTL(debtor.totalDebt || 0) })),
+    [debtorsData],
+  );
+  const totalDebt = debtors.reduce((sum, debtor) => sum + debtor.debt, 0);
+  const maxDebt = Math.max(0, ...debtors.map((debtor) => debtor.debt));
+  const query = search.trim().toLocaleLowerCase('tr-TR');
+  const visible = query ? debtors.filter((debtor) => debtor.name.toLocaleLowerCase('tr-TR').includes(query)) : debtors;
 
   return (
-    <Layout title="Borçlu Müşteri Detayları">
-      {/* Header */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: { xs: 'stretch', sm: 'center' }, 
-        mb: { xs: 2, sm: 4 },
-        flexDirection: { xs: 'column', sm: 'row' },
-        gap: { xs: 1, sm: 0 }
-      }}>
-        <Box>
-          <Typography variant="h4" component="h1" sx={{ 
-            fontWeight: 700, 
-            mb: 0.5,
-            fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' }
-          }}>
-            💳 Borçlu Müşteri Detayları
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{
-            fontSize: { xs: '0.875rem', sm: '1rem' }
-          }}>
-            Ödenmemiş borcu bulunan müşteriler ve borç tutarları
-          </Typography>
-        </Box>
+    <>
+      <PageHeader
+        title="Borçlular"
+        subtitle="Açık bakiyesi olan müşteriler, borç tutarına göre sıralı."
+        actions={<Button variant="outlined" endIcon={<ArrowForward />} onClick={() => navigate('/panel/odenmeyen-borclar')}>Kalem kalem gör</Button>}
+      />
+
+      {error && <Alert severity="error" sx={{ mb: 2 }}>Borçlu müşteri verileri yüklenemedi: {(error as Error).message}</Alert>}
+
+      <Box sx={kpiRow3Sx}>
+        <KpiTile label="Toplam alacak" loading={isLoading} value={<Box component="span" sx={{ color: totalDebt > 0 ? a.danger : a.ink }}>{formatCurrency(totalDebt)}</Box>} meta="En yakın 10 TL'ye yuvarlı" />
+        <KpiTile label="Borçlu müşteri" loading={isLoading} value={debtors.length} meta="Açık bakiyesi olan" />
+        <KpiTile label="En yüksek borç" loading={isLoading} value={formatCurrency(maxDebt)} meta={debtors[0]?.name || '—'} />
       </Box>
 
-      <Grid container spacing={{ xs: 2, sm: 4 }}>
-        {/* Left Side - Debtors Table */}
-        <Grid item xs={12} md={8}>
-          <Paper sx={{ p: { xs: 2, sm: 3 } }}>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>
-              📋 Borçlu Müşteriler
-            </Typography>
+      <Box sx={panelSx}>
+        <Toolbar>
+          <Typography sx={{ fontWeight: 800, fontSize: 15.5 }}>Müşteri bazında borç</Typography>
+          <Box sx={{ flex: 1 }} />
+          <SearchField value={search} onChange={setSearch} placeholder="Müşteri ara" sx={{ width: { xs: '100%', sm: 240 } }} />
+        </Toolbar>
 
-            {debtors.length === 0 ? (
-              <Box sx={{ textAlign: 'center', py: 8 }}>
-                <Typography variant="h6" color="text.secondary">
-                  Borçlu müşteri bulunamadı
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  Tüm müşteriler ödemelerini yapmış durumda.
-                </Typography>
-              </Box>
-            ) : (
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Müşteri Adı</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Borç Tutarı</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {debtors.map((debtor: any) => (
-                      <TableRow key={debtor.customerId} hover>
-                        <TableCell>
-                          <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                            {debtor.customerName}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography 
-                            variant="body1" 
-                            sx={{ 
-                              color: 'error.main',
-                              fontWeight: 600
-                            }}
-                          >
-                            {formatCurrency(Math.round((debtor.totalDebt / 100) / 10) * 10)}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
-          </Paper>
-        </Grid>
-
-        {/* Right Side - Total Debt Summary */}
-        <Grid item xs={12} md={4}>
-          <Paper 
-            sx={{ 
-              p: { xs: 3, sm: 4 }, 
-              textAlign: 'center',
-              background: 'linear-gradient(145deg, #f8f9fa 0%, #e9ecef 100%)',
-              border: '2px solid #dee2e6'
-            }}
-          >
-            <Typography variant="h6" gutterBottom sx={{ 
-              fontWeight: 600, 
-              color: 'text.secondary',
-              fontSize: { xs: '1rem', sm: '1.25rem' }
-            }}>
-              💰 Toplam Borç
-            </Typography>
-            
-            <Typography 
-              variant="h3" 
-              sx={{ 
-                fontWeight: 700,
-                color: 'error.main',
-                mb: 2,
-                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' }
-              }}
-            >
-              {formatCurrency(Math.round((totalDebt / 100) / 10) * 10)}
-            </Typography>
-            
-            <Typography variant="body2" color="text.secondary">
-              {debtors.length} müşteriden toplanan borç tutarı
-            </Typography>
-          </Paper>
-        </Grid>
-      </Grid>
-    </Layout>
+        {isLoading ? (
+          <Box sx={{ p: 2.5 }}>{[0, 1, 2, 3].map((i) => <Skeleton key={i} height={52} />)}</Box>
+        ) : debtors.length === 0 ? (
+          <EmptyState icon={<CheckCircleOutline />} title="Borçlu müşteri yok" subtitle="Tüm müşteriler ödemelerini yapmış durumda." />
+        ) : visible.length === 0 ? (
+          <EmptyState compact title="Aramaya uygun müşteri yok" />
+        ) : (
+          <Box component="ol" sx={{ listStyle: 'none', m: 0, p: 0 }}>
+            {visible.map((debtor) => {
+              const rank = debtors.indexOf(debtor) + 1;
+              const share = totalDebt ? debtor.debt / totalDebt : 0;
+              return (
+                <Box component="li" key={debtor.id} sx={{ display: 'grid', gridTemplateColumns: { xs: '28px 36px minmax(0, 1fr) auto', sm: '32px 38px minmax(0, 1fr) minmax(120px, 2fr) auto' }, alignItems: 'center', columnGap: 1.5, px: 2.5, py: 1.5, borderTop: `1px solid ${a.lineSoft}`, '&:first-of-type': { borderTop: 0 } }}>
+                  <Typography sx={{ ...monoSx, fontSize: 12.5, color: a.subtle }}>{String(rank).padStart(2, '0')}</Typography>
+                  <Avatar sx={{ width: 34, height: 34, bgcolor: a.accentSoft, color: a.accent, fontSize: 14, fontWeight: 800 }}>{debtor.name.charAt(0).toLocaleUpperCase('tr-TR')}</Avatar>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography noWrap sx={{ fontWeight: 700, fontSize: 14.5 }}>{debtor.name}</Typography>
+                    <Typography sx={{ fontSize: 12.5, color: a.muted }}>Toplam alacağın %{Math.round(share * 100)}'i</Typography>
+                  </Box>
+                  <Box aria-hidden sx={{ display: { xs: 'none', sm: 'block' }, height: 8, borderRadius: 999, bgcolor: a.surface, overflow: 'hidden' }}>
+                    <Box sx={{ height: '100%', width: `${maxDebt ? (debtor.debt / maxDebt) * 100 : 0}%`, bgcolor: a.chart1, borderRadius: 999, transition: `width .6s ${ease}` }} />
+                  </Box>
+                  <Stack alignItems="flex-end">
+                    <Typography sx={{ ...monoSx, fontWeight: 600, fontSize: 14.5, color: a.danger }}>{formatCurrency(debtor.debt)}</Typography>
+                  </Stack>
+                </Box>
+              );
+            })}
+          </Box>
+        )}
+      </Box>
+    </>
   );
 }

@@ -1,24 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Container,
   Typography,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Box,
   CircularProgress,
   Alert,
-  Chip,
   Button,
-  Stack,
+  IconButton,
+  Tooltip,
   TextField,
-  InputAdornment,
   Dialog,
-  DialogTitle,
   DialogContent,
   DialogActions,
   Grid,
@@ -28,16 +18,17 @@ import {
   InputLabel
 } from '@mui/material';
 import {
-  Search as SearchIcon,
-  Download as DownloadIcon,
-  Print as PrintIcon,
-  Edit as EditIcon
+  DownloadOutlined as DownloadIcon,
+  PrintOutlined as PrintIcon,
+  EditOutlined as EditIcon
 } from '@mui/icons-material';
-import Layout from '../components/Layout';
+import { a, fonts, monoSx } from '../admin/theme';
+import { DialogHeader } from '../admin/dialogParts';
+import { EmptyState, KpiTile, PageHeader, Plate, SearchField, Status, StatusBadge, Toolbar, panelSx, kpiRow3Sx } from '../admin/ui';
 import { rentalsApi, vehiclesApi, customersApi } from '../api/client';
 import { formatCurrency } from '../utils/currency';
 import { formatDate } from '../utils/format';
-import { getStatusColor, getStatusText, StatusType } from '../utils/status';
+import { getStatusText, StatusType } from '../utils/status';
 
 interface RentalData {
   id: string;
@@ -315,11 +306,6 @@ export const UnpaidDebtsDetail: React.FC = () => {
     window.print();
   };
 
-  const handleExport = () => {
-    // TODO: Export functionality
-    console.log('Export functionality will be implemented');
-  };
-
   const handleEditRental = (rentalId: string) => {
     const rental = filteredRentals.find(r => r.id === rentalId);
     if (rental) {
@@ -406,302 +392,162 @@ export const UnpaidDebtsDetail: React.FC = () => {
     setEditingRental(null);
   };
 
-  if (loading) {
-    return (
-      <Layout>
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-          <CircularProgress />
-        </Box>
-      </Layout>
-    );
-  }
+  // Bakiye: toplamdan peşin, 4 taksit ve plan dışı ek ödemeler düşülür
+  // (Kiralamalar, Borçlular ve kiralama detayıyla aynı hesap).
+  const sheetBalance = (rental: RentalData) => rental.balance;
 
-  if (error) {
-    return (
-      <Layout>
-        <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-          <Alert severity="error">{error}</Alert>
-        </Container>
-      </Layout>
-    );
-  }
+  const customerLabel = (rental: RentalData) => `${rental.customer.firstName} ${rental.customer.lastName}`.trim() || 'Bilinmiyor';
+
+  const sheetColumns: { key: string; label: string; align?: 'left' | 'right' | 'center'; value: (rental: RentalData) => React.ReactNode; excel: (rental: RentalData) => string | number; strong?: boolean }[] = [
+    { key: 'date', label: 'Tarih', value: (r) => <><Box component="span" sx={{ display: 'block' }}>{formatDate(r.startDate)}</Box><Box component="span" sx={{ display: 'block', color: a.muted }}>{formatDate(r.endDate)}</Box></>, excel: (r) => `${formatDate(r.startDate)} - ${formatDate(r.endDate)}` },
+    { key: 'plate', label: 'Plaka', value: (r) => <Plate value={r.vehicle.plate} size="sm" />, excel: (r) => r.vehicle.plate },
+    { key: 'vehicle', label: 'Araç', value: (r) => <Box component="span" sx={{ fontFamily: fonts.sans }}>{r.vehicle.name || 'Bilinmiyor'}</Box>, excel: (r) => r.vehicle.name },
+    { key: 'customer', label: 'Kiralayan', value: (r) => <Box component="span" sx={{ fontWeight: 700, fontFamily: fonts.sans }}>{customerLabel(r)}</Box>, excel: customerLabel },
+    { key: 'days', label: 'Gün', align: 'center', value: (r) => r.days, excel: (r) => r.days },
+    { key: 'rent', label: 'Kira', align: 'right', value: (r) => formatCurrency(r.totalPrice), excel: (r) => r.totalPrice },
+    { key: 'km', label: 'KM', align: 'right', value: (r) => formatCurrency(r.kmPrice), excel: (r) => r.kmPrice },
+    { key: 'rentKm', label: 'Kira+KM', align: 'right', strong: true, value: (r) => formatCurrency(r.totalPrice + r.kmTotal), excel: (r) => r.totalPrice + r.kmTotal },
+    { key: 'cleaning', label: 'Temizlik', align: 'right', value: (r) => formatCurrency(r.fuelCost), excel: (r) => r.fuelCost },
+    { key: 'hgs', label: 'HGS', align: 'right', value: (r) => formatCurrency(r.hgsFee), excel: (r) => r.hgsFee },
+    { key: 'damage', label: 'Kaza', align: 'right', value: (r) => formatCurrency(r.damageFee), excel: (r) => r.damageFee },
+    { key: 'fuel', label: 'Yakıt', align: 'right', value: (r) => formatCurrency(r.actualFuelCost), excel: (r) => r.actualFuelCost },
+    { key: 'total', label: 'Toplam', align: 'right', strong: true, value: (r) => formatCurrency(r.totalAmount), excel: (r) => r.totalAmount },
+    { key: 'advance', label: 'Peşin', align: 'right', value: (r) => formatCurrency(r.advancePayment), excel: (r) => r.advancePayment },
+    { key: 'p1', label: '1. öd.', align: 'right', value: (r) => formatCurrency(r.payment1), excel: (r) => r.payment1 },
+    { key: 'p2', label: '2. öd.', align: 'right', value: (r) => formatCurrency(r.payment2), excel: (r) => r.payment2 },
+    { key: 'p3', label: '3. öd.', align: 'right', value: (r) => formatCurrency(r.payment3), excel: (r) => r.payment3 },
+    { key: 'p4', label: '4. öd.', align: 'right', value: (r) => formatCurrency(r.payment4), excel: (r) => r.payment4 },
+    { key: 'extra', label: 'Ek öd.', align: 'right', value: (r) => (r.extraPayments ? <Box component="span" sx={{ color: a.success }}>{formatCurrency(r.extraPayments)}</Box> : formatCurrency(0)), excel: (r) => r.extraPayments },
+    {
+      key: 'balance',
+      label: 'Bakiye',
+      align: 'right',
+      strong: true,
+      value: (r) => {
+        const balance = sheetBalance(r);
+        return <Box component="span" sx={{ color: balance > 0 ? a.danger : a.success }}>{formatCurrency(balance)}</Box>;
+      },
+      excel: sheetBalance,
+    },
+    { key: 'status', label: 'Durum', align: 'center', value: (r) => <Status value={r.status} />, excel: (r) => getStatusText(r.status as StatusType) },
+    { key: 'type', label: 'Tür', align: 'center', value: (r) => <StatusBadge label={r.rentalType === 'NEW' ? 'Yeni' : 'Uzatma'} tone={r.rentalType === 'NEW' ? 'neutral' : 'accent'} />, excel: (r) => (r.rentalType === 'NEW' ? 'Yeni' : 'Uzatma') },
+    { key: 'note', label: 'Açıklama', value: (r) => <Tooltip title={r.description || ''}><Box component="span" sx={{ display: 'block', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: fonts.sans, color: a.muted }}>{r.description || '—'}</Box></Tooltip>, excel: (r) => r.description || '' },
+  ];
+
+  // xlsx (~280 KB) yalnızca dışa aktarırken yüklenir
+  const exportSheet = async () => {
+    const XLSX = await import('xlsx');
+    const data = filteredRentals.map((rental) => Object.fromEntries(sheetColumns.map((column) => [column.label, column.excel(rental)])));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Ödenmeyen borçlar');
+    XLSX.writeFile(wb, `odenmeyen-borclar-${new Date().toLocaleDateString('tr-TR').replace(/\./g, '-')}.xlsx`);
+  };
+
+  const totalOutstanding = filteredRentals.reduce((sum, rental) => sum + Math.max(0, sheetBalance(rental)), 0);
+  const debtorCount = new Set(filteredRentals.map((rental) => rental.customerId)).size;
+
+  const headCell = { position: 'sticky' as const, top: 0, zIndex: 2, bgcolor: a.raised, color: a.subtle, fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' as const, p: '10px 10px', borderBottom: `1px solid ${a.line}`, whiteSpace: 'nowrap' as const };
 
   return (
-    <Layout>
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
-          <Stack direction="row" spacing={2}>
-            <Button
-              startIcon={<DownloadIcon />}
-              onClick={handleExport}
-              variant="outlined"
-              size="small"
-            >
-              Excel'e Aktar
-            </Button>
-            <Button
-              startIcon={<PrintIcon />}
-              onClick={handlePrint}
-              variant="outlined"
-              size="small"
-            >
-              Yazdır
-            </Button>
-          </Stack>
-        </Stack>
+    <>
+      <PageHeader
+        title="Ödenmeyen borçlar"
+        subtitle="Bakiyesi kapanmamış kiralamaların tüm kalemleri, tek tabloda."
+        actions={
+          <>
+            <Tooltip title="Excel'e aktar">
+              <span>
+                <IconButton onClick={exportSheet} disabled={loading || filteredRentals.length === 0} aria-label="Excel'e aktar" sx={{ border: `1px solid ${a.line}`, bgcolor: a.raised }}>
+                  <DownloadIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="Yazdır">
+              <IconButton onClick={handlePrint} aria-label="Yazdır" sx={{ border: `1px solid ${a.line}`, bgcolor: a.raised }}>
+                <PrintIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </>
+        }
+      />
 
-        <Paper sx={{ mb: 3, p: 2 }}>
-          <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-            <TextField
-              placeholder="Müşteri adı, araç markası/modeli veya plaka ile ara..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              size="small"
-              sx={{ minWidth: 300 }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel>Araç Seçiniz</InputLabel>
-              <Select
-                value={selectedVehicle}
-                label="Araç Seçiniz"
-                onChange={(e) => setSelectedVehicle(e.target.value)}
-              >
-                <MenuItem value="">Tüm Araçlar</MenuItem>
-                {vehicles.map((vehicle) => (
-                  <MenuItem key={vehicle.id} value={vehicle.id}>
-                    {vehicle.plate} - {vehicle.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            {selectedVehicle && (
-              <Button
-                size="small"
-                onClick={() => setSelectedVehicle('')}
-                color="secondary"
-              >
-                Filtreyi Temizle
-              </Button>
-            )}
-            <Typography variant="body2" color="text.secondary">
-              Toplam {filteredRentals.length} borçlu kiralama
-            </Typography>
-          </Stack>
-        </Paper>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        <TableContainer component={Paper} sx={{ maxHeight: 'calc(100vh - 250px)', overflow: 'auto' }}>
-          <Table stickyHeader size="small" sx={{ 
-            '& .MuiTableCell-root': { 
-              padding: '2px 4px', 
-              fontSize: '0.65rem', 
-              lineHeight: 1.1,
-              whiteSpace: 'nowrap',
-              borderRight: '1px solid #e0e0e0'
-            } 
-          }}>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ minWidth: 80, fontWeight: 'bold', bgcolor: 'grey.100', fontSize: '0.6rem' }}>
-                  Kiralama Tarihi
-                </TableCell>
-                <TableCell sx={{ minWidth: 50, fontWeight: 'bold', bgcolor: 'grey.100', fontSize: '0.6rem' }}>
-                  Plaka
-                </TableCell>
-                <TableCell sx={{ minWidth: 70, fontWeight: 'bold', bgcolor: 'grey.100', fontSize: '0.6rem' }}>
-                  Araç İsmi
-                </TableCell>
-                <TableCell sx={{ minWidth: 80, fontWeight: 'bold', bgcolor: 'grey.100', fontSize: '0.6rem' }}>
-                  Kiralayan
-                </TableCell>
-                <TableCell sx={{ minWidth: 30, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center', fontSize: '0.6rem' }}>
-                  Gün
-                </TableCell>
-                <TableCell sx={{ minWidth: 55, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'right', fontSize: '0.6rem' }}>
-                  Kira
-                </TableCell>
-                <TableCell sx={{ minWidth: 45, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'right', fontSize: '0.6rem' }}>
-                  KM
-                </TableCell>
-                <TableCell sx={{ minWidth: 60, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'right', fontSize: '0.6rem' }}>
-                  Kira+KM
-                </TableCell>
-                <TableCell sx={{ minWidth: 45, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'right', fontSize: '0.6rem' }}>
-                  Temizlik
-                </TableCell>
-                <TableCell sx={{ minWidth: 35, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'right', fontSize: '0.6rem' }}>
-                  HGS
-                </TableCell>
-                <TableCell sx={{ minWidth: 45, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'right', fontSize: '0.6rem' }}>
-                  Kaza
-                </TableCell>
-                <TableCell sx={{ minWidth: 45, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'right', fontSize: '0.6rem' }}>
-                  Yakıt
-                </TableCell>
-                <TableCell sx={{ minWidth: 60, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'right', fontSize: '0.6rem' }}>
-                  Toplam
-                </TableCell>
-                <TableCell sx={{ minWidth: 45, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'right', fontSize: '0.6rem' }}>
-                  Peşin
-                </TableCell>
-                <TableCell sx={{ minWidth: 35, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'right', fontSize: '0.6rem' }}>
-                  1.Öd
-                </TableCell>
-                <TableCell sx={{ minWidth: 35, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'right', fontSize: '0.6rem' }}>
-                  2.Öd
-                </TableCell>
-                <TableCell sx={{ minWidth: 35, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'right', fontSize: '0.6rem' }}>
-                  3.Öd
-                </TableCell>
-                <TableCell sx={{ minWidth: 35, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'right', fontSize: '0.6rem' }}>
-                  4.Öd
-                </TableCell>
-                <TableCell sx={{ minWidth: 50, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'right', fontSize: '0.6rem' }}>
-                  Bakiye
-                </TableCell>
-                <TableCell sx={{ minWidth: 45, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center', fontSize: '0.6rem' }}>
-                  Durum
-                </TableCell>
-                <TableCell sx={{ minWidth: 50, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center', fontSize: '0.6rem' }}>
-                  Tür
-                </TableCell>
-                <TableCell sx={{ minWidth: 80, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center', fontSize: '0.6rem' }}>
-                  Açıklama
-                </TableCell>
-                <TableCell sx={{ minWidth: 60, fontWeight: 'bold', bgcolor: 'grey.100', textAlign: 'center', fontSize: '0.6rem' }}>
-                  İşlemler
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredRentals.map((rental) => (
-                <TableRow 
-                  key={rental.id} 
-                  sx={{ 
-                    '&:nth-of-type(odd)': { bgcolor: 'grey.50' },
-                    '&:hover': { bgcolor: 'grey.100' }
-                  }}
-                >
-                  <TableCell>
-                    <Box>
-                      <Typography variant="caption" display="block" sx={{ fontSize: '0.6rem' }}>
-                        {formatDate(rental.startDate)}
-                      </Typography>
-                      <Typography variant="caption" display="block" sx={{ fontSize: '0.6rem', color: 'text.secondary' }}>
-                        {formatDate(rental.endDate)}
-                      </Typography>
+      <Box sx={kpiRow3Sx}>
+        <KpiTile label="Açık bakiye" loading={loading} value={<Box component="span" sx={{ color: totalOutstanding > 0 ? a.danger : a.ink }}>{formatCurrency(totalOutstanding)}</Box>} meta="Ek ödemeler düşülmüş" />
+        <KpiTile label="Borçlu kiralama" loading={loading} value={filteredRentals.length} meta={selectedVehicle || searchTerm ? 'Filtrelenen' : 'Tümü'} />
+        <KpiTile label="Müşteri" loading={loading} value={debtorCount} meta="Borcu olan kişi" />
+      </Box>
+
+      <Box sx={{ ...panelSx, overflow: 'hidden' }}>
+        <Toolbar>
+          <SearchField value={searchTerm} onChange={setSearchTerm} placeholder="Müşteri, araç veya plaka" sx={{ width: { xs: '100%', sm: 280 } }} />
+          <TextField select value={selectedVehicle} onChange={(e) => setSelectedVehicle(e.target.value)} SelectProps={{ displayEmpty: true }} inputProps={{ 'aria-label': 'Araç' }} sx={{ width: { xs: '100%', sm: 220 } }}>
+            <MenuItem value="">Tüm araçlar</MenuItem>
+            {vehicles.map((vehicle) => <MenuItem key={vehicle.id} value={vehicle.id}>{vehicle.plate} · {vehicle.name}</MenuItem>)}
+          </TextField>
+          {(selectedVehicle || searchTerm) && (
+            <Button size="small" onClick={() => { setSelectedVehicle(''); setSearchTerm(''); }} sx={{ color: a.muted }}>Temizle</Button>
+          )}
+        </Toolbar>
+
+        {loading ? (
+          <Box sx={{ display: 'grid', placeItems: 'center', minHeight: 240 }}><CircularProgress size={28} /></Box>
+        ) : filteredRentals.length === 0 ? (
+          <EmptyState title={searchTerm || selectedVehicle ? 'Filtreye uygun borçlu kiralama yok' : 'Ödenmeyen borç yok'} subtitle={searchTerm || selectedVehicle ? 'Filtreyi temizlemeyi deneyin.' : 'Tüm kiralamaların bakiyesi kapalı.'} />
+        ) : (
+          <Box sx={{ overflow: 'auto', maxHeight: 'calc(100dvh - 330px)', minHeight: 280 }}>
+            <Box component="table" sx={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', minWidth: 1500 }}>
+              <Box component="thead">
+                <Box component="tr">
+                  {sheetColumns.map((column) => (
+                    <Box component="th" key={column.key} scope="col" sx={{ ...headCell, textAlign: column.align || 'left' }}>{column.label}</Box>
+                  ))}
+                  <Box component="th" scope="col" sx={{ ...headCell, right: 0, zIndex: 3, textAlign: 'right' }} />
+                </Box>
+              </Box>
+              <Box component="tbody">
+                {filteredRentals.map((rental) => (
+                  <Box component="tr" key={rental.id} sx={{ '&:nth-of-type(even) td': { bgcolor: a.hover }, '@media (hover: hover)': { '&:hover td': { bgcolor: a.accentSoft } } }}>
+                    {sheetColumns.map((column) => (
+                      <Box
+                        component="td"
+                        key={column.key}
+                        sx={{
+                          p: '8px 10px',
+                          textAlign: column.align || 'left',
+                          borderBottom: `1px solid ${a.lineSoft}`,
+                          bgcolor: a.raised,
+                          whiteSpace: 'nowrap',
+                          fontSize: 12.5,
+                          ...monoSx,
+                          fontWeight: column.strong ? 600 : 400,
+                          color: a.ink,
+                        }}
+                      >
+                        {column.value(rental)}
+                      </Box>
+                    ))}
+                    <Box component="td" sx={{ position: 'sticky', right: 0, p: '6px 10px', bgcolor: a.raised, borderBottom: `1px solid ${a.lineSoft}`, borderLeft: `1px solid ${a.lineSoft}`, textAlign: 'right' }}>
+                      <Button size="small" variant="outlined" startIcon={<EditIcon sx={{ fontSize: 15 }} />} onClick={() => handleEditRental(rental.id)}>Düzenle</Button>
                     </Box>
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 500 }}>{rental.vehicle.plate}</TableCell>
-                  <TableCell>{rental.vehicle.name || 'Bilinmiyor'}</TableCell>
-                  <TableCell>
-                    {`${rental.customer.firstName} ${rental.customer.lastName}`.trim() || 'Bilinmiyor'}
-                  </TableCell>
-                  <TableCell align="center">{rental.days}</TableCell>
-                  <TableCell align="right">{formatCurrency(rental.totalPrice)}</TableCell>
-                  <TableCell align="right">{formatCurrency(rental.kmPrice)}</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
-                    {formatCurrency(rental.totalPrice + rental.kmTotal)}
-                  </TableCell>
-                  <TableCell align="right">{formatCurrency(rental.fuelCost)}</TableCell>
-                  <TableCell align="right">{formatCurrency(rental.hgsFee)}</TableCell>
-                  <TableCell align="right">{formatCurrency(rental.damageFee)}</TableCell>
-                  <TableCell align="right">{formatCurrency(rental.actualFuelCost)}</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
-                    {formatCurrency(rental.totalAmount)}
-                  </TableCell>
-                  <TableCell align="right">{formatCurrency(rental.advancePayment)}</TableCell>
-                  <TableCell align="right">{formatCurrency(rental.payment1)}</TableCell>
-                  <TableCell align="right">{formatCurrency(rental.payment2)}</TableCell>
-                  <TableCell align="right">{formatCurrency(rental.payment3)}</TableCell>
-                  <TableCell align="right">{formatCurrency(rental.payment4)}</TableCell>
-                  <TableCell 
-                    align="right" 
-                    sx={{ 
-                      fontWeight: 600,
-                      color: (() => {
-                        // Toplam sütunuyla aynı değeri kullan
-                        const totalDue = rental.totalAmount;
-                        
-                        // Sadece taksitler + peşin (ek ödemeler dahil etme)
-                        const totalPaid = (rental.advancePayment || 0) + (rental.payment1 || 0) + 
-                          (rental.payment2 || 0) + (rental.payment3 || 0) + (rental.payment4 || 0);
-                        
-                        const balance = totalDue - totalPaid;
-                        return balance > 0 ? 'error.main' : 'success.main';
-                      })()
-                    }}
-                  >
-                    {(() => {
-                      // Toplam sütunuyla aynı değeri kullan
-                      const totalDue = rental.totalAmount;
-                      
-                      // Sadece taksitler + peşin (ek ödemeler dahil etme)
-                      const totalPaid = (rental.advancePayment || 0) + (rental.payment1 || 0) + 
-                        (rental.payment2 || 0) + (rental.payment3 || 0) + (rental.payment4 || 0);
-                      
-                      const balance = totalDue - totalPaid;
-                      return formatCurrency(balance);
-                    })()}
-                  </TableCell>
-                  <TableCell align="center">
-                    <Chip
-                      label={getStatusText(rental.status as StatusType)}
-                      color={getStatusColor(rental.status as StatusType)}
-                      size="small"
-                      variant="outlined"
-                      sx={{ fontSize: '0.65rem', height: 20 }}
-                    />
-                  </TableCell>
-                  <TableCell align="center">
-                    <Chip
-                      label={rental.rentalType === 'NEW' ? 'Yeni' : 'Uzatma'}
-                      color={rental.rentalType === 'NEW' ? 'primary' : 'secondary'}
-                      size="small"
-                      variant="outlined"
-                      sx={{ fontSize: '0.65rem', height: 20 }}
-                    />
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {rental.description || '-'}
-                  </TableCell>
-                  <TableCell align="center">
-                    <Button
-                      size="small"
-                      startIcon={<EditIcon />}
-                      variant="outlined"
-                      sx={{ fontSize: '0.6rem', minWidth: 'auto', px: 1 }}
-                      onClick={() => handleEditRental(rental.id)}
-                    >
-                      Düzenle
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        {filteredRentals.length === 0 && (
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <Typography variant="body1" color="text.secondary">
-              {searchTerm ? 'Arama kriterinize uygun borçlu kiralama bulunamadı' : 'Herhangi bir borçlu kiralama bulunamadı'}
-            </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
           </Box>
         )}
+      </Box>
 
         {/* Edit Rental Modal */}
         <Dialog open={editModalOpen} onClose={handleCloseEdit} maxWidth="md" fullWidth>
-          <DialogTitle>
-            Kiralama Düzenle - {editingRental?.vehicle.plate} ({editingRental?.customer.firstName} {editingRental?.customer.lastName})
-          </DialogTitle>
-          <DialogContent>
+          <DialogHeader
+            title="Kiralamayı düzenle"
+            subtitle={<><Box component="span" sx={monoSx}>{editingRental?.vehicle.plate}</Box> · {editingRental?.customer.firstName} {editingRental?.customer.lastName}</>}
+            onClose={handleCloseEdit}
+          />
+          <DialogContent sx={{ px: { xs: 2.5, sm: 3 }, py: 3 }}>
             <Grid container spacing={2} sx={{ mt: 1 }}>
               {/* Dates */}
               <Grid item xs={6}>
@@ -1006,7 +852,7 @@ export const UnpaidDebtsDetail: React.FC = () => {
               {/* Ek Ödemeler Bölümü */}
               {editingRental && editingRental.extraPayments > 0 && (
                 <Grid item xs={12}>
-                  <Box sx={{ mt: 2, p: 2, bgcolor: 'info.50', borderRadius: 1, border: '1px solid', borderColor: 'info.200' }}>
+                  <Box sx={{ mt: 2, p: 2, bgcolor: a.surface, borderRadius: 1, border: '1px solid', borderColor: a.line }}>
                     <Typography variant="h6" color="info.main" sx={{ mb: 2 }}>
                       Ek Ödemeler
                     </Typography>
@@ -1042,7 +888,7 @@ export const UnpaidDebtsDetail: React.FC = () => {
 
               {/* Calculated Totals */}
               <Grid item xs={12}>
-                <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Box sx={{ mt: 2, p: 2, bgcolor: a.surface, borderRadius: 1 }}>
                   <Grid container spacing={2}>
                     <Grid item xs={4}>
                       <Typography variant="body2" color="text.secondary">
@@ -1053,12 +899,13 @@ export const UnpaidDebtsDetail: React.FC = () => {
                       <Typography variant="body2" color="text.secondary">
                         Toplam Ödenen: {formatCurrency(
                           (() => {
-                            // Sadece taksit ödemelerini hesapla
-                            return (editForm.advancePayment || 0) + 
-                                   editForm.payment1 + 
-                                   editForm.payment2 + 
-                                   editForm.payment3 + 
-                                   editForm.payment4;
+                            // Peşin + taksitler + plan dışı ek ödemeler
+                            return (editForm.advancePayment || 0) +
+                                   editForm.payment1 +
+                                   editForm.payment2 +
+                                   editForm.payment3 +
+                                   editForm.payment4 +
+                                   (editingRental?.extraPayments || 0);
                           })()
                         )}
                       </Typography>
@@ -1067,13 +914,14 @@ export const UnpaidDebtsDetail: React.FC = () => {
                       <Typography variant="body2" color="text.secondary" fontWeight="bold">
                         Bakiye: {formatCurrency(
                           (() => {
-                            // Toplam tutar - Sadece taksit ödemeleri
+                            // Toplam tutar - (peşin + taksitler + ek ödemeler)
                             const totalDue = editingRental?.totalAmount || 0;
-                            const totalPaid = (editForm.advancePayment || 0) + 
-                                            editForm.payment1 + 
-                                            editForm.payment2 + 
-                                            editForm.payment3 + 
-                                            editForm.payment4;
+                            const totalPaid = (editForm.advancePayment || 0) +
+                                            editForm.payment1 +
+                                            editForm.payment2 +
+                                            editForm.payment3 +
+                                            editForm.payment4 +
+                                            (editingRental?.extraPayments || 0);
                             
                             return totalDue - totalPaid;
                           })()
@@ -1085,15 +933,12 @@ export const UnpaidDebtsDetail: React.FC = () => {
               </Grid>
             </Grid>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseEdit}>İptal</Button>
-            <Button variant="contained" onClick={handleSaveEdit}>
-              Kaydet
-            </Button>
+          <DialogActions sx={{ px: { xs: 2.5, sm: 3 }, py: 2, gap: 1, borderTop: `1px solid ${a.lineSoft}` }}>
+            <Button variant="outlined" onClick={handleCloseEdit}>Vazgeç</Button>
+            <Button variant="contained" onClick={handleSaveEdit}>Değişiklikleri kaydet</Button>
           </DialogActions>
         </Dialog>
-      </Container>
-    </Layout>
+    </>
   );
 };
 

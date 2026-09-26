@@ -1,71 +1,60 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
+  Alert,
+  Avatar,
   Box,
   Button,
-  Typography,
-  Paper,
-  Grid,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  TextField,
-  InputAdornment,
-  Stack,
   Dialog,
-  DialogTitle,
-  DialogContent,
   DialogActions,
-  Alert,
-  Chip,
-  Avatar,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Stack,
+  TextField,
+  Typography,
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Search as SearchIcon,
-  Person as PersonIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Close as CloseIcon,
-} from '@mui/icons-material';
+import { Add as AddIcon, Close as CloseIcon, DeleteOutline, EditOutlined, PeopleAltOutlined } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import Layout from '../components/Layout';
 import { customersApi, Customer } from '../api/client';
+import { maskPhone } from '../utils/privacy';
+import { a, monoSx } from '../admin/theme';
+import {
+  ConfirmDialog,
+  DataTable,
+  EmptyState,
+  FilterTabs,
+  PageHeader,
+  RowActions,
+  SearchField,
+  StatusBadge,
+  Toolbar,
+  panelSx,
+} from '../admin/ui';
+
+type Segment = 'ALL' | 'ACTIVE' | 'NONE';
+
+// Müşteri kaydı yalnızca ad soyad ve telefon tutar.
+const emptyForm = { fullName: '', phone: '' };
 
 export default function Customers() {
   const queryClient = useQueryClient();
-  
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [customerDialog, setCustomerDialog] = useState<{
-    open: boolean;
-    customer?: Customer;
-    mode: 'create' | 'edit';
-  }>({ open: false, mode: 'create' });
-  
-  const [formData, setFormData] = useState({
-    fullName: '',
-    phone: '',
-    email: '',
-    address: '',
-    identityNumber: '',
-  });
-  
+  const [segment, setSegment] = useState<Segment>('ALL');
+  const [customerDialog, setCustomerDialog] = useState<{ open: boolean; customer?: Customer; mode: 'create' | 'edit' }>({ open: false, mode: 'create' });
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [formData, setFormData] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Fetch customers
-  const { data: customersRes, isLoading } = useQuery({
+  const { data: customersRes, isLoading, isError } = useQuery({
     queryKey: ['customers', searchTerm],
     queryFn: () => customersApi.getAll(searchTerm || undefined, 1000),
     staleTime: 30 * 1000,
   });
 
-  const customers = customersRes?.data?.data || [];
+  const customers: Customer[] = customersRes?.data?.data || [];
 
-  // Create customer mutation
   const createCustomerMutation = useMutation({
     mutationFn: customersApi.create,
     onSuccess: () => {
@@ -77,12 +66,13 @@ export default function Customers() {
     },
   });
 
-  // Update customer mutation
   const updateCustomerMutation = useMutation({
-    mutationFn: ({ id, ...data }: { id: string } & Partial<Customer>) =>
-      customersApi.update(id, data),
+    mutationFn: ({ id, ...data }: { id: string } & Partial<Customer>) => customersApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['rentals'] });
+      queryClient.invalidateQueries({ queryKey: ['all-rentals'] });
+      queryClient.invalidateQueries({ queryKey: ['active-rentals'] });
       handleCloseDialog();
     },
     onError: (error: any) => {
@@ -90,271 +80,190 @@ export default function Customers() {
     },
   });
 
-  // Delete customer mutation
   const deleteCustomerMutation = useMutation({
     mutationFn: customersApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
-    },
-    onError: (error: any) => {
-      alert(error.response?.data?.error || 'Müşteri silinirken hata oluştu');
+      setDeleteTarget(null);
     },
   });
 
   const handleOpenDialog = (mode: 'create' | 'edit', customer?: Customer) => {
     setCustomerDialog({ open: true, mode, customer });
-    if (mode === 'edit' && customer) {
-      setFormData({
-        fullName: customer.fullName,
-        phone: customer.phone || '',
-        email: customer.email || '',
-        address: customer.address || '',
-        identityNumber: customer.identityNumber || '',
-      });
-    } else {
-      setFormData({
-        fullName: '',
-        phone: '',
-        email: '',
-        address: '',
-        identityNumber: '',
-      });
-    }
+    setFormData(mode === 'edit' && customer
+      ? { fullName: customer.fullName, phone: customer.phone || '' }
+      : emptyForm);
     setErrors({});
   };
 
   const handleCloseDialog = () => {
     setCustomerDialog({ open: false, mode: 'create' });
-    setFormData({
-      fullName: '',
-      phone: '',
-      email: '',
-      address: '',
-      identityNumber: '',
-    });
+    setFormData(emptyForm);
     setErrors({});
   };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = 'Ad soyad gereklidir';
-    }
-
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Geçerli bir email adresi giriniz';
-    }
-
+    if (!formData.fullName.trim()) newErrors.fullName = 'Ad soyad gereklidir';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
-
     try {
       if (customerDialog.mode === 'create') {
         await createCustomerMutation.mutateAsync(formData);
       } else if (customerDialog.customer) {
-        await updateCustomerMutation.mutateAsync({
-          id: customerDialog.customer.id,
-          ...formData,
-        });
+        await updateCustomerMutation.mutateAsync({ id: customerDialog.customer.id, ...formData });
       }
     } catch (error) {
       console.error('Submit error:', error);
     }
   };
 
-  const handleChange = (field: string) => (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: event.target.value,
-    }));
-    
-    if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: '',
-      }));
-    }
+  const handleChange = (field: keyof typeof emptyForm) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({ ...prev, [field]: event.target.value }));
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: '' }));
   };
 
+  const hasRentals = (customer: Customer) => (customer.rentalCount || 0) > 0;
+  const counts = useMemo(() => ({
+    ALL: customers.length,
+    ACTIVE: customers.filter(hasRentals).length,
+    NONE: customers.filter((customer) => !hasRentals(customer)).length,
+  }), [customers]);
+  const visible = customers.filter((customer) =>
+    segment === 'ALL' ? true : segment === 'ACTIVE' ? hasRentals(customer) : !hasRentals(customer),
+  );
+
+  const pending = createCustomerMutation.isPending || updateCustomerMutation.isPending;
+
+  const actionsFor = (customer: Customer) => [
+    { label: 'Düzenle', icon: <EditOutlined />, onClick: () => handleOpenDialog('edit', customer) },
+    { label: 'Sil', icon: <DeleteOutline />, danger: true, onClick: () => { deleteCustomerMutation.reset(); setDeleteTarget(customer); } },
+  ];
+
+  const avatar = (customer: Customer, size = 34) => (
+    <Avatar sx={{ width: size, height: size, bgcolor: a.accentSoft, color: a.accent, fontSize: size * 0.4, fontWeight: 800 }}>
+      {customer.fullName.charAt(0).toLocaleUpperCase('tr-TR')}
+    </Avatar>
+  );
+
   return (
-    <Layout>
-      <Box sx={{ p: 3 }}>
-        {/* Header */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <PersonIcon sx={{ color: 'primary.main' }} />
-            Müşteri Yönetimi
-          </Typography>
-          
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog('create')}
-            sx={{ minWidth: 160 }}
-          >
-            Yeni Müşteri
-          </Button>
-        </Box>
+    <>
+      <PageHeader
+        title="Müşteriler"
+        subtitle={`${customers.length} kayıtlı müşteri`}
+        actions={<Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog('create')}>Yeni müşteri</Button>}
+      />
 
-        {/* Search */}
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <TextField
-            fullWidth
-            placeholder="Müşteri ara (isim)..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
+      {isError && <Alert severity="error" sx={{ mb: 2 }}>Müşteriler yüklenemedi.</Alert>}
+
+      <Box sx={panelSx}>
+        <Toolbar>
+          <FilterTabs
+            label="Müşteri grubu"
+            value={segment}
+            onChange={setSegment}
+            options={[
+              { value: 'ALL', label: 'Tümü', count: counts.ALL },
+              { value: 'ACTIVE', label: 'Kiralama yapanlar', count: counts.ACTIVE },
+              { value: 'NONE', label: 'Hiç kiralamayanlar', count: counts.NONE },
+            ]}
           />
-        </Paper>
+          <Box sx={{ flex: 1 }} />
+          <SearchField value={searchTerm} onChange={setSearchTerm} placeholder="İsimle ara" sx={{ width: { xs: '100%', sm: 240 } }} />
+        </Toolbar>
 
-        {/* Customers Table */}
-        <Paper sx={{ overflow: 'hidden' }}>
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Müşteri Adı</TableCell>
-                  <TableCell>Kiralama Sayısı</TableCell>
-                  <TableCell>Kayıt Tarihi</TableCell>
-                  <TableCell align="right">İşlemler</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} align="center">
-                      Yükleniyor...
-                    </TableCell>
-                  </TableRow>
-                ) : customers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} align="center">
-                      {searchTerm ? 'Arama kriterinize uygun müşteri bulunamadı' : 'Henüz müşteri kaydı yok'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  customers.map((customer) => (
-                    <TableRow key={customer.id} hover>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Avatar sx={{ bgcolor: 'primary.main' }}>
-                            {customer.fullName.charAt(0).toUpperCase()}
-                          </Avatar>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                            {customer.fullName}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      
-                      <TableCell>
-                        <Chip 
-                          label={`${customer.rentalCount || 0} kiralama`}
-                          size="small"
-                          color={customer.rentalCount && customer.rentalCount > 0 ? 'success' : 'default'}
-                        />
-                      </TableCell>
-                      
-                      <TableCell>
-                        <Typography variant="body2">
-                          {new Date(customer.createdAt).toLocaleDateString('tr-TR')}
-                        </Typography>
-                      </TableCell>
-                      
-                      <TableCell align="right">
-                        <Stack direction="row" spacing={1}>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleOpenDialog('edit', customer)}
-                            color="primary"
-                          >
-                            <EditIcon />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            onClick={() => {
-                              if (confirm(`${customer.fullName} müşterisini silmek istediğinizden emin misiniz?`)) {
-                                deleteCustomerMutation.mutate(customer.id);
-                              }
-                            }}
-                            color="error"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-
-        {/* Customer Create/Edit Dialog */}
-        <Dialog 
-          open={customerDialog.open} 
-          onClose={handleCloseDialog}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              {customerDialog.mode === 'create' ? 'Yeni Müşteri Ekle' : 'Müşteri Düzenle'}
-              <IconButton onClick={handleCloseDialog} size="small">
-                <CloseIcon />
-              </IconButton>
-            </Box>
-          </DialogTitle>
-          
-          <DialogContent>
-            {errors.submit && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {errors.submit}
-              </Alert>
-            )}
-            
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Ad Soyad *"
-                  value={formData.fullName}
-                  onChange={handleChange('fullName')}
-                  error={!!errors.fullName}
-                  helperText={errors.fullName}
-                />
-              </Grid>
-              
-            </Grid>
-          </DialogContent>
-          
-          <DialogActions>
-            <Button onClick={handleCloseDialog}>
-              İptal
-            </Button>
-            <Button 
-              variant="contained" 
-              onClick={handleSubmit}
-              disabled={createCustomerMutation.isPending || updateCustomerMutation.isPending}
-            >
-              {customerDialog.mode === 'create' ? 'Oluştur' : 'Güncelle'}
-            </Button>
-          </DialogActions>
-        </Dialog>
+        <DataTable
+          rows={visible}
+          rowKey={(customer) => customer.id}
+          loading={isLoading}
+          onRowClick={(customer) => handleOpenDialog('edit', customer)}
+          empty={
+            <EmptyState
+              icon={<PeopleAltOutlined />}
+              title={searchTerm ? 'Aramaya uygun müşteri yok' : 'Henüz müşteri kaydı yok'}
+              subtitle={searchTerm ? 'Farklı bir isim deneyin.' : 'Kiralama oluştururken de müşteri ekleyebilirsiniz.'}
+            />
+          }
+          columns={[
+            {
+              key: 'name',
+              header: 'Müşteri',
+              render: (customer) => (
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  {avatar(customer)}
+                  <Typography noWrap sx={{ fontWeight: 700, fontSize: 14, minWidth: 0 }}>{customer.fullName}</Typography>
+                </Stack>
+              ),
+            },
+            { key: 'phone', header: 'Telefon', hideBelow: 'sm', render: (customer) => <Box component="span" sx={{ ...monoSx, fontSize: 13 }}>{maskPhone(customer.phone)}</Box> },
+            {
+              key: 'rentals',
+              header: 'Kiralama',
+              render: (customer) => (customer.rentalCount || 0) > 0
+                ? <StatusBadge label={`${customer.rentalCount} kiralama`} tone="success" />
+                : <StatusBadge label="Henüz yok" tone="neutral" />,
+            },
+            { key: 'actions', header: '', align: 'right', width: 56, render: (customer) => <RowActions items={actionsFor(customer)} /> },
+          ]}
+          mobileRow={(customer) => (
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              {avatar(customer, 38)}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography noWrap sx={{ fontWeight: 700, fontSize: 14.5 }}>{customer.fullName}</Typography>
+                <Typography sx={{ ...monoSx, fontSize: 12.5, color: a.muted }}>{maskPhone(customer.phone)} · {customer.rentalCount || 0} kiralama</Typography>
+              </Box>
+              <RowActions items={actionsFor(customer)} />
+            </Stack>
+          )}
+        />
       </Box>
-    </Layout>
+
+      <Dialog open={customerDialog.open} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
+          {customerDialog.mode === 'create' ? 'Yeni müşteri' : 'Müşteriyi düzenle'}
+          <IconButton onClick={handleCloseDialog} size="small" aria-label="Kapat"><CloseIcon fontSize="small" /></IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {errors.submit && <Alert severity="error" sx={{ mb: 2 }}>{errors.submit}</Alert>}
+          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, pt: 1 }}>
+            <TextField
+              fullWidth
+              autoFocus
+              label="Ad soyad"
+              required
+              value={formData.fullName}
+              onChange={handleChange('fullName')}
+              error={!!errors.fullName}
+              helperText={errors.fullName}
+              sx={{ gridColumn: '1 / -1' }}
+            />
+            <TextField fullWidth label="Telefon" type="tel" placeholder="05xx xxx xx xx" value={formData.phone} onChange={handleChange('phone')} sx={{ gridColumn: '1 / -1' }} />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button variant="outlined" onClick={handleCloseDialog}>Vazgeç</Button>
+          <Button variant="contained" onClick={handleSubmit} disabled={pending}>
+            {pending ? 'Kaydediliyor…' : customerDialog.mode === 'create' ? 'Müşteri ekle' : 'Kaydet'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        danger
+        title="Müşteriyi sil"
+        body={<><strong>{deleteTarget?.fullName}</strong> kaydı silinecek. Kiralama geçmişi olan müşteriler güvenlik nedeniyle silinemez.</>}
+        confirmLabel="Sil"
+        pendingLabel="Siliniyor…"
+        pending={deleteCustomerMutation.isPending}
+        error={deleteCustomerMutation.isError ? (deleteCustomerMutation.error as any)?.response?.data?.error || 'Müşteri silinemedi.' : undefined}
+        onConfirm={() => deleteTarget && deleteCustomerMutation.mutate(deleteTarget.id)}
+        onClose={() => setDeleteTarget(null)}
+      />
+    </>
   );
 }

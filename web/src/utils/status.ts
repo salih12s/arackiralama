@@ -1,10 +1,13 @@
 export type RentalStatus = 'ACTIVE' | 'RETURNED' | 'COMPLETED' | 'CANCELLED';
 export type VehicleStatus = 'IDLE' | 'RENTED' | 'RESERVED' | 'SERVICE';
-export type StatusType = RentalStatus | VehicleStatus;
+export type ReservationStatus = 'PENDING' | 'CONFIRMED';
+export type StatusType = RentalStatus | VehicleStatus | ReservationStatus;
 
 export const getStatusColor = (status: StatusType): 'primary' | 'success' | 'error' | 'warning' | 'default' | 'info' => {
   switch (status) {
     case 'ACTIVE': return 'primary';
+    case 'PENDING': return 'warning';
+    case 'CONFIRMED': return 'success';
     case 'RENTED': return 'primary';
     case 'COMPLETED': return 'success';
     case 'RETURNED': return 'success';
@@ -18,14 +21,16 @@ export const getStatusColor = (status: StatusType): 'primary' | 'success' | 'err
 
 export const getStatusText = (status: StatusType): string => {
   switch (status) {
-    case 'ACTIVE': return 'KIRADA';
+    case 'ACTIVE': return 'Kirada';
+    case 'PENDING': return 'Bekliyor';
+    case 'CONFIRMED': return 'Onaylandı';
     case 'RENTED': return 'Kirada';
-    case 'COMPLETED': return 'TESLİM EDİLDİ';
-    case 'RETURNED': return 'TESLİM EDİLDİ';
+    case 'COMPLETED': return 'Teslim Edildi';
+    case 'RETURNED': return 'Teslim Edildi';
     case 'IDLE': return 'Boşta';
-    case 'CANCELLED': return 'İPTAL';
+    case 'CANCELLED': return 'İptal';
     case 'SERVICE': return 'Serviste';
-    case 'RESERVED': return 'REZERVE';
+    case 'RESERVED': return 'Rezerve';
     default: return status;
   }
 };

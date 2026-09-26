@@ -1,454 +1,232 @@
-import { useState, useMemo } from 'react';
-import {
-  Box,
-  Typography,
-  Paper,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Alert,
-  LinearProgress,
-  Button
-} from '@mui/material';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useMemo, useState } from 'react';
+import { Alert, Box, Button, IconButton, MenuItem, Skeleton, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import { DownloadOutlined, Refresh } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import Layout from '../components/Layout';
 import { rentalsApi } from '../api/rentals';
 import { formatCurrency } from '../utils/currency';
+import { a, ease, monoSx } from '../admin/theme';
+import { DataTable, EmptyState, KpiTile, Money, PageHeader, Panel, Plate, Sub } from '../admin/ui';
+import { FleetBar, RevenueChart } from '../admin/charts';
 
-interface MonthlyVehicleRevenue {
-  vehicleId: string;
-  vehiclePlate: string;
-  vehicleName: string;
-  monthlyData: {
-    month: string;
-    revenue: number;
-  }[];
-}
+const monthNames = [
+  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
+];
+
+const ALL_MONTHS = 'Tüm Aylar';
+
+/** Durum dağılımı: doğrulanmış palet (bordo, yeşil, bal, gri). */
+const statusMeta: Record<string, { label: string; color: string }> = {
+  ACTIVE: { label: 'Kirada', color: '#9B2F45' },
+  COMPLETED: { label: 'Tamamlandı', color: '#3F8A5A' },
+  RETURNED: { label: 'Teslim alındı', color: '#D4914A' },
+  CANCELLED: { label: 'İptal', color: '#968984' },
+};
+
+const calculatePaid = (rental: any) => {
+  const legacyPayments = (rental.upfront || 0) + (rental.pay1 || 0) + (rental.pay2 || 0) + (rental.pay3 || 0) + (rental.pay4 || 0);
+  const additionalPayments = (rental.payments || []).reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0);
+  return legacyPayments + additionalPayments;
+};
 
 export default function Reports() {
-  const [selectedYear, setSelectedYear] = useState(2025);
-  const [selectedMonth, setSelectedMonth] = useState('Tüm Aylar');
+  const currentYear = dayjs().year();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState<string | number>(ALL_MONTHS);
 
-  const monthNames = [
-    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
-  ];
-
-  // Fetch all rentals
-  const { data: allRentalsData, isLoading: rentalsLoading, error: rentalsError } = useQuery({
+  const rentalsQuery = useQuery({
     queryKey: ['all-rentals-revenue-analysis'],
-    queryFn: async () => {
-      console.log('🔄 Fetching revenue analysis rentals...');
-      try {
-        const result = await rentalsApi.getAll({ 
-          limit: 10000,
-          page: 1
-        });
-        console.log('📋 Revenue analysis API response:', result);
-        console.log('📋 Rentals data:', result?.data || []);
-        return result;
-      } catch (error) {
-        console.error('❌ Error fetching rentals:', error);
-        throw error;
-      }
-    },
-    staleTime: 1 * 60 * 1000,
-    gcTime: 2 * 60 * 1000,
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
+    queryFn: () => rentalsApi.getAll({ limit: 10_000, page: 1 }),
+    staleTime: 60_000,
+    gcTime: 120_000,
   });
 
-  const rentals = allRentalsData?.data || [];
-  
-  console.log('🔍 Rentals for analysis:', rentals);
-  console.log('📊 Total rentals count:', rentals.length);
+  const rentals = rentalsQuery.data?.data || [];
 
-  // Calculate daily revenue for each rental day and distribute across months
-  const calculateDailyRevenue = (rental: any) => {
-    console.log('💰 Calculating revenue for rental:', rental.id);
-    
-    if (!rental.startDate || !rental.endDate) {
-      console.log('⚠️ Missing dates for rental:', rental.id);
-      return [];
-    }
-    
-    const startDate = dayjs(rental.startDate).startOf('day'); // Saati 00:00:00 yap
-    const endDate = dayjs(rental.endDate).startOf('day'); // Saati 00:00:00 yap  
-    const totalDays = endDate.diff(startDate, 'days'); // +1 çünkü başlangıç günü de dahil
-    
-    console.log(`📅 Rental ${rental.id}: ${totalDays} days from ${startDate.format('YYYY-MM-DD')} to ${endDate.format('YYYY-MM-DD')}`);
-    
-    // Calculate total revenue (daily price + km price)
-    const dailyPrice = rental.dailyPrice || 0; // Backend sends in kuruş
-    const kmPrice = rental.kmDiff || 0; // Backend sends in kuruş
-    const totalRevenue = (dailyPrice * totalDays) + kmPrice; // Already in kuruş from backend
-    const dailyRevenue = totalRevenue / totalDays;
+  const yearRentals = useMemo(
+    () => rentals.filter((rental: any) => dayjs(rental.startDate).year() === selectedYear),
+    [rentals, selectedYear],
+  );
 
-    console.log(`💰 Rental ${rental.id} revenue: ${totalRevenue} kuruş (daily: ${dailyPrice}, km: ${kmPrice}, daily avg: ${dailyRevenue})`);
+  const periodRentals = useMemo(() => {
+    if (selectedMonth === ALL_MONTHS) return yearRentals;
+    return yearRentals.filter((rental: any) => dayjs(rental.startDate).month() + 1 === Number(selectedMonth));
+  }, [yearRentals, selectedMonth]);
 
-    const dailyRevenueData: { date: string; revenue: number; vehicleId: string; vehiclePlate: string; vehicleName: string }[] = [];
-    
-    for (let i = 0; i < totalDays; i++) {
-      const currentDate = startDate.add(i, 'days');
-      dailyRevenueData.push({
-        date: currentDate.format('YYYY-MM-DD'),
-        revenue: dailyRevenue,
-        vehicleId: rental.vehicle?.id || 'unknown',
-        vehiclePlate: rental.vehicle?.plate || 'Bilinmeyen',
-        vehicleName: `${rental.vehicle?.brand || ''} ${rental.vehicle?.model || ''}`.trim() || 'Bilinmeyen'
-      });
-    }
-    
-    return dailyRevenueData;
+  const monthlyData = useMemo(() => monthNames.map((month, index) => {
+    const items = yearRentals.filter((rental: any) => dayjs(rental.startDate).month() === index);
+    const billed = items.reduce((sum: number, rental: any) => sum + (rental.totalDue || 0), 0);
+    const collected = items.reduce((sum: number, rental: any) => sum + calculatePaid(rental), 0);
+    return { month, label: month.slice(0, 3), billed, collected, rentals: items.length };
+  }), [yearRentals]);
+
+  const summary = useMemo(() => {
+    const billed = periodRentals.reduce((sum: number, rental: any) => sum + (rental.totalDue || 0), 0);
+    const collected = periodRentals.reduce((sum: number, rental: any) => sum + calculatePaid(rental), 0);
+    const outstanding = periodRentals.reduce((sum: number, rental: any) => sum + Math.max((rental.totalDue || 0) - calculatePaid(rental), 0), 0);
+    const completed = periodRentals.filter((rental: any) => ['COMPLETED', 'RETURNED'].includes(rental.status)).length;
+    return {
+      billed,
+      collected,
+      outstanding,
+      count: periodRentals.length,
+      completed,
+      average: periodRentals.length ? billed / periodRentals.length : 0,
+      collectionRate: billed > 0 ? Math.min((collected / billed) * 100, 100) : 0,
+    };
+  }, [periodRentals]);
+
+  const vehicleData = useMemo(() => {
+    const map = new Map<string, { key: string; plate: string; name: string; billed: number; collected: number; rentals: number }>();
+    periodRentals.forEach((rental: any) => {
+      const key = rental.vehicle?.id || rental.vehicleId || 'unknown';
+      const current = map.get(key) || {
+        key,
+        plate: rental.vehicle?.plate || 'Plakasız',
+        name: rental.vehicle?.name || [rental.vehicle?.brand, rental.vehicle?.model].filter(Boolean).join(' ') || 'Araç',
+        billed: 0,
+        collected: 0,
+        rentals: 0,
+      };
+      current.billed += rental.totalDue || 0;
+      current.collected += calculatePaid(rental);
+      current.rentals += 1;
+      map.set(key, current);
+    });
+    return Array.from(map.values()).sort((x, y) => y.billed - x.billed);
+  }, [periodRentals]);
+
+  const statusSegments = useMemo(() => {
+    const counts = new Map<string, number>();
+    periodRentals.forEach((rental: any) => counts.set(rental.status, (counts.get(rental.status) || 0) + 1));
+    return Object.entries(statusMeta).map(([key, meta]) => ({ key, label: meta.label, color: meta.color, value: counts.get(key) || 0 }));
+  }, [periodRentals]);
+
+  const bestMonth = monthlyData.reduce((best, month) => (month.billed > best.billed ? month : best), monthlyData[0]);
+  const topBilled = vehicleData[0]?.billed || 0;
+
+  const exportCsv = () => {
+    const rows = [
+      ['Plaka', 'Araç', 'Kiralama Sayısı', 'Faturalanan', 'Tahsil Edilen', 'Kalan'],
+      ...vehicleData.map((vehicle) => [
+        vehicle.plate,
+        vehicle.name,
+        vehicle.rentals,
+        vehicle.billed.toFixed(2),
+        vehicle.collected.toFixed(2),
+        Math.max(vehicle.billed - vehicle.collected, 0).toFixed(2),
+      ]),
+    ];
+    const csv = `﻿${rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(';')).join('\n')}`;
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `arac-raporu-${selectedYear}-${selectedMonth}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
-  // Process all rental data and calculate monthly revenues
-  const { monthlyVehicleRevenues } = useMemo(() => {
-    console.log('🔄 Processing rentals data...', rentals);
-    
-    if (!rentals || rentals.length === 0) {
-      console.log('⚠️ No rentals data available');
-      return { monthlyVehicleRevenues: [], monthlyTotalRevenues: [] };
-    }
-
-    const vehicleRevenueMap = new Map<string, MonthlyVehicleRevenue>();
-    const monthlyTotalMap = new Map<string, number>();
-
-    // Process each rental
-    rentals.forEach((rental: any, index: number) => {
-      console.log(`📋 Processing rental ${index + 1}:`, {
-        id: rental.id,
-        startDate: rental.startDate,
-        endDate: rental.endDate,
-        dailyPrice: rental.dailyPrice,
-        kmPrice: rental.kmPrice,
-        vehicle: rental.vehicle
-      });
-      
-      const dailyData = calculateDailyRevenue(rental);
-      console.log(`💰 Daily data for rental ${rental.id}:`, dailyData);
-      
-      dailyData.forEach(({ date, revenue, vehicleId, vehiclePlate, vehicleName }) => {
-        const monthKey = dayjs(date).format('YYYY-MM');
-        
-        // Initialize vehicle revenue data if not exists
-        if (!vehicleRevenueMap.has(vehicleId)) {
-          vehicleRevenueMap.set(vehicleId, {
-            vehicleId,
-            vehiclePlate,
-            vehicleName,
-            monthlyData: []
-          });
-        }
-        
-        const vehicleRevenue = vehicleRevenueMap.get(vehicleId)!;
-        const existingMonth = vehicleRevenue.monthlyData.find(m => m.month === monthKey);
-        
-        if (existingMonth) {
-          existingMonth.revenue += revenue;
-        } else {
-          vehicleRevenue.monthlyData.push({
-            month: monthKey,
-            revenue: revenue
-          });
-        }
-        
-        // Add to total monthly revenue
-        monthlyTotalMap.set(monthKey, (monthlyTotalMap.get(monthKey) || 0) + revenue);
-      });
-    });
-
-    // Convert to arrays and sort
-    const vehicleRevenues = Array.from(vehicleRevenueMap.values());
-    const totalRevenues = Array.from(monthlyTotalMap.entries())
-      .map(([month, totalRevenue]) => ({
-        month,
-        totalRevenue
-      }))
-      .sort((a, b) => a.month.localeCompare(b.month));
-
-    console.log('📊 Final vehicle revenues:', vehicleRevenues);
-    console.log('📊 Final total revenues:', totalRevenues);
-
-    return { monthlyVehicleRevenues: vehicleRevenues };
-  }, [rentals]);
-
-  // Filter data based on selected year and month (for second chart only)
-  const filteredVehicleData = useMemo(() => {
-    return monthlyVehicleRevenues.map(vehicle => ({
-      ...vehicle,
-      monthlyData: vehicle.monthlyData.filter(data => {
-        const dataYear = parseInt(data.month.split('-')[0]);
-        return dataYear === selectedYear; // Only filter by year, show all months
-      })
-    })).filter(vehicle => vehicle.monthlyData.length > 0);
-  }, [monthlyVehicleRevenues, selectedYear]);
-
-  // Prepare chart data for monthly total revenues (first chart)
-  const monthlyTotalChartData = useMemo(() => {
-    // Create 12 months for selected year
-    const months = [];
-    for (let i = 1; i <= 12; i++) {
-      const monthKey = `${selectedYear}-${String(i).padStart(2, '0')}`;
-      const monthName = monthNames[i - 1];
-      
-      // Calculate total revenue for this month from all vehicles
-      let totalRevenue = 0;
-      
-      filteredVehicleData.forEach(vehicle => {
-        const monthData = vehicle.monthlyData.find(data => data.month === monthKey);
-        if (monthData) {
-          totalRevenue += monthData.revenue;
-        }
-      });
-      
-      months.push({
-        month: monthName,
-        monthKey: monthKey,
-        totalRevenue: totalRevenue
-      });
-    }
-    
-    console.log('📊 Monthly total revenues:', months);
-    return months;
-  }, [filteredVehicleData, selectedYear, monthNames]);
-
-  // Prepare chart data for selected month vehicle revenues (second chart)
-  const monthlyVehicleChartData = useMemo(() => {
-    if (selectedMonth === 'Tüm Aylar') {
-      return [];
-    }
-
-    const targetMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-    console.log('🎯 Target month for vehicle chart:', targetMonth);
-
-    const vehicleRevenueForMonth: { plate: string; revenue: number; vehicleName: string }[] = [];
-
-    filteredVehicleData.forEach(vehicle => {
-      const monthData = vehicle.monthlyData.find(data => data.month === targetMonth);
-      if (monthData) {
-        vehicleRevenueForMonth.push({
-          plate: vehicle.vehiclePlate,
-          revenue: monthData.revenue,
-          vehicleName: vehicle.vehicleName
-        });
-      }
-    });
-
-    console.log('📊 Vehicle revenue for selected month:', vehicleRevenueForMonth);
-    return vehicleRevenueForMonth.sort((a, b) => b.revenue - a.revenue);
-  }, [filteredVehicleData, selectedYear, selectedMonth]);
-
-  if (rentalsError) {
-    return (
-      <Layout title="Detaylı Raporlar ve Analizler">
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 8 }}>
-          <Alert severity="error" sx={{ mb: 2 }}>
-            Veri yüklenirken hata oluştu.
-          </Alert>
-          <Button 
-            variant="contained" 
-            onClick={() => window.location.reload()}
-            sx={{ mt: 2 }}
-          >
-            Sayfayı Yenile
-          </Button>
-        </Box>
-      </Layout>
-    );
-  }
-
-  if (rentalsLoading) {
-    return (
-      <Layout title="Detaylı Raporlar ve Analizler">
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 8 }}>
-          <LinearProgress sx={{ width: '50%', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary">
-            Gelir analizi hazırlanıyor...
-          </Typography>
-        </Box>
-      </Layout>
-    );
-  }
+  const periodLabel = selectedMonth === ALL_MONTHS ? `${selectedYear} yılı` : `${monthNames[Number(selectedMonth) - 1]} ${selectedYear}`;
+  const loading = rentalsQuery.isLoading;
 
   return (
-    <Layout title="Detaylı Raporlar ve Analizler">
-      {/* Header */}
+    <>
+      <PageHeader
+        title="Raporlar"
+        subtitle={`${periodLabel} için gelir, tahsilat ve filo verimliliği`}
+        actions={
+          <>
+            <TextField select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))} inputProps={{ 'aria-label': 'Yıl' }} sx={{ minWidth: 96 }}>
+              {Array.from({ length: 7 }, (_, index) => currentYear - 3 + index).map((year) => <MenuItem key={year} value={year}>{year}</MenuItem>)}
+            </TextField>
+            <TextField select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} inputProps={{ 'aria-label': 'Dönem' }} sx={{ minWidth: 136 }}>
+              <MenuItem value={ALL_MONTHS}>Tüm aylar</MenuItem>
+              {monthNames.map((month, index) => <MenuItem key={month} value={index + 1}>{month}</MenuItem>)}
+            </TextField>
+            <Tooltip title="Yenile">
+              <IconButton onClick={() => rentalsQuery.refetch()} aria-label="Yenile" sx={{ border: `1px solid ${a.line}`, bgcolor: a.raised }}><Refresh fontSize="small" /></IconButton>
+            </Tooltip>
+            <Button variant="contained" startIcon={<DownloadOutlined />} onClick={exportCsv} disabled={loading}>CSV indir</Button>
+          </>
+        }
+      />
 
-      {/* Filter Controls */}
-      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 4 }}>
-        <Grid container spacing={{ xs: 2, sm: 3 }} alignItems="center">
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth>
-              <InputLabel sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Yıl Seçiniz</InputLabel>
-              <Select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
-                label="Yıl Seçiniz"
-                sx={{ 
-                  '& .MuiSelect-select': { 
-                    fontSize: { xs: '0.875rem', sm: '1rem' },
-                    py: { xs: 1.5, sm: 2 }
-                  }
-                }}
-              >
-                <MenuItem value={2024}>2024</MenuItem>
-                <MenuItem value={2025}>2025</MenuItem>
-                <MenuItem value={2026}>2026</MenuItem>
-                <MenuItem value={2027}>2027</MenuItem>
-                <MenuItem value={2028}>2028</MenuItem>
-                <MenuItem value={2029}>2029</MenuItem>
-                <MenuItem value={2030}>2030</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth>
-              <InputLabel sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Ay</InputLabel>
-              <Select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                label="Ay"
-                sx={{ 
-                  '& .MuiSelect-select': { 
-                    fontSize: { xs: '0.875rem', sm: '1rem' },
-                    py: { xs: 1.5, sm: 2 }
-                  }
-                }}
-              >
-                <MenuItem value="Tüm Aylar">Tüm Aylar</MenuItem>
-                {monthNames.map((month, index) => (
-                  <MenuItem key={index + 1} value={index + 1}>
-                    {month}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-        </Grid>
-      </Paper>
+      {rentalsQuery.isError && (
+        <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" onClick={() => rentalsQuery.refetch()}>Tekrar dene</Button>}>
+          Rapor verileri yüklenirken hata oluştu.
+        </Alert>
+      )}
 
-      {/* Monthly Total Revenue Chart */}
-      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 4 }}>
-        <Typography variant="h6" gutterBottom sx={{ 
-          fontWeight: 600, 
-          mb: 3,
-          fontSize: { xs: '1rem', sm: '1.25rem' }
-        }}>
-          📅 Aylık Toplam Gelir Analizi ({selectedYear})
-        </Typography>
-        
-        {monthlyTotalChartData.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 8 }}>
-            <Typography variant="h6" color="text.secondary" sx={{
-              fontSize: { xs: '1rem', sm: '1.25rem' }
-            }}>
-              {selectedYear} yılı için veri bulunamadı
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ 
-              mt: 1,
-              fontSize: { xs: '0.875rem', sm: '0.875rem' }
-            }}>
-              Seçilen yılda kiralama verisi bulunmuyor.
-            </Typography>
-          </Box>
-        ) : (
-          <Box sx={{ width: '100%', height: { xs: 250, sm: 300, md: 400 } }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart 
-                data={monthlyTotalChartData} 
-                margin={{ 
-                  top: 20, 
-                  right: 30, 
-                  left: 20, 
-                  bottom: 5 
-                }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis 
-                  tickFormatter={(value) => `${(value / 100000).toFixed(0)}K`}
-                  label={{ value: 'Kuruş', angle: -90, position: 'insideLeft' }}
-                />
-                <Tooltip 
-                  formatter={(value: number) => [formatCurrency(value), 'Toplam Gelir']}
-                  labelFormatter={(month) => `Ay: ${month}`}
-                />
-                <Bar 
-                  dataKey="totalRevenue" 
-                  fill="#4caf50"
-                  name="Aylık Toplam Gelir"
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </Box>
-        )}
-      </Paper>
+      <Box sx={{ display: 'grid', gap: 2, mb: 2, gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' } }}>
+        <KpiTile label="Faturalanan" loading={loading} value={formatCurrency(summary.billed)} meta={`${summary.count} kiralama`} />
+        <KpiTile label="Tahsil edilen" loading={loading} value={formatCurrency(summary.collected)} progress={summary.collectionRate / 100} meta={`%${summary.collectionRate.toFixed(1)} tahsilat oranı`} />
+        <KpiTile label="Bekleyen alacak" loading={loading} value={<Box component="span" sx={{ color: summary.outstanding > 0 ? a.danger : a.ink }}>{formatCurrency(summary.outstanding)}</Box>} meta={summary.outstanding > 0 ? 'Takip edilmesi gereken' : 'Bekleyen alacak yok'} />
+        <KpiTile label="Ortalama kiralama" loading={loading} value={formatCurrency(summary.average)} meta={`${summary.completed} tamamlanan işlem`} />
+      </Box>
 
-      {/* Vehicle Revenue by Plate Chart */}
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>
-          📊 Araç Bazında Aylık Gelirler
-          {selectedMonth !== 'Tüm Aylar' && (
-            <Typography variant="body2" color="text.secondary" component="span" sx={{ ml: 1 }}>
-              ({monthNames[Number(selectedMonth) - 1]} {selectedYear})
-            </Typography>
+      <Box sx={{ display: 'grid', gap: 2, mb: 2, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 2fr) minmax(0, 1fr)' }, alignItems: 'start' }}>
+        <Panel
+          title={`${selectedYear} aylık gelir`}
+          subtitle={bestMonth && bestMonth.billed > 0 ? `Kiralama başlangıcına göre · en güçlü ay ${bestMonth.month}` : 'Kiralama başlangıcına göre'}
+        >
+          {loading ? <Skeleton variant="rounded" height={280} /> : <RevenueChart data={monthlyData} height={260} />}
+        </Panel>
+
+        <Panel title="Kiralama durumları" subtitle={`${periodLabel} · ${summary.count} işlem`}>
+          {loading ? <Skeleton height={90} /> : summary.count === 0 ? (
+            <EmptyState compact title="Bu dönem için veri yok" />
+          ) : (
+            <FleetBar segments={statusSegments} />
           )}
-        </Typography>
-        
-        {selectedMonth === 'Tüm Aylar' ? (
-          <Box sx={{ textAlign: 'center', py: 8 }}>
-            <Typography variant="h6" color="text.secondary">
-              Araç bazında gelir analizi için lütfen bir ay seçin
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Yukarıdaki filtrelerden bir ay seçerek o aya ait araç gelirlerini görüntüleyebilirsiniz.
-            </Typography>
-          </Box>
-        ) : monthlyVehicleChartData.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 8 }}>
-            <Typography variant="h6" color="text.secondary">
-              {selectedYear} yılının {monthNames[Number(selectedMonth) - 1]} ayı için araç gelir verisi bulunamadı
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Seçilen dönemde kiralama verisi bulunmuyor.
-            </Typography>
-          </Box>
-        ) : (
-          <Box sx={{ width: '100%', height: { xs: 250, sm: 300, md: 400 } }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyVehicleChartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }} barCategoryGap="40%">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="plate" 
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                  interval={0}
-                />
-                <YAxis 
-                  tickFormatter={(value) => `${(value / 100000).toFixed(0)}K`}
-                  label={{ value: 'Kuruş', angle: -90, position: 'insideLeft' }}
-                />
-                <Tooltip 
-                  formatter={(value: number) => [formatCurrency(value), 'Gelir']}
-                  labelFormatter={(plate) => `Araç: ${plate}`}
-                />
-                <Bar 
-                  dataKey="revenue" 
-                  fill="#4caf50"
-                  name="Aylık Gelir"
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </Box>
-        )}
-      </Paper>
-    </Layout>
+        </Panel>
+      </Box>
+
+      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 5fr) minmax(0, 7fr)' }, alignItems: 'start' }}>
+        <Panel title="Araç gelir sıralaması" subtitle="Seçili dönemde en yüksek ciro" padded={false}>
+          {loading ? <Box sx={{ p: 2.5 }}><Skeleton height={200} /></Box> : vehicleData.length === 0 ? (
+            <EmptyState compact title="Seçili dönemde veri yok" />
+          ) : (
+            <Box component="ol" sx={{ listStyle: 'none', m: 0, p: 0, pb: 1 }}>
+              {vehicleData.slice(0, 7).map((vehicle, index) => (
+                <Box component="li" key={vehicle.key} sx={{ display: 'grid', gridTemplateColumns: '24px 96px minmax(0, 1fr) auto', alignItems: 'center', columnGap: 1.5, px: 2.5, py: 1.1 }}>
+                  <Typography sx={{ ...monoSx, fontSize: 12, color: a.subtle }}>{index + 1}</Typography>
+                  <Plate value={vehicle.plate} size="sm" />
+                  <Tooltip title={`${vehicle.name} · ${vehicle.rentals} kiralama`}>
+                    <Box aria-hidden sx={{ height: 10, borderRadius: '0 4px 4px 0', bgcolor: a.surface }}>
+                      <Box sx={{ height: '100%', width: `${topBilled ? (vehicle.billed / topBilled) * 100 : 0}%`, bgcolor: a.chart1, borderRadius: '0 4px 4px 0', transition: `width .6s ${ease}` }} />
+                    </Box>
+                  </Tooltip>
+                  <Typography sx={{ ...monoSx, fontSize: 12.5, fontWeight: 500, textAlign: 'right', minWidth: 96 }}>{formatCurrency(vehicle.billed)}</Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </Panel>
+
+        <Panel title="Araç performans tablosu" subtitle={`Gelir, tahsilat ve açık bakiye · ${vehicleData.length} araç`} padded={false}>
+          <DataTable
+            dense
+            rows={vehicleData.slice(0, 10)}
+            rowKey={(vehicle) => vehicle.key}
+            loading={loading}
+            empty={<EmptyState compact title="Seçili dönemde araç performans verisi yok" />}
+            columns={[
+              { key: 'vehicle', header: 'Araç', render: (vehicle) => <><Plate value={vehicle.plate} size="sm" /><Sub>{vehicle.name}</Sub></> },
+              { key: 'rentals', header: 'Kiralama', align: 'center', render: (vehicle) => <Box component="span" sx={monoSx}>{vehicle.rentals}</Box> },
+              { key: 'billed', header: 'Faturalanan', align: 'right', render: (vehicle) => <Money value={vehicle.billed} /> },
+              { key: 'collected', header: 'Tahsilat', align: 'right', hideBelow: 'sm', render: (vehicle) => <Money value={vehicle.collected} tone="success" /> },
+              { key: 'left', header: 'Kalan', align: 'right', render: (vehicle) => { const left = Math.max(vehicle.billed - vehicle.collected, 0); return <Money value={left} tone={left > 0 ? 'danger' : 'muted'} strong={left > 0} />; } },
+            ]}
+            mobileRow={(vehicle) => (
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Box><Plate value={vehicle.plate} size="sm" /><Sub>{vehicle.rentals} kiralama</Sub></Box>
+                <Box sx={{ textAlign: 'right' }}><Money value={vehicle.billed} /><Sub>Kalan {formatCurrency(Math.max(vehicle.billed - vehicle.collected, 0))}</Sub></Box>
+              </Stack>
+            )}
+          />
+        </Panel>
+      </Box>
+    </>
   );
 }

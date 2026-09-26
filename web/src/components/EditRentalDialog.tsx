@@ -1,24 +1,18 @@
 import { useState, useEffect } from 'react';
 import {
   Dialog,
-  DialogTitle,
   DialogContent,
   DialogActions,
   Button,
   TextField,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
   MenuItem,
   Typography,
   Box,
   Alert,
   Autocomplete,
-  IconButton,
-  Tooltip,
+  Skeleton,
+  Stack,
 } from '@mui/material';
-import { ArrowUpward } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -29,6 +23,8 @@ import dayjs, { Dayjs } from 'dayjs';
 import { vehiclesApi, rentalsApi, customersApi, Rental, Vehicle, Customer } from '../api/client';
 import { formatCurrency } from '../utils/currency';
 import { invalidateAllRentalCaches } from '../utils/cacheInvalidation';
+import { a, monoSx } from '../admin/theme';
+import { BalanceHero, DialogHeader, FormSection, SummaryPanel, SummaryRow, dialogBodySx, fieldGrid, moneyInputProps } from '../admin/dialogParts';
 
 const rentalSchema = z.object({
   vehicleId: z.string().min(1, 'Araç seçimi gereklidir'),
@@ -160,16 +156,6 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
   
   const totalPaidTRY = totalPaid + paidFromRental; // TL
   const balanceTRY = totalDueTRY - totalPaidTRY;
-  
-  console.log('🔧 EditRentalDialog calculations:', {
-    totalDueTRY,
-    totalPaid,
-    paidFromRental, 
-    totalPaidTRY,
-    balanceTRY,
-    paymentsCount: payments?.length,
-    currentRentalId: currentRental?.id
-  });
   
   // Borç tamamen kapanmış mı kontrolü
   const isDebtFullyPaid = balanceTRY <= 0;
@@ -318,14 +304,6 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
         payload.note = existingNote ? `ORIGINAL_TOTAL:${originalTotalInCents}|${existingNote}` : `ORIGINAL_TOTAL:${originalTotalInCents}`;
       }
       
-      console.log('🚀 Update Payload Debug (TL values):', {
-        totalAmount: data.totalAmount,
-        calculatedDailyPrice: data.totalAmount && data.days ? data.totalAmount / data.days : 0,
-        cleaning: payload.cleaning,
-        hgs: payload.hgs,
-        updatedEndDate: updatedEndDate.format('YYYY-MM-DD HH:mm')
-      });
-      
       return rentalsApi.update(rentalId!, payload);
     },
     onSuccess: () => {
@@ -345,382 +323,255 @@ export default function EditRentalDialog({ open, onClose, rental }: EditRentalDi
     onClose();
   };
 
+  const paperProps = { sx: { m: { xs: 1.5, sm: 3 }, width: { xs: 'calc(100% - 24px)', sm: 'calc(100% - 48px)' }, maxHeight: { xs: 'calc(100% - 24px)', sm: '92vh' } } };
+
   if (!rentalData) {
     return (
-      <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth>
-        <DialogContent>
-          <Typography>Kiralama bilgileri yükleniyor...</Typography>
+      <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth PaperProps={paperProps}>
+        <DialogHeader title="Kiralamayı düzenle" onClose={handleClose} />
+        <DialogContent sx={{ px: 3, py: 3 }}>
+          <Skeleton height={48} />
+          <Skeleton height={48} />
+          <Skeleton height={160} />
         </DialogContent>
       </Dialog>
     );
   }
 
-  return (
-    <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <DialogTitle>
-          Kiralama Düzenle - {rentalData?.vehicle?.plate || rentalData?.vehiclePlate || 'Bilinmeyen Araç'}
-        </DialogTitle>
-        <DialogContent>
-          {updateRentalMutation.isError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              Kiralama güncellenirken bir hata oluştu.
-            </Alert>
-          )}
-          
-          <Grid container spacing={2}>
-            {/* Vehicle Selection */}
-            <Grid item xs={12} md={6}>
-              <Controller
-                name="vehicleId"
-                control={control}
-                render={({ field }) => (
-                  <FormControl fullWidth margin="normal" error={!!errors.vehicleId}>
-                    <InputLabel>Araç</InputLabel>
-                    <Select
-                      {...field}
-                      label="Araç"
-                    >
-                      {Array.isArray(vehicles) ? vehicles.map((vehicle) => (
-                        <MenuItem key={vehicle.id} value={vehicle.id}>
-                          {vehicle.name || vehicle.plate} - {vehicle.plate}
-                        </MenuItem>
-                      )) : null}
-                    </Select>
-                  </FormControl>
-                )}
-              />
-            </Grid>
+  const selectedVehicle = Array.isArray(vehicles) ? vehicles.find((vehicle) => vehicle.id === watchedValues?.vehicleId) : undefined;
+  const extrasTRY = (watchedValues?.kmDiff || 0) + (watchedValues?.cleaning || 0) + (watchedValues?.hgs || 0) + (watchedValues?.damage || 0) + (watchedValues?.fuel || 0);
+  const dailyRateTRY = watchedValues?.days ? Math.round(((watchedValues?.totalAmount || 0) / watchedValues.days) / 10) * 10 : 0;
+  const plate = rentalData?.vehicle?.plate || rentalData?.vehiclePlate || 'Bilinmeyen araç';
 
-            {/* Customer Info */}
-            <Grid item xs={12} md={6}>
-              <Controller
-                name="customerName"
-                control={control}
-                render={({ field }) => (
-                  <Autocomplete<Customer, false, false, true>
-                    options={customers}
-                    getOptionLabel={(option) => 
-                      typeof option === 'string' ? option : option.fullName
-                    }
-                    freeSolo
-                    value={field.value}
-                    onChange={(_event, value) => {
-                      const name = typeof value === 'string' ? value : value?.fullName || '';
-                      field.onChange(name);
-                      // If customer is selected, populate phone field
-                      if (value && typeof value === 'object') {
-                        setValue('customerPhone', value.phone || '');
-                      }
-                    }}
-                    onInputChange={(_event, inputValue) => {
-                      field.onChange(inputValue);
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        fullWidth
-                        label="Müşteri Adı"
-                        margin="normal"
-                        error={!!errors.customerName}
-                        helperText={errors.customerName?.message}
-                        placeholder="Müşteri adı yazın veya seçin..."
+  // Ek ücret alanları: boş bırakılırsa 0
+  const extraField = (name: 'kmDiff' | 'cleaning' | 'hgs' | 'damage' | 'fuel', label: string) => (
+    <Controller
+      key={name}
+      name={name}
+      control={control}
+      render={({ field: formField }) => (
+        <TextField {...formField} fullWidth label={label} type="number" InputProps={moneyInputProps} onChange={(e) => formField.onChange(parseFloat(e.target.value) || 0)} />
+      )}
+    />
+  );
+
+  // Ödeme alanları: 0 boş görünür, silinebilir
+  const paymentField = (name: 'upfront' | 'pay1' | 'pay2' | 'pay3' | 'pay4', label: string) => (
+    <Controller
+      key={name}
+      name={name}
+      control={control}
+      render={({ field: formField }) => (
+        <TextField
+          {...formField}
+          value={formField.value === 0 ? '' : formField.value}
+          fullWidth
+          label={label}
+          type="number"
+          placeholder="0"
+          inputProps={{ step: 0.01 }}
+          InputProps={moneyInputProps}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value === '') {
+              formField.onChange('');
+            } else {
+              const numValue = parseFloat(value);
+              formField.onChange(isNaN(numValue) ? '' : numValue);
+            }
+          }}
+        />
+      )}
+    />
+  );
+
+  return (
+    <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth PaperProps={paperProps}>
+      <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'contents' }}>
+        <DialogHeader
+          title="Kiralamayı düzenle"
+          subtitle={<><Box component="span" sx={monoSx}>{plate}</Box>{rentalData?.customer?.fullName ? ` · ${rentalData.customer.fullName}` : ''}</>}
+          onClose={handleClose}
+          disabled={updateRentalMutation.isPending}
+        />
+
+        <DialogContent sx={{ px: { xs: 2.5, sm: 3 }, py: 3 }}>
+          {updateRentalMutation.isError && (
+            <Alert severity="error" sx={{ mb: 2.5 }}>Kiralama güncellenirken bir hata oluştu.</Alert>
+          )}
+
+          <Box sx={dialogBodySx}>
+            <Box sx={{ minWidth: 0 }}>
+              <FormSection step={1} title="Araç ve müşteri">
+                <Box sx={fieldGrid({ xs: 1, sm: 2 })}>
+                  <Controller
+                    name="vehicleId"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField {...field} value={field.value ?? ''} select fullWidth label="Araç" error={!!errors.vehicleId} helperText={errors.vehicleId?.message}>
+                        {Array.isArray(vehicles) ? vehicles.map((vehicle) => (
+                          <MenuItem key={vehicle.id} value={vehicle.id}>
+                            <Box component="span" sx={{ ...monoSx, mr: 1 }}>{vehicle.plate}</Box>
+                            {vehicle.name}
+                          </MenuItem>
+                        )) : null}
+                      </TextField>
+                    )}
+                  />
+                  <Controller
+                    name="customerName"
+                    control={control}
+                    render={({ field }) => (
+                      <Autocomplete<Customer, false, false, true>
+                        options={customers}
+                        getOptionLabel={(option) => (typeof option === 'string' ? option : option.fullName)}
+                        freeSolo
+                        value={field.value}
+                        onChange={(_event, value) => {
+                          field.onChange(typeof value === 'string' ? value : value?.fullName || '');
+                          // Listeden seçilirse telefonu da doldur
+                          if (value && typeof value === 'object') setValue('customerPhone', value.phone || '');
+                        }}
+                        onInputChange={(_event, inputValue) => field.onChange(inputValue)}
+                        renderInput={(params) => (
+                          <TextField {...params} fullWidth label="Müşteri" error={!!errors.customerName} helperText={errors.customerName?.message} />
+                        )}
+                        renderOption={(props, option) => (
+                          <Box component="li" {...props}>
+                            <Box>
+                              <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{typeof option === 'string' ? option : (option as Customer).fullName}</Typography>
+                              {typeof option === 'object' && (option as Customer).phone && (
+                                <Typography sx={{ fontSize: 12.5, color: a.muted, ...monoSx }}>{(option as Customer).phone}</Typography>
+                              )}
+                            </Box>
+                          </Box>
+                        )}
                       />
                     )}
-                    renderOption={(props, option) => (
-                      <Box component="li" {...props}>
-                        <Box>
-                          <Typography variant="body2">
-                            {typeof option === 'string' ? option : (option as Customer).fullName}
-                          </Typography>
-                          {typeof option === 'object' && (option as Customer).phone && (
-                            <Typography variant="caption" color="text.secondary">
-                              {(option as Customer).phone}
-                            </Typography>
-                          )}
-                        </Box>
-                      </Box>
+                  />
+                  <Controller
+                    name="customerPhone"
+                    control={control}
+                    defaultValue=""
+                    render={({ field }) => <TextField {...field} fullWidth label="Telefon" type="tel" placeholder="İsteğe bağlı" sx={{ gridColumn: { sm: '1 / -1' } }} />}
+                  />
+                </Box>
+              </FormSection>
+
+              <FormSection step={2} title="Tarih ve kira bedeli" hint="Gün değişince toplam, mevcut günlük ücrete göre yeniden hesaplanır">
+                <Box sx={fieldGrid({ xs: 1, sm: 2 })}>
+                  <DatePicker label="Başlangıç" value={startDate} onChange={handleStartDateChange} slotProps={{ textField: { fullWidth: true, size: 'small' } }} />
+                  <DatePicker label="Bitiş" value={endDate} onChange={handleEndDateChange} minDate={startDate || undefined} slotProps={{ textField: { fullWidth: true, size: 'small' } }} />
+                  <Controller
+                    name="days"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        label="Gün sayısı"
+                        type="number"
+                        onChange={(e) => handleDaysChange(parseInt(e.target.value) || 0)}
+                        error={!!errors.days}
+                        helperText={errors.days?.message}
+                      />
                     )}
                   />
-                )}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <Controller
-                name="customerPhone"
-                control={control}
-                defaultValue=""
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    label="Telefon (Opsiyonel)"
-                    margin="normal"
+                  <Controller
+                    name="totalAmount"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        value={field.value === 0 ? '' : field.value}
+                        fullWidth
+                        label="Kira bedeli (toplam)"
+                        type="number"
+                        inputProps={{ step: 10 }}
+                        InputProps={moneyInputProps}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '') {
+                            field.onChange('');
+                          } else {
+                            const numValue = parseFloat(value);
+                            field.onChange(isNaN(numValue) ? '' : numValue);
+                          }
+                        }}
+                        onBlur={(e) => field.onChange(Math.round((parseFloat(e.target.value) || 0) / 10) * 10)}
+                        error={!!errors.totalAmount}
+                        helperText={errors.totalAmount?.message || "10'a yuvarlanır"}
+                      />
+                    )}
                   />
-                )}
-              />
-            </Grid>
+                </Box>
+              </FormSection>
 
-            {/* Date Selection */}
-            <Grid item xs={12} md={6}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <DatePicker
-                  label="Başlangıç Tarihi"
-                  value={startDate}
-                  onChange={handleStartDateChange}
-                  sx={{ width: '100%', mt: 2, mb: 1 }}
-                />
-              </Box>
-            </Grid>
+              <FormSection step={3} title="Ek ücretler">
+                <Box sx={fieldGrid({ xs: 2, sm: 3, md: 5 })}>
+                  {extraField('kmDiff', 'KM farkı')}
+                  {extraField('cleaning', 'Temizlik')}
+                  {extraField('hgs', 'HGS')}
+                  {extraField('damage', 'Kaza / sürtme')}
+                  {extraField('fuel', 'Yakıt')}
+                </Box>
+              </FormSection>
 
-            <Grid item xs={12} md={3}>
-              <Controller
-                name="days"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    label="Gün Sayısı"
-                    type="number"
-                    margin="normal"
-                    onChange={(e) => {
-                      const newDays = parseInt(e.target.value) || 0;
-                      handleDaysChange(newDays);
-                    }}
-                    error={!!errors.days}
-                    helperText={errors.days?.message}
-                  />
-                )}
-              />
-            </Grid>
+              <FormSection step={4} title="Alınan ödemeler" hint="Peşin ve taksitler; plan dışı ödemeler özette listelenir">
+                <Box sx={fieldGrid({ xs: 2, sm: 3, md: 5 })}>
+                  {paymentField('upfront', 'Peşin')}
+                  {paymentField('pay1', '1. ödeme')}
+                  {paymentField('pay2', '2. ödeme')}
+                  {paymentField('pay3', '3. ödeme')}
+                  {paymentField('pay4', '4. ödeme')}
+                </Box>
+              </FormSection>
 
-            <Grid item xs={12} md={3}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <DatePicker
-                  label="Bitiş Tarihi"
-                  value={endDate}
-                  onChange={handleEndDateChange}
-                  sx={{ width: '100%', mt: 2, mb: 1 }}
-                  minDate={startDate || undefined}
-                />
-
-              </Box>
-            </Grid>
-
-            {/* Total Amount */}
-            <Grid item xs={12} md={6}>
-              <Controller
-                name="totalAmount"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    value={field.value === 0 ? '' : field.value}
-                    fullWidth
-                    label="Toplam Ödeme (TRY)"
-                    type="number"
-                    margin="normal"
-                    inputProps={{ 
-                      step: 10,
-                      min: undefined 
-                    }}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === '') {
-                        field.onChange('');
-                      } else {
-                        const numValue = parseFloat(value);
-                        field.onChange(isNaN(numValue) ? '' : numValue);
-                      }
-                    }}
-                    onBlur={(e) => {
-                      // Yuvarlama sistemi: 10'lara yuvarla
-                      const value = parseFloat(e.target.value) || 0;
-                      const roundedValue = Math.round(value / 10) * 10;
-                      field.onChange(roundedValue);
-                    }}
-                    error={!!errors.totalAmount}
-                    helperText={errors.totalAmount?.message || "Otomatik olarak 10'lara yuvarlanır"}
-                  />
-                )}
-              />
-            </Grid>
-
-            {/* Additional Costs */}
-            <Grid item xs={12}>
-              <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
-                Ek Ücretler (TRY)
-              </Typography>
-            </Grid>
-
-            {[
-              { name: 'kmDiff' as const, label: 'KM Farkı' },
-              { name: 'cleaning' as const, label: 'Temizlik' },
-              { name: 'hgs' as const, label: 'HGS' },
-              { name: 'damage' as const, label: 'Kaza/Sürtme' },
-              { name: 'fuel' as const, label: 'Yakıt Bedeli' },
-            ].map((field) => (
-              <Grid item xs={6} md={2.4} key={field.name}>
+              <FormSection step={5} title="Not">
                 <Controller
-                  name={field.name}
+                  name="note"
                   control={control}
-                  render={({ field: formField }) => (
-                    <TextField
-                      {...formField}
-                      fullWidth
-                      label={field.label}
-                      type="number"
-                      margin="normal"
-                      onChange={(e) => formField.onChange(parseFloat(e.target.value) || 0)}
-                    />
-                  )}
+                  defaultValue=""
+                  render={({ field }) => <TextField {...field} fullWidth multiline minRows={2} placeholder="İsteğe bağlı açıklama" />}
                 />
-              </Grid>
-            ))}
+              </FormSection>
+            </Box>
 
-            {/* Payments */}
-            <Grid item xs={12}>
-              <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
-                Ödemeler (TRY)
-              </Typography>
-            </Grid>
+            <SummaryPanel>
+              <SummaryRow label="Araç" mono={false} value={selectedVehicle ? <><Box component="span" sx={monoSx}>{selectedVehicle.plate}</Box> · {selectedVehicle.name}</> : '—'} />
+              <SummaryRow label="Müşteri" mono={false} value={watchedValues?.customerName || '—'} />
+              <SummaryRow label="Tarih" value={startDate && endDate ? `${startDate.format('DD.MM')} → ${endDate.format('DD.MM.YY')}` : '—'} />
+              <SummaryRow label="Süre" mono={false} value={`${watchedValues?.days || 0} gün`} />
+              <Box sx={{ my: 1, borderTop: `1px solid ${a.line}` }} />
+              <SummaryRow label="Günlük ücret" value={formatCurrency(dailyRateTRY)} muted />
+              <SummaryRow label="Kira bedeli" value={formatCurrency(watchedValues?.totalAmount || 0)} />
+              <SummaryRow label="Ek ücretler" value={formatCurrency(extrasTRY)} />
+              <SummaryRow label="Genel toplam" value={formatCurrency(totalDueTRY)} strong />
+              <SummaryRow label="Peşin + taksitler" value={formatCurrency(paidFromRental)} tone="success" />
+              {payments.length > 0 && <SummaryRow label={`Ek ödemeler (${payments.length})`} value={formatCurrency(totalPaid)} tone="success" />}
+              <BalanceHero balance={balanceTRY} total={totalDueTRY} paid={totalPaidTRY} label={isDebtFullyPaid ? 'Borç kapandı' : 'Kalan bakiye'} />
 
-            {[
-              { name: 'upfront' as const, label: 'Peşin' },
-              { name: 'pay1' as const, label: '1. Ödeme' },
-              { name: 'pay2' as const, label: '2. Ödeme' },
-              { name: 'pay3' as const, label: '3. Ödeme' },
-              { name: 'pay4' as const, label: '4. Ödeme' },
-            ].map((field) => (
-              <Grid item xs={6} md={2.4} key={field.name}>
-                <Controller
-                  name={field.name}
-                  control={control}
-                  render={({ field: formField }) => (
-                    <TextField
-                      {...formField}
-                      value={formField.value === 0 ? '' : formField.value}
-                      fullWidth
-                      label={field.label}
-                      type="number"
-                      margin="normal"
-                      inputProps={{ 
-                        step: 0.01,
-                        min: undefined 
-                      }}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value === '') {
-                          formField.onChange('');
-                        } else {
-                          const numValue = parseFloat(value);
-                          formField.onChange(isNaN(numValue) ? '' : numValue);
-                        }
-                      }}
-                    />
-                  )}
-                />
-              </Grid>
-            ))}
-
-            {/* Note */}
-            <Grid item xs={12}>
-              <Controller
-                name="note"
-                control={control}
-                defaultValue=""
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    label="Açıklama (Opsiyonel)"
-                    multiline
-                    rows={2}
-                    margin="normal"
-                  />
-                )}
-              />
-            </Grid>
-
-            {/* Totals */}
-            <Grid item xs={12}>
-              <Box sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
-                <Typography variant="h6" gutterBottom>
-                  Hesaplama Özeti
-                </Typography>
-                
-                {/* Ana mali bilgiler */}
-                <Grid container spacing={2} sx={{ mb: 2 }}>
-                  <Grid item xs={4}>
-                    <Typography variant="body2">
-                      <strong>Toplam Ödenecek: {formatCurrency(totalDueTRY)}</strong>
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={4}>
-                    <Typography variant="body2">
-                      Toplam Ödenen: {formatCurrency(totalPaidTRY)}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={4}>
-                    <Typography variant="body2" sx={{ color: balanceTRY > 0 ? 'error.main' : 'success.main' }}>
-                      <strong>Kalan Bakiye: {formatCurrency(balanceTRY)}</strong>
-                    </Typography>
-                  </Grid>
-                </Grid>
-
-                {/* Ek Ödemeler (Ara Ödemeler) */}
-                {payments && payments.length > 0 && (
-                  <Box sx={{ mt: 2, p: 2, bgcolor: 'info.50', borderRadius: 1, border: '1px solid', borderColor: 'info.200' }}>
-                    <Typography variant="subtitle2" gutterBottom sx={{ color: 'info.main', fontWeight: 600 }}>
-                      Ek Ödemeler ({payments.length} adet)
-                    </Typography>
-                    <Grid container spacing={1}>
-                      {payments.map((payment, index) => (
-                        <Grid item xs={12} sm={6} md={4} key={payment.id}>
-                          <Box sx={{ 
-                            p: 1, 
-                            bgcolor: 'white', 
-                            borderRadius: 0.5, 
-                            border: '1px solid', 
-                            borderColor: 'grey.300',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 0.5
-                          }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
-                              {index + 1}. {formatCurrency(payment.amount)}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {payment.method === 'CASH' ? 'Nakit' : payment.method === 'CARD' ? 'Kart' : 'Transfer'}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {dayjs(payment.paidAt).format('DD.MM.YYYY HH:mm')}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      ))}
-                    </Grid>
-                    <Typography variant="body2" sx={{ mt: 1, fontWeight: 600, color: 'info.dark' }}>
-                      Ek Ödemeler Toplamı: {formatCurrency(totalPaid)}
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            </Grid>
-          </Grid>
+              {payments.length > 0 && (
+                <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px solid ${a.line}` }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: a.muted, mb: 0.75 }}>Plan dışı ek ödemeler</Typography>
+                  {payments.map((payment) => (
+                    <Stack key={payment.id} direction="row" justifyContent="space-between" sx={{ py: 0.4 }}>
+                      <Typography sx={{ fontSize: 12.5, color: a.muted }}>
+                        {dayjs(payment.paidAt).format('DD.MM.YY')} · {payment.method === 'CASH' ? 'Nakit' : payment.method === 'CARD' ? 'Kart' : 'Havale'}
+                      </Typography>
+                      <Typography sx={{ ...monoSx, fontSize: 12.5, color: a.success }}>{formatCurrency(payment.amount)}</Typography>
+                    </Stack>
+                  ))}
+                </Box>
+              )}
+            </SummaryPanel>
+          </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose} disabled={updateRentalMutation.isPending}>
-            İptal
-          </Button>
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={updateRentalMutation.isPending}
-          >
-            {updateRentalMutation.isPending ? 'Güncelleniyor...' : 'Güncelle'}
+
+        <DialogActions sx={{ px: { xs: 2.5, sm: 3 }, py: 2, gap: 1, borderTop: `1px solid ${a.lineSoft}` }}>
+          <Button variant="outlined" onClick={handleClose} disabled={updateRentalMutation.isPending}>Vazgeç</Button>
+          <Button type="submit" variant="contained" disabled={updateRentalMutation.isPending}>
+            {updateRentalMutation.isPending ? 'Kaydediliyor…' : 'Değişiklikleri kaydet'}
           </Button>
         </DialogActions>
       </form>

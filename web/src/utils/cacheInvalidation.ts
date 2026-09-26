@@ -16,12 +16,7 @@ export const invalidateAllRentalCaches = (queryClient: QueryClient) => {
   queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
   queryClient.invalidateQueries({ queryKey: ['debtors'] });
   
-  // Araç cache'leri
-  queryClient.invalidateQueries({ queryKey: ['vehicles'] });
-  queryClient.invalidateQueries({ queryKey: ['idle-vehicles'] });
-  queryClient.invalidateQueries({ queryKey: ['reserved-vehicles'] });
-  queryClient.invalidateQueries({ queryKey: ['service-vehicles'] });
-  queryClient.invalidateQueries({ queryKey: ['vehicles-all'] });
+  invalidateVehicleCaches(queryClient);
   
   // Rapor cache'leri
   queryClient.invalidateQueries({ queryKey: ['vehicle-income-report'] });
@@ -30,6 +25,20 @@ export const invalidateAllRentalCaches = (queryClient: QueryClient) => {
   
   // Müşteri cache'leri
   queryClient.invalidateQueries({ queryKey: ['customers'] });
+};
+
+/** Public vitrin ve admin araç listelerinin tamamını birlikte yeniler. */
+export const invalidateVehicleCaches = (queryClient: QueryClient) => {
+  queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+  queryClient.invalidateQueries({ queryKey: ['idle-vehicles'] });
+  queryClient.invalidateQueries({ queryKey: ['reserved-vehicles'] });
+  queryClient.invalidateQueries({ queryKey: ['service-vehicles'] });
+  queryClient.invalidateQueries({ queryKey: ['vehicles-all'] });
+  queryClient.invalidateQueries({ queryKey: ['home-vehicles'] });
+  queryClient.invalidateQueries({ queryKey: ['vehicle'] });
+  queryClient.invalidateQueries({ queryKey: ['categories'] });
+  queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+  queryClient.invalidateQueries({ queryKey: ['availability'] });
 };
 
 /**
