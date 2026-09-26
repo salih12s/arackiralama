@@ -8,9 +8,9 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://arackiralama-production.up.railway.app',
+        target: 'http://localhost:3005',
         changeOrigin: true,
-        secure: true
+        secure: false
       }
     }
   },

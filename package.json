@@ -13,11 +13,13 @@
     "api:dev": "npm run dev --prefix api",
     "api:migrate": "npm run migrate --prefix api",
     "api:seed": "npm run seed --prefix api",
+    "api:demo-refresh": "npm run demo:refresh --prefix api",
     "api:start": "npm run start --prefix api",
     "web:dev": "npm run dev --prefix web",
     "web:build": "npm run build --prefix web",
     "web:preview": "npm run preview --prefix web",
-    "build": "npm run build --prefix web"
+    "build": "npm run build --prefix web",
+    "typecheck": "npm run typecheck --prefix web && npm run typecheck --prefix api"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
