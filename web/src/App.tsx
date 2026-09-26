@@ -1,202 +1,34 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import dayjs from 'dayjs';
-import 'dayjs/locale/tr';
+import { lazy, Suspense } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Box, CircularProgress } from '@mui/material';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from './hooks/useAuth.tsx';
+import { queryClient } from './shared/queryClient';
 
-import theme from './theme';
-import { AuthProvider, useAuth } from './hooks/useAuth.tsx';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import RentalDetail from './pages/RentalDetail';
-import Vehicles from './pages/Vehicles';
-import Customers from './pages/Customers';
-import Reports from './pages/Reports';
-import DebtorDetails from './pages/DebtorDetails';
-import UnpaidDebtsDetail from './pages/UnpaidDebtsDetail';
-import VehicleDetail from './pages/VehicleDetail';
-import Backup from './pages/Backup';
-import AllRentals from './pages/AllRentals';
-import VehicleExpenses from './pages/VehicleExpenses';
-import Notes from './pages/Notes';
+const PublicApp = lazy(() => import('./public-site/PublicApp'));
+const AdminApp = lazy(() => import('./admin/AdminApp'));
 
-// Set dayjs locale
-dayjs.locale('tr');
+function Loader() { return <Box sx={{ minHeight: '50vh', display: 'grid', placeItems: 'center' }}><CircularProgress size={30} /></Box>; }
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 2, // 2 kez yeniden dene
-      staleTime: 30 * 1000, // 30 saniye fresh tut (daha hızlı güncelleme)
-      gcTime: 2 * 60 * 1000, // 2 dakika cache'de sakla
-      refetchOnWindowFocus: false, // Pencere odaklandığında otomatik yenileme - KAPALI
-      refetchOnMount: true, // Component mount olduğunda yenile
-      refetchOnReconnect: true, // İnternet bağlantısı geri geldiğinde yenile
-    },
-  },
-});
-
-// Protected Route component
-interface ProtectedRouteProps {
-  children: React.ReactNode;
+function LegacyRedirect({ target }: { target: string }) {
+  const location = useLocation();
+  const suffix = location.pathname.replace(/^\/(rentals|vehicles|vehicle|customers|reports|debtor-details|unpaid-debts|vehicle-expenses|notes|backup)/, '');
+  return <Navigate to={`${target}${suffix}${location.search}`} replace />;
 }
 
-function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+export default function App() {
+  return <QueryClientProvider client={queryClient}><AuthProvider><Suspense fallback={<Loader />}><Routes>
+    <Route path="/panel/*" element={<AdminApp />} />
+    <Route path="/rentals/*" element={<LegacyRedirect target="/panel/kiralamalar" />} />
+    <Route path="/vehicles/*" element={<LegacyRedirect target="/panel/araclar" />} />
+    <Route path="/vehicle/*" element={<LegacyRedirect target="/panel/araclar" />} />
+    <Route path="/customers/*" element={<LegacyRedirect target="/panel/musteriler" />} />
+    <Route path="/reports/*" element={<LegacyRedirect target="/panel/raporlar" />} />
+    <Route path="/debtor-details/*" element={<LegacyRedirect target="/panel/borclular" />} />
+    <Route path="/unpaid-debts/*" element={<LegacyRedirect target="/panel/odenmeyen-borclar" />} />
+    <Route path="/vehicle-expenses/*" element={<LegacyRedirect target="/panel/arac-giderleri" />} />
+    <Route path="/notes/*" element={<LegacyRedirect target="/panel/notlar" />} />
+    <Route path="/backup/*" element={<LegacyRedirect target="/panel/yedekleme" />} />
+    <Route path="/*" element={<PublicApp />} />
+  </Routes></Suspense></AuthProvider></QueryClientProvider>;
 }
-
-// Public Route component (redirect if authenticated)
-function PublicRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
-  return !isAuthenticated ? <>{children}</> : <Navigate to="/" replace />;
-}
-
-function AppRoutes() {
-  return (
-    <Routes>
-      <Route
-        path="/login"
-        element={
-          <PublicRoute>
-            <Login />
-          </PublicRoute>
-        }
-      />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/rentals"
-        element={
-          <ProtectedRoute>
-            <AllRentals />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/rentals/:id"
-        element={
-          <ProtectedRoute>
-            <RentalDetail />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/vehicles"
-        element={
-          <ProtectedRoute>
-            <Vehicles />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/customers"
-        element={
-          <ProtectedRoute>
-            <Customers />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/vehicles/:id"
-        element={
-          <ProtectedRoute>
-            <VehicleDetail />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/vehicle/:id"
-        element={
-          <ProtectedRoute>
-            <VehicleDetail />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/reports"
-        element={
-          <ProtectedRoute>
-            <Reports />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/debtor-details"
-        element={
-          <ProtectedRoute>
-            <DebtorDetails />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/unpaid-debts"
-        element={
-          <ProtectedRoute>
-            <UnpaidDebtsDetail />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/backup"
-        element={
-          <ProtectedRoute>
-            <Backup />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/vehicle-expenses"
-        element={
-          <ProtectedRoute>
-            <VehicleExpenses />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/notes"
-        element={
-          <ProtectedRoute>
-            <Notes />
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
-  );
-}
-
-function App() {
-  return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="tr">
-            <AppRoutes />
-          </LocalizationProvider>
-        </AuthProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
-  );
-}
-
-export default App;

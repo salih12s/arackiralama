@@ -2,14 +2,42 @@
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="robots" content="noindex, nofollow" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Araç Kiralama Admin Paneli</title>
-    <meta name="description" content="Private car rental admin panel" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>SS Filo | Araç Kiralama</title>
+    <meta
+      name="description"
+      content="Müsait araçları inceleyin ve kolayca rezervasyon talebi oluşturun."
+    />
+    <meta name="theme-color" content="#FBF8F3" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/brand/favicon-64.png" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+    <script>
+      // Public sitede koyu/açık tema, ilk boyamadan önce uygulanır (beyaz parlama olmasın).
+      (function () {
+        if (location.pathname.indexOf('/panel') === 0) {
+          var adminMode;
+          try { adminMode = localStorage.getItem('sa-color-mode'); } catch (e) {}
+          if (adminMode !== 'light' && adminMode !== 'dark') {
+            adminMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.setAttribute('data-sa-theme', adminMode);
+          if (adminMode === 'dark') document.documentElement.style.backgroundColor = '#120D0E';
+          return;
+        }
+        var mode;
+        try { mode = localStorage.getItem('ss-color-mode'); } catch (e) {}
+        if (mode !== 'light' && mode !== 'dark') {
+          mode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-ss-theme', mode);
+        if (mode === 'dark') document.documentElement.style.backgroundColor = '#140E0F';
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
   </head>

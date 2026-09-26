@@ -1,0 +1,7 @@
+Options -MultiViews
+RewriteEngine On
+
+# Serve existing assets normally; send client-side routes to the SPA entry.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
