@@ -1,248 +1,171 @@
-# 🚗 Araç Kiralama Yönetim Paneli
+<p align="center">
+  <img src="docs/media/banner.png" alt="SS Filo — araç kiralama sitesi ve filo yönetim paneli" width="100%">
+</p>
 
-Full-stack araç kiralama işletmesi yönetim paneli. Araç filosu, müşteri takibi, kira sözleşmeleri, ödemeler, giderler ve detaylı raporlama özelliklerini tek bir platformda sunar.
+<p align="center">
+  <b>Araç kiralama işletmeleri için müşteri sitesi ve operasyon paneli.</b><br>
+  Müşteri müsait aracı bulup rezervasyon talebi bırakır; ekip kiralamayı, tahsilatı ve filoyu aynı yerden yönetir.
+</p>
 
-> **Canlı:** Sistem aktif olarak bir araç kiralama firması tarafından kullanılmaktadır.
+<p align="center">
+  <img src="https://img.shields.io/badge/TypeScript-6E1F2F?style=flat-square&logo=typescript&logoColor=F4EDE2" alt="TypeScript">
+  <img src="https://img.shields.io/badge/React_18-6E1F2F?style=flat-square&logo=react&logoColor=F4EDE2" alt="React 18">
+  <img src="https://img.shields.io/badge/MUI-6E1F2F?style=flat-square&logo=mui&logoColor=F4EDE2" alt="MUI">
+  <img src="https://img.shields.io/badge/Node.js-6E1F2F?style=flat-square&logo=nodedotjs&logoColor=F4EDE2" alt="Node.js">
+  <img src="https://img.shields.io/badge/PostgreSQL-6E1F2F?style=flat-square&logo=postgresql&logoColor=F4EDE2" alt="PostgreSQL">
+  <img src="https://img.shields.io/badge/Prisma-6E1F2F?style=flat-square&logo=prisma&logoColor=F4EDE2" alt="Prisma">
+</p>
 
----
-
-## Teknoloji Yığını
-
-| Katman | Teknolojiler |
-|--------|-------------|
-| **Frontend** | React 18, TypeScript, Material UI 5, React Query, React Hook Form, Recharts, Vite |
-| **Backend** | Node.js, Express, TypeScript, Zod (validation) |
-| **Veritabanı** | PostgreSQL, Prisma ORM |
-| **Auth** | JWT (JSON Web Token), Bcrypt |
-| **Deployment** | Railway (API), cPanel (Frontend) |
-
----
-
-## Özellikler
-
-### Araç Yönetimi
-- Araç ekleme, düzenleme ve durumunu takip etme (Boşta / Kirada / Serviste / Rezerveli)
-- Araç başına gelir-gider analizi ve performans metrikleri
-- Konsinye araç desteği
-
-### Kiralama İşlemleri
-- Yeni kiralama oluşturma ve uzatma desteği
-- Günlük ücret, km farkı, temizlik, HGS, hasar, yakıt gibi ek kalem hesaplamaları
-- Çoklu ödeme takibi (Nakit / Havale / Kart)
-- Kalan borç otomatik hesaplama
-- Soft delete ile güvenli silme (veri kaybı önleme)
-
-### Müşteri Yönetimi
-- Müşteri kayıt ve düzenleme
-- Müşteri bazlı kiralama geçmişi
-
-### Rezervasyon Sistemi
-- Tarih ve saat bazlı araç rezervasyonu
-- Durum takibi: Beklemede → Onaylandı → Tamamlandı / İptal
-
-### Raporlama ve Analitik
-- Dashboard: Toplam gelir, aktif kiralama sayısı, doluluk oranı gibi KPI'lar
-- Aylık gelir raporları ve araç bazlı performans analizi
-- Borçlu müşteri listesi ve detaylı borç takibi
-- PDF ve Excel export desteği
-
-### Araç Giderleri
-- Lastik, bakım, onarım, sigorta gibi gider kalemleri
-- Araç bazlı gider analizi
-
-### Yedekleme
-- Manuel ve otomatik (cron) veritabanı yedekleme
-- Son 30 yedeği saklama
-- Yedekten geri yükleme
-
-### Güvenlik
-- JWT tabanlı kimlik doğrulama (24 saat geçerli)
-- Bcrypt ile şifre hashleme (cost factor: 12)
-- Helmet güvenlik başlıkları
-- Rate limiting
-- CORS whitelist
+<p align="center">
+  <a href="#kiralama-sitesi">Kiralama sitesi</a> ·
+  <a href="#yönetim-paneli">Yönetim paneli</a> ·
+  <a href="#açık-ve-koyu-mod">Açık / koyu mod</a> ·
+  <a href="#mobil">Mobil</a> ·
+  <a href="#tasarım">Tasarım</a> ·
+  <a href="#teknoloji">Teknoloji</a>
+</p>
 
 ---
 
-## Proje Yapısı
+## Neden SS Filo
 
-```
-├── api/                          # Backend (Express + Prisma)
-│   ├── prisma/
-│   │   ├── schema.prisma         # Veritabanı şeması (13 tablo)
-│   │   └── migrations/           # Veritabanı migration geçmişi
-│   └── src/
-│       ├── server.ts             # Uygulama giriş noktası
-│       ├── app.ts                # Express konfigürasyonu, route tanımları
-│       ├── seed.ts               # Test verisi oluşturma
-│       ├── db/prisma.ts          # Prisma client instance
-│       ├── lib/currency.ts       # TL/kuruş dönüşüm yardımcıları
-│       ├── middleware/
-│       │   ├── auth.ts           # JWT doğrulama middleware
-│       │   └── basicAuth.ts      # Basic Auth middleware
-│       ├── routes/
-│       │   ├── auth.ts           # Giriş / kayıt
-│       │   ├── vehicles.ts       # Araç CRUD + performans
-│       │   ├── rentals.ts        # Kiralama CRUD + soft delete
-│       │   ├── payments.ts       # Ödeme kayıt
-│       │   ├── customers.ts      # Müşteri CRUD
-│       │   ├── reservations.ts   # Rezervasyon CRUD
-│       │   ├── vehicleExpenses.ts# Araç giderleri
-│       │   ├── notes.ts          # Not CRUD
-│       │   ├── reports.ts        # Raporlar
-│       │   ├── analytics.ts      # Dashboard istatistikleri
-│       │   └── backup.ts         # Yedekleme işlemleri
-│       └── services/
-│           ├── rentalCalc.ts     # Kiralama tutar hesaplama
-│           ├── backupService.ts  # Otomatik yedekleme servisi
-│           └── report.ts         # Rapor oluşturma
-│
-├── web/                          # Frontend (React + MUI)
-│   ├── src/
-│   │   ├── App.tsx               # Route tanımları, protected routes
-│   │   ├── main.tsx              # Uygulama giriş noktası
-│   │   ├── theme.ts              # MUI tema konfigürasyonu
-│   │   ├── api/                  # API istemci katmanı (Axios)
-│   │   │   ├── client.ts         # Axios instance, tipler, API fonksiyonları
-│   │   │   ├── analytics.ts
-│   │   │   ├── rentals.ts
-│   │   │   ├── vehicles.ts
-│   │   │   ├── vehicleExpenses.ts
-│   │   │   ├── reports.ts
-│   │   │   └── notes.ts
-│   │   ├── components/           # Yeniden kullanılabilir bileşenler
-│   │   │   ├── Layout.tsx        # Yan menü + üst bar
-│   │   │   ├── NewRentalDialog.tsx
-│   │   │   ├── EditRentalDialog.tsx
-│   │   │   ├── AddPaymentDialog.tsx
-│   │   │   ├── ReservationDialog.tsx
-│   │   │   ├── ConsignmentRentalDialog.tsx
-│   │   │   ├── NewVehicleDialog.tsx
-│   │   │   ├── NewCustomerDialog.tsx
-│   │   │   ├── RentalTable.tsx
-│   │   │   ├── KpiCard.tsx
-│   │   │   ├── StatCard.tsx
-│   │   │   └── StatusChip.tsx
-│   │   ├── pages/                # Sayfa bileşenleri
-│   │   │   ├── Dashboard.tsx     # Ana sayfa - KPI'lar ve genel bakış
-│   │   │   ├── AllRentals.tsx    # Kiralama listesi ve yönetimi
-│   │   │   ├── RentalDetail.tsx  # Kiralama detay sayfası
-│   │   │   ├── Vehicles.tsx      # Araç listesi
-│   │   │   ├── VehicleDetail.tsx # Araç detayı ve performansı
-│   │   │   ├── Customers.tsx     # Müşteri yönetimi
-│   │   │   ├── Reports.tsx       # Aylık raporlar
-│   │   │   ├── DetailedReport.tsx# Detaylı rapor
-│   │   │   ├── DebtorDetails.tsx # Borçlu listesi
-│   │   │   ├── UnpaidDebtsDetail.tsx
-│   │   │   ├── VehicleExpenses.tsx
-│   │   │   ├── Notes.tsx
-│   │   │   ├── Backup.tsx
-│   │   │   └── Login.tsx
-│   │   ├── hooks/
-│   │   │   └── useAuth.tsx       # Authentication context
-│   │   └── utils/
-│   │       ├── currency.ts       # TL formatlama
-│   │       └── cacheInvalidation.ts
-│   └── vite.config.ts
-│
-└── package.json                  # Monorepo workspace konfigürasyonu
-```
+Küçük ve orta ölçekli kiralama işletmeleri genellikle iki ayrı dertle uğraşır: müşteri telefonla "şu tarihte hangi araç boş?" diye sorar, ekip ise kiralamaları, taksitleri ve borçları Excel'de takip eder.
+
+SS Filo ikisini tek üründe birleştirir. **Kiralama sitesinde** müşteri seçtiği tarihte gerçekten müsait olan araçları ve baştan belli toplam fiyatı görür, dört adımda rezervasyon talebi bırakır. Talep **yönetim paneline** düşer; ekip onaylar, kiralamayı başlatır, ödemeleri alır ve filonun durumunu tek ekrandan izler.
+
+> Bu depo bir ürün vitrinidir. Görsellerdeki müşteri adları, plakalar ve tutarlar demo verisidir.
 
 ---
 
-## Database Schema
+## Kiralama sitesi
 
-```
-User ─────────────── Authentication (JWT)
-Vehicle ──┬──────── Fleet inventory
-          ├── Rental ──── Payment (1:N payment records)
-          ├── Reservation
-          ├── VehicleExpense
-          └── ConsignmentDeduction
-Customer ─┬── Rental
-          ├── Reservation
-          └── ExternalPayment
-ConsignmentRental ─┬── ConsignmentDeduction
-                   └── ExternalPayment
-Note ────────────── Admin notes
-```
+<p align="center">
+  <img src="docs/media/demo-site.gif" alt="Kiralama sitesi: tarih seçme, filoyu filtreleme, araç detayı ve dört adımlı rezervasyon" width="100%">
+  <br><sub>Tarih seç → müsait araçları filtrele → aracı incele → dört adımda rezervasyon talebi</sub>
+</p>
 
-**Currency convention:** All monetary values are stored as **kuruş** (integer cents) in the database to avoid floating-point rounding errors. The API layer handles TL ↔ kuruş conversion via `tlToKurus()` / `kurusToTlNumber()`.
+- **Gerçek müsaitlik.** Seçilen tarihlerde kirada, rezervli ya da serviste olan araçlar "dolu" görünür; fiyat ve toplam tutar sunucuda hesaplanır.
+- **Dört adımlı rezervasyon.** Tarih ve teslim noktası → araç → iletişim bilgileri → özet. Sağdaki özet her adımda güncellenir.
+- **Kodla takip.** Talep sonrası müşteriye `SS-XXXXXX` biçiminde bir kod verilir; durum telefon numarasıyla sorgulanır.
+- **Teslim noktası seçimi.** Ofis, iki havalimanı ya da adrese teslim; araç detayından rezervasyona taşınır.
+- **Filo sayfası.** Kategori, vites, yakıt, koltuk ve fiyat filtreleri; masaüstünde yan panel, mobilde alttan açılan çekmece.
 
----
-
-## Getting Started
-
-### Prerequisites
-- Node.js ≥ 18
-- PostgreSQL
-- npm
-
-### 1. Clone
-
-```bash
-git clone https://github.com/salih12s/arackiralama.git
-cd arackiralama
-```
-
-### 2. Install Dependencies
-
-```bash
-npm run install-all
-```
-
-### 3. Configure Environment
-
-Create **api/.env**:
-```env
-DATABASE_URL=postgresql://user:password@localhost:5432/arackiralama
-JWT_SECRET=your-secret-key
-PORT=3005
-ALLOWED_ORIGIN=http://localhost:5173
-```
-
-Create **web/.env**:
-```env
-VITE_API_URL=http://localhost:3005/api
-```
-
-### 4. Initialize Database
-
-```bash
-npm run api:migrate
-npm run api:seed        # Optional: seed sample data
-```
-
-### 5. Run Development Servers
-
-```bash
-npm run dev
-```
-
-| Service | URL |
-|---------|-----|
-| API | http://localhost:3005 |
-| Frontend | http://localhost:5173 |
+<table>
+  <tr>
+    <td width="50%"><img src="docs/media/site-home.png" alt="Ana sayfa"><br><sub><b>Ana sayfa</b> · süre sekmeli arama kutusu, teslim noktaları, koşullar</sub></td>
+    <td width="50%"><img src="docs/media/site-fleet.png" alt="Araç filosu"><br><sub><b>Filo</b> · seçili tarihlere göre müsaitlik ve toplam fiyat</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/media/site-detail.png" alt="Araç detayı"><br><sub><b>Araç detayı</b> · teknik özellikler, teslim noktası, anlık fiyat hesabı</sub></td>
+    <td width="50%"><img src="docs/media/site-booking.png" alt="Rezervasyon özeti"><br><sub><b>Rezervasyon</b> · adım göstergesi ve sabit özet kartı</sub></td>
+  </tr>
+</table>
 
 ---
 
-## Key Design Decisions
+## Yönetim paneli
 
-- **Monorepo with npm workspaces** — single `npm run dev` starts both API and frontend
-- **Integer currency (kuruş)** — eliminates floating-point errors in financial calculations
-- **Soft delete on rentals** — `deleted` flag instead of hard delete preserves audit trail
-- **React Query caching** — centralized cache invalidation via `utils/cacheInvalidation.ts`
-- **Shared utility layer** — `utils/format.ts`, `utils/status.ts` eliminate code duplication across 10+ pages
-- **Centralized error handling** — `errorHandler.ts` middleware handles Zod validation + Prisma errors globally
+<p align="center">
+  <img src="docs/media/demo-panel.gif" alt="Yönetim paneli: genel bakış, gelir grafiği, kiralamalar, ödeme alma ve araç galerisi" width="100%">
+  <br><sub>Demo girişi → genel bakış ve gelir grafiği → kiralamalar → ödeme alma → araç galerisi</sub>
+</p>
+
+- **Genel bakış.** "Bugün" şeridi gecikmiş iadeleri, bugün dönecek ve teslim edilecek araçları, onay bekleyen web taleplerini öne çıkarır. Doluluk, tahsilat oranı ve aylık gelir tek bakışta görünür.
+- **Kiralamalar.** Durum sekmeleri, araç, bakiye ve tarih filtreleri, Excel'e aktarma. Her satırda tek ana işlem (teslim al), geri kalanı "⋯" menüsünde.
+- **Ödeme alma.** Kalanın tamamını ya da yarısını tek tıkla doldurma, nakit / kart / havale, ödeme sonrası bakiyenin önizlemesi.
+- **Yeni kiralama.** Numaralı form bölümleri ve yazdıkça güncellenen özet; toplamdan günlük ücrete çeviren hesaplama yardımcısı.
+- **Araçlar.** Galeri ve liste görünümü, sitede yayınla / gizle anahtarı, fotoğraf yönetimi, servise alma, arşiv.
+- **Web talepleri.** Siteden gelen rezervasyonları onaylama ya da iptal etme; başlangıca kalan süre.
+- **Finans.** Aylık raporlar, müşteri bazında borçlar, kalem kalem ödenmeyen borç tablosu, araç giderleri.
+- **Sistem.** Satır satır not defteri; Excel, PDF ve teknik (JSON) yedek; sunucuda zamanlanmış otomatik yedekleme.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/media/panel-dashboard.png" alt="Genel bakış"><br><sub><b>Genel bakış</b> · bugün şeridi, göstergeler, aktif kiralamalar</sub></td>
+    <td width="50%"><img src="docs/media/panel-rentals.png" alt="Kiralamalar"><br><sub><b>Kiralamalar</b> · sayılı durum sekmeleri ve filtreler</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/media/panel-rental-detail.png" alt="Kiralama detayı"><br><sub><b>Kiralama detayı</b> · finansal durum ve ödeme planı</sub></td>
+    <td width="50%"><img src="docs/media/panel-payment.png" alt="Ödeme al penceresi"><br><sub><b>Ödeme al</b> · hızlı doldurma ve bakiye önizlemesi</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/media/panel-new-rental.png" alt="Yeni kiralama penceresi"><br><sub><b>Yeni kiralama</b> · canlı özet paneli</sub></td>
+    <td width="50%"><img src="docs/media/panel-vehicles.png" alt="Araçlar galerisi"><br><sub><b>Araçlar</b> · galeri görünümü ve yayın anahtarı</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/media/panel-reports.png" alt="Raporlar"><br><sub><b>Raporlar</b> · aylık gelir, durum dağılımı, araç sıralaması</sub></td>
+    <td width="50%"><img src="docs/media/panel-unpaid.png" alt="Ödenmeyen borçlar"><br><sub><b>Ödenmeyen borçlar</b> · tüm ücret kalemleri tek tabloda</sub></td>
+  </tr>
+</table>
 
 ---
 
-## Screenshots
+## Açık ve koyu mod
 
-> *Screenshots will be added soon.*
+<p align="center">
+  <img src="docs/media/themes.png" alt="Yönetim paneli açık ve koyu modda" width="100%">
+</p>
+
+Site ve panelin her ekranı iki modda da çalışır. Koyu mod açık temanın tersine çevrilmiş hali değildir; zemin, çizgi ve durum renkleri ayrı ayarlanmıştır, butonlar krem zemin üzerinde bordo yazıya döner. Tercih hatırlanır ve sayfa açılışında beyaz parlama olmaz.
+
+<p align="center">
+  <img src="docs/media/demo-theme.gif" alt="Panelde ve sitede koyu moda geçiş" width="100%">
+</p>
 
 ---
 
-## License
+## Mobil
 
-This project is for private use.
+<p align="center">
+  <img src="docs/media/mobile.png" alt="Site ve panelin telefon görünümleri" width="100%">
+</p>
+
+Tüm ekranlar telefona göre yeniden düzenlenir: sitede araç detayında alta sabit bir fiyat ve rezervasyon çubuğu, filo sayfasında alttan açılan filtre çekmecesi; panelde alt sekme çubuğu ve tablolar yerine kart listeleri.
+
+---
+
+## Tasarım
+
+<p align="center">
+  <img src="docs/media/identity.png" alt="Logo, renk paleti ve yazı tipleri" width="100%">
+</p>
+
+- **Kimlik.** "Rozet" logosu ve bordo–krem palet sitenin de panelin de temelini oluşturur. Başlıklarda Playfair Display, arayüzde Manrope, tutar, plaka ve tarihlerde alt alta hizalanan JetBrains Mono kullanılır.
+- **Tasarım token'ları.** Renkler CSS değişkeni olarak iki palette (açık / koyu) tanımlıdır; bileşenler sabit renk yerine bu token'ları kullanır.
+- **Grafikler.** Gelir ve filo grafikleri projeye özel SVG bileşenleridir; renkleri renk körlüğü testlerinden geçirilmiş paletten gelir, her seri etiketle de belirtilir.
+- **Ayrıntılar.** Klavye odağı görünür, dokunma hedefleri büyük, durum rozetleri renk + metinle anlatılır.
+
+---
+
+## Teknoloji
+
+**Arayüz**
+- [React 18](https://react.dev) ve [TypeScript](https://www.typescriptlang.org) – uygulama
+- [Vite](https://vitejs.dev) – geliştirme ve derleme
+- [MUI](https://mui.com) – bileşen altyapısı, üzerine projeye özel tasarım sistemi
+- [TanStack Query](https://tanstack.com/query) – sunucu verisi ve önbellek
+- [React Hook Form](https://react-hook-form.com) + [Zod](https://zod.dev) – formlar ve doğrulama
+- [React Router](https://reactrouter.com) – site ve panel yönlendirmesi
+
+**Sunucu**
+- [Node.js](https://nodejs.org) + [Express](https://expressjs.com) – REST API
+- [Zod](https://zod.dev) – istek doğrulama
+- [JWT](https://jwt.io) – panel oturumu; [Helmet](https://helmetjs.github.io) ve [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) – güvenlik başlıkları ve istek sınırı
+- [Multer](https://github.com/expressjs/multer) – araç fotoğrafı yükleme; yerel, [Cloudinary](https://cloudinary.com) ya da S3 uyumlu depolama
+- [node-cron](https://github.com/node-cron/node-cron) – zamanlanmış yedekleme
+
+**Veri**
+- [PostgreSQL](https://www.postgresql.org) – veritabanı
+- [Prisma](https://www.prisma.io) – ORM ve migration'lar
+
+**Dışa aktarma ve test**
+- [SheetJS](https://sheetjs.com) – Excel; [jsPDF](https://github.com/parallax/jsPDF) – PDF rapor
+- [Vitest](https://vitest.dev) ve [Jest](https://jestjs.io) – arayüz ve servis testleri
+
+---
+
+## Künye
+
+- Araç fotoğrafları [Wikimedia Commons](https://commons.wikimedia.org)'tan, yazarlarının seçtiği CC BY / CC BY-SA lisanslarıyla kullanılmıştır. Yazar ve lisans listesi: [`docs/brand/vehicle-photo-credits.md`](docs/brand/vehicle-photo-credits.md). Görseller ilgili modelin temsilidir.
+- Ana sayfadaki kapak görseli yapay zekâ ile oluşturulmuştur.
+- Uygulamadaki müşteri, plaka, tutar ve iletişim bilgileri kurgusal demo verisidir.
