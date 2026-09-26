@@ -20,8 +20,6 @@ const ensureBackupDir = async () => {
 // Export all data as JSON backup
 router.post('/export', authenticateToken, async (req, res) => {
   try {
-    console.log('🔄 Creating database backup...');
-
     // Fetch all data from database
     const [users, vehicles, customers, rentals, payments] = await Promise.all([
       prisma.user.findMany({
@@ -95,8 +93,6 @@ router.post('/export', authenticateToken, async (req, res) => {
 
     // Write backup to file
     await fs.writeFile(filepath, JSON.stringify(backup, null, 2));
-
-    console.log('✅ Backup created successfully:', filename);
 
     // Return backup info and data
     res.json({
@@ -203,7 +199,7 @@ router.get('/download/:filename', authenticateToken, async (req, res) => {
 
     // Read and return file
     const content = await fs.readFile(filepath, 'utf8');
-    const backup = JSON.parse(content);
+    JSON.parse(content); // bozuk yedek dosyası indirilmesin
 
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

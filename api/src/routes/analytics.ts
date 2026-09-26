@@ -32,7 +32,7 @@ router.get('/vehicle/:id', async (req, res) => {
     let totalPaid = 0;
     let totalOutstanding = 0;
     let totalDays = 0;
-    let totalRentals = vehicle.rentals.length;
+    const totalRentals = vehicle.rentals.length;
 
     const revenueByMonth: { [key: string]: number } = {};
     const customerHistory: Array<{
@@ -43,12 +43,12 @@ router.get('/vehicle/:id', async (req, res) => {
     }> = [];
 
     // Her kiralama için hesaplamalar
-    vehicle.rentals.forEach((rental: any) => {
+    vehicle.rentals.forEach((rental) => {
       totalRevenue += rental.totalDue;
       totalDays += rental.days;
 
       // Ödemeler
-      const paymentSum = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
+      const paymentSum = rental.payments.reduce((sum: number, payment) => sum + payment.amount, 0);
       const manualPayments = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
       const totalRentalPaid = paymentSum + manualPayments;
       
@@ -62,7 +62,7 @@ router.get('/vehicle/:id', async (req, res) => {
 
     // Müşteri geçmişi hesaplama
     const customerMap = new Map();
-    vehicle.rentals.forEach((rental: any) => {
+    vehicle.rentals.forEach((rental) => {
       const key = rental.customerId;
       if (!customerMap.has(key)) {
         customerMap.set(key, {
@@ -76,7 +76,7 @@ router.get('/vehicle/:id', async (req, res) => {
       const customer = customerMap.get(key);
       customer.rentalCount++;
       
-      const paymentSum = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
+      const paymentSum = rental.payments.reduce((sum: number, payment) => sum + payment.amount, 0);
       const manualPayments = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
       customer.totalSpent += paymentSum + manualPayments;
       
@@ -109,12 +109,9 @@ router.get('/vehicle/:id', async (req, res) => {
       vehicle: {
         id: vehicle.id,
         plate: vehicle.plate,
-        brand: (vehicle as any).brand,
-        model: (vehicle as any).model,
-        year: (vehicle as any).year,
-        color: (vehicle as any).color,
-        status: vehicle.status,
-        note: (vehicle as any).note
+        name: vehicle.name,
+        year: vehicle.year,
+        status: vehicle.status
       },
       statistics: {
         totalRevenue,
@@ -128,7 +125,7 @@ router.get('/vehicle/:id', async (req, res) => {
       },
       monthlyTrends,
       customerHistory: customerHistory.slice(0, 10), // Top 10 müşteri
-      recentRentals: vehicle.rentals.slice(0, 5).map((rental: any) => ({
+      recentRentals: vehicle.rentals.slice(0, 5).map((rental) => ({
         id: rental.id,
         customerName: rental.customer.fullName,
         startDate: rental.startDate,
@@ -158,10 +155,10 @@ router.get('/overview', async (req, res) => {
       _count: true
     });
 
-    const statusCounts = vehicleStats.reduce((acc: any, stat: any) => {
+    const statusCounts = vehicleStats.reduce<Record<string, number>>((acc, stat) => {
       acc[stat.status] = stat._count;
       return acc;
-    }, {} as Record<string, number>);
+    }, {});
 
     // Bu ayki kiralamalar
     const monthlyRentals = await prisma.rental.findMany({
@@ -176,9 +173,9 @@ router.get('/overview', async (req, res) => {
     let monthlyPaid = 0;
     let monthlyOutstanding = 0;
 
-    monthlyRentals.forEach((rental: any) => {
+    monthlyRentals.forEach((rental) => {
       monthlyRevenue += rental.totalDue;
-      const paymentSum = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
+      const paymentSum = rental.payments.reduce((sum: number, payment) => sum + payment.amount, 0);
       const manualPayments = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
       const totalPaid = paymentSum + manualPayments;
       
@@ -200,9 +197,9 @@ router.get('/overview', async (req, res) => {
       }
     });
 
-    const vehicleRevenues = topVehicles.map((vehicle: any) => {
-      const revenue = vehicle.rentals.reduce((sum: number, rental: any) => {
-        const paymentSum = rental.payments.reduce((pSum: number, payment: any) => pSum + payment.amount, 0);
+    const vehicleRevenues = topVehicles.map((vehicle) => {
+      const revenue = vehicle.rentals.reduce((sum: number, rental) => {
+        const paymentSum = rental.payments.reduce((pSum: number, payment) => pSum + payment.amount, 0);
         const manualPayments = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
         return sum + paymentSum + manualPayments;
       }, 0);
@@ -210,16 +207,15 @@ router.get('/overview', async (req, res) => {
       return {
         id: vehicle.id,
         plate: vehicle.plate,
-        brand: vehicle.brand,
-        model: vehicle.model,
+        name: vehicle.name,
         revenue,
         rentalCount: vehicle.rentals.length
       };
-    }).sort((a: any, b: any) => b.revenue - a.revenue).slice(0, 10);
+    }).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
 
     res.json({
       vehicleStats: {
-        total: Object.values(statusCounts).reduce((sum: number, count: any) => sum + count, 0),
+        total: Object.values(statusCounts).reduce((sum: number, count) => sum + count, 0),
         idle: statusCounts.IDLE || 0,
         rented: statusCounts.RENTED || 0,
         reserved: statusCounts.RESERVED || 0,

@@ -29,7 +29,7 @@ const updateVehicleExpenseSchema = z.object({
 // GET /api/vehicle-expenses
 router.get('/', async (req, res) => {
   try {
-    const expenses = await (prisma as any).vehicleExpense.findMany({
+    const expenses = await prisma.vehicleExpense.findMany({
       include: {
         vehicle: {
           select: {
@@ -56,7 +56,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const expense = await (prisma as any).vehicleExpense.findUnique({
+    const expense = await prisma.vehicleExpense.findUnique({
       where: { id },
       include: {
         vehicle: {
@@ -85,7 +85,7 @@ router.post('/', async (req, res) => {
   try {
     const validatedData = createVehicleExpenseSchema.parse(req.body);
     
-    const expense = await (prisma as any).vehicleExpense.create({
+    const expense = await prisma.vehicleExpense.create({
       data: validatedData,
       include: {
         vehicle: {
@@ -114,7 +114,7 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const validatedData = updateVehicleExpenseSchema.parse(req.body);
     
-    const expense = await (prisma as any).vehicleExpense.update({
+    const expense = await prisma.vehicleExpense.update({
       where: { id },
       data: validatedData,
       include: {
@@ -143,7 +143,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    await (prisma as any).vehicleExpense.delete({
+    await prisma.vehicleExpense.delete({
       where: { id }
     });
 

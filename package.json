@@ -19,7 +19,8 @@
     "web:build": "npm run build --prefix web",
     "web:preview": "npm run preview --prefix web",
     "build": "npm run build --prefix web",
-    "typecheck": "npm run typecheck --prefix web && npm run typecheck --prefix api"
+    "typecheck": "npm run typecheck --prefix web && npm run typecheck --prefix api",
+    "lint": "npm run lint --prefix web && npm run lint --prefix api"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

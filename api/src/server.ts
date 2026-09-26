@@ -11,13 +11,13 @@ async function startServer() {
   try {
     // Test database connection
     await prisma.$connect();
-    console.log('📦 Database connected successfully');
+    console.info('📦 Database connected successfully');
 
     // Start server
     const server = app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🔒 CORS allowed origin: ${process.env.ALLOWED_ORIGIN || '(tanımsız)'}`);
+      console.info(`🚀 Server running on port ${PORT}`);
+      console.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.info(`🔒 CORS allowed origin: ${process.env.ALLOWED_ORIGIN || '(tanımsız)'}`);
     });
 
     // Initialize backup scheduler (uses BACKUP_FREQUENCY from .env or defaults to weekly)
@@ -25,18 +25,18 @@ async function startServer() {
 
     // Graceful shutdown
     process.on('SIGTERM', () => {
-      console.log('SIGTERM signal received: closing HTTP server');
+      console.info('SIGTERM signal received: closing HTTP server');
       server.close(() => {
-        console.log('HTTP server closed');
+        console.info('HTTP server closed');
         prisma.$disconnect();
         process.exit(0);
       });
     });
 
     process.on('SIGINT', () => {
-      console.log('SIGINT signal received: closing HTTP server');
+      console.info('SIGINT signal received: closing HTTP server');
       server.close(() => {
-        console.log('HTTP server closed');
+        console.info('HTTP server closed');
         prisma.$disconnect();
         process.exit(0);
       });

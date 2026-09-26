@@ -10,7 +10,7 @@ import {
   rangesOverlap,
   reservationEndDate,
 } from '../services/availabilityService';
-import { buildQuote, calculateRentalDays } from '../services/quoteService';
+import { buildQuote, calculateRentalDays, type Quote } from '../services/quoteService';
 import { isLegacyDataUrl } from '../services/imageStorageService';
 
 const router = Router();
@@ -84,7 +84,9 @@ const showcaseSelect = {
     orderBy: [{ isPrimary: 'desc' as const }, { sortOrder: 'asc' as const }],
     select: { id: true, imageUrl: true, altText: true, sortOrder: true, isPrimary: true },
   },
-};
+} satisfies Prisma.VehicleSelect;
+
+type ShowcaseVehicle = Prisma.VehicleGetPayload<{ select: typeof showcaseSelect }>;
 
 function maskPlate(plate: string): string {
   return `${plate.slice(0, 2)} ••• ${plate.slice(-2)}`;
@@ -98,9 +100,9 @@ function normalizePhone(phone: string): string {
   return digits;
 }
 
-function toShowcase(vehicle: any, opts: { withGallery?: boolean; available?: boolean; unavailableReason?: string; quote?: any } = {}) {
+function toShowcase(vehicle: ShowcaseVehicle, opts: { withGallery?: boolean; available?: boolean; unavailableReason?: string; quote?: Quote | null } = {}) {
   const legacyImageUrl = vehicle.imageUrl && !isLegacyDataUrl(vehicle.imageUrl) ? vehicle.imageUrl : null;
-  const gallery = (vehicle.images || []).map((image: any) => ({ id: image.id, imageUrl: image.imageUrl, altText: image.altText, sortOrder: image.sortOrder, isPrimary: image.isPrimary }));
+  const gallery = vehicle.images.map((image) => ({ id: image.id, imageUrl: image.imageUrl, altText: image.altText, sortOrder: image.sortOrder, isPrimary: image.isPrimary }));
   const primaryImage = gallery[0]?.imageUrl || legacyImageUrl;
   const publicQuote = opts.quote ? { days: opts.quote.days, dailyRateTL: opts.quote.dailyRateTL, totalTL: opts.quote.totalTL } : opts.quote;
   return {
@@ -302,7 +304,7 @@ router.post('/reservations', writeLimiter, async (req, res) => {
         if (!vehicle) return { status: 409 as const, error: 'Bu araç artık listede değil. Lütfen başka bir araç seçin.' };
 
         // Müsaitlik: listeleme anına değil, ŞU ANA göre yeniden kontrol
-        const availability = await checkVehicleAvailability(vehicle.id, { start: startDate, end: endDate }, tx as any);
+        const availability = await checkVehicleAvailability(vehicle.id, { start: startDate, end: endDate }, tx);
         if (!availability.available) {
           return {
             status: 409 as const,

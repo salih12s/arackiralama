@@ -1,4 +1,5 @@
 import express from 'express';
+import { Prisma, PaymentMethod } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../db/prisma';
 import { authenticateToken } from '../middleware/auth';
@@ -39,7 +40,7 @@ router.post('/:id/payments', async (req, res) => {
       return res.status(404).json({ error: 'Rental not found' });
     }
 
-    const result = await prisma.$transaction(async (tx: any) => {
+    const result = await prisma.$transaction(async (tx) => {
       // Create payment
       const payment = await tx.payment.create({
         data: {
@@ -102,9 +103,9 @@ router.patch('/:paymentId/date', async (req, res) => {
     });
 
     res.json(updatedPayment);
-  } catch (error: any) {
+  } catch (error) {
     console.error('Update payment date error:', error);
-    if (error.code === 'P2025') {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
       return res.status(404).json({ error: 'Payment not found' });
     }
     res.status(500).json({ error: 'Internal server error' });
@@ -116,20 +117,21 @@ router.get('/', async (req, res) => {
   try {
     const { rentalId, method, from, to } = req.query;
 
-    const where: any = {};
+    const where: Prisma.PaymentWhereInput = {};
     
     if (rentalId) {
-      where.rentalId = rentalId;
+      where.rentalId = rentalId as string;
     }
 
     if (method) {
-      where.method = method;
+      where.method = method as PaymentMethod;
     }
 
     if (from || to) {
-      where.paidAt = {};
-      if (from) where.paidAt.gte = new Date(from as string);
-      if (to) where.paidAt.lte = new Date(to as string);
+      where.paidAt = {
+        ...(from ? { gte: new Date(from as string) } : {}),
+        ...(to ? { lte: new Date(to as string) } : {}),
+      };
     }
 
     const payments = await prisma.payment.findMany({

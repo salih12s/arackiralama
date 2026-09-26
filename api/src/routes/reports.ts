@@ -5,8 +5,6 @@ import {
   getMonthlyReport,
   getVehicleIncomeReport,
   getDebtorReport,
-  getFinancialDashboard,
-  getOverallVehiclePerformance,
   getVehicleRevenueReport
 } from '../services/report';
 

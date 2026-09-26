@@ -59,10 +59,10 @@ export async function getDashboardStats(month?: number, year?: number): Promise<
     where: { active: true }
   });
 
-  const statusCounts = vehicleCounts.reduce((acc: any, item: any) => {
+  const statusCounts = vehicleCounts.reduce<Record<string, number>>((acc, item) => {
     acc[item.status] = item._count;
     return acc;
-  }, {} as Record<string, number>);
+  }, {});
 
   // Calculate month totals
   const monthlyRentals = await prisma.rental.findMany({
@@ -96,7 +96,7 @@ export async function getDashboardStats(month?: number, year?: number): Promise<
     return Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1; // +1 çünkü aynı gün de dahil
   };
 
-  monthlyRentals.forEach((rental: any) => {
+  monthlyRentals.forEach((rental) => {
     const startDate = new Date(rental.startDate);
     const endDate = new Date(rental.endDate);
     
@@ -117,7 +117,7 @@ export async function getDashboardStats(month?: number, year?: number): Promise<
       monthBilled += monthlyPortion + additionalCosts;
       
       // Ödemeler için de aynı oranı uygula
-      const paymentSum = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
+      const paymentSum = rental.payments.reduce((sum: number, payment) => sum + payment.amount, 0);
       const manualPayments = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
       const totalPayments = paymentSum + manualPayments;
       
@@ -135,7 +135,7 @@ export async function getDashboardStats(month?: number, year?: number): Promise<
   });
 
   return {
-    totalVehicles: Object.values(statusCounts).reduce((sum: number, count: any) => sum + count, 0),
+    totalVehicles: Object.values(statusCounts).reduce((sum: number, count) => sum + count, 0),
     rentedToday: statusCounts.RENTED || 0, // Araç durumu RENTED olanların sayısı
     idle: statusCounts.IDLE || 0,
     reserved: statusCounts.RESERVED || 0,
@@ -183,7 +183,7 @@ export async function getMonthlyReport(year: number): Promise<MonthlyReportItem[
       return Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1; // +1 çünkü aynı gün de dahil
     };
 
-    rentals.forEach((rental: any) => {
+    rentals.forEach((rental) => {
       const rentalStartDate = new Date(rental.startDate);
       const rentalEndDate = new Date(rental.endDate);
       
@@ -205,7 +205,7 @@ export async function getMonthlyReport(year: number): Promise<MonthlyReportItem[
         billed += totalMonthlyBilling;
         
         // Ödemeler için de aynı oranı uygula
-        const paymentSum = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
+        const paymentSum = rental.payments.reduce((sum: number, payment) => sum + payment.amount, 0);
         const manualPayments = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
         const totalPayments = paymentSum + manualPayments;
         
@@ -244,17 +244,17 @@ export async function getVehicleIncomeReport(): Promise<VehicleIncomeReport[]> {
     }
   });
 
-  return vehicles.map((vehicle: any) => {
+  return vehicles.map((vehicle) => {
     let billed = 0;
     let collected = 0;
     let outstanding = 0;
 
-    vehicle.rentals.forEach((rental: any) => {
+    vehicle.rentals.forEach((rental) => {
       // Araç geliri = Sadece kiralama ücreti + KM farkı (temizlik, HGS vs. hariç)
       const vehicleIncome = (rental.days * rental.dailyPrice) + (rental.kmDiff || 0);
       billed += vehicleIncome;
       
-      const paymentSum = rental.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
+      const paymentSum = rental.payments.reduce((sum: number, payment) => sum + payment.amount, 0);
       const manualPayments = rental.upfront + rental.pay1 + rental.pay2 + rental.pay3 + rental.pay4;
       const totalCollected = paymentSum + manualPayments;
       
@@ -293,10 +293,10 @@ export async function getVehicleRevenueReport(): Promise<VehicleRevenue[]> {
     }
   });
 
-  return vehicles.map((vehicle: any) => {
+  return vehicles.map((vehicle) => {
     let totalRevenue = 0;
 
-    vehicle.rentals.forEach((rental: any) => {
+    vehicle.rentals.forEach((rental) => {
       // Araç geliri = Kiralama ücreti + KM farkı (sadece araçla ilgili gelir)
       const dailyRate = rental.dailyPrice || 0;
       const days = rental.days || 0;
@@ -328,7 +328,7 @@ export async function getDebtorReport(): Promise<{ customerId: string; customerN
   // Müşteri bazında borç toplamı
   const customerDebtMap = new Map<string, { customerName: string; totalDebt: number }>();
 
-  rentals.forEach((rental: any) => {
+  rentals.forEach((rental) => {
     // UnpaidDebtsDetail mantığı ile gerçek zamanlı hesaplama
     const days = rental.days || 0;
     const dailyPrice = rental.dailyPrice || 0;  // TL cinsinden
@@ -346,7 +346,7 @@ export async function getDebtorReport(): Promise<{ customerId: string; customerN
     
     // Ödemeler - TL cinsinden
     const installmentPayments = (rental.upfront || 0) + (rental.pay1 || 0) + (rental.pay2 || 0) + (rental.pay3 || 0) + (rental.pay4 || 0);
-    const extraPayments = rental.payments.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0);
+    const extraPayments = rental.payments.reduce((sum: number, payment) => sum + (payment.amount || 0), 0);
     const totalPaid = installmentPayments + extraPayments;
     
     // Bakiye hesaplama

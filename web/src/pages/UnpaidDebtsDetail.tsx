@@ -130,7 +130,7 @@ export const UnpaidDebtsDetail: React.FC = () => {
   };
 
   const handleEditFormChange = (field: string, value: any) => {
-    let newForm = { ...editForm, [field]: value };
+    const newForm = { ...editForm, [field]: value };
 
     // Auto-calculate dates and days
     if (field === 'startDate' || field === 'endDate') {
@@ -183,10 +183,6 @@ export const UnpaidDebtsDetail: React.FC = () => {
         customersApi.getAll(undefined, 1000)
       ]);
 
-      console.log('Rentals Response:', rentalsResponse);
-      console.log('Vehicles Response:', vehiclesResponse);
-      console.log('Customers Response:', customersResponse);
-
       const rentalsData = Array.isArray(rentalsResponse.data) ? rentalsResponse.data : (rentalsResponse.data.data || []);
       const vehiclesData = vehiclesResponse.data ? vehiclesResponse.data : vehiclesResponse;
       const customersData = customersResponse.data ? customersResponse.data.data : customersResponse.data;
@@ -202,15 +198,10 @@ export const UnpaidDebtsDetail: React.FC = () => {
       setCustomers(Array.isArray(customersData) ? customersData : []);
 
         const formattedData: RentalData[] = rentalsData.map((rental: any) => {
-          console.log('Rental data:', rental); // Debug için
-          
           const vehicle = Array.isArray(vehiclesData) 
             ? vehiclesData.find((v: any) => v.id === rental.vehicleId)
             : null;
             
-          console.log('Found vehicle:', vehicle); // Debug için
-          console.log('Customer data:', rental.customer); // Debug için
-          
           // Orijinal toplam tutarı note'dan oku
           const noteMatch = rental.note?.match(/ORIGINAL_TOTAL:(\d+)/);
           const originalTotalTL = noteMatch ? parseInt(noteMatch[1]) / 100 : (rental.days * rental.dailyPrice);
@@ -309,7 +300,6 @@ export const UnpaidDebtsDetail: React.FC = () => {
   const handleEditRental = (rentalId: string) => {
     const rental = filteredRentals.find(r => r.id === rentalId);
     if (rental) {
-      console.log('Edit rental data:', rental); // Debug için
       setEditingRental(rental);
       // Veriler artık API'dan TL cinsinde geliyor, direkt kullan (100'e bölme!)
       setEditForm({
@@ -333,7 +323,6 @@ export const UnpaidDebtsDetail: React.FC = () => {
         description: rental.description?.replace(/ORIGINAL_TOTAL:\d+\|?/, '') || '',
         note: rental.note || '' // Orijinal note'u da sakla
       });
-      console.log('Edit form set:', editForm); // Debug için
       setEditModalOpen(true);
     }
   };
@@ -366,8 +355,6 @@ export const UnpaidDebtsDetail: React.FC = () => {
         note: editForm.description              // Açıklama alanı
       };
 
-      console.log('Updating rental with data:', updatedData);
-
       // Call API to update rental
       await rentalsApi.update(editingRental.id, updatedData);
       
@@ -377,8 +364,6 @@ export const UnpaidDebtsDetail: React.FC = () => {
       // Close modal
       setEditModalOpen(false);
       setEditingRental(null);
-      
-      console.log('Rental updated successfully');
     } catch (error) {
       console.error('Error updating rental:', error);
       setError('Kiralama güncellenirken hata oluştu');

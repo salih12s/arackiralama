@@ -1,4 +1,5 @@
 import express from 'express';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import multer from 'multer';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
@@ -197,9 +198,10 @@ router.get('/', async (req, res) => {
   try {
     const { status, consignment, archived = 'active', limit = '1000' } = req.query;
     
-    const where: any = {};
-    if (status && vehicleStatusSchema.safeParse(status).success) {
-      where.status = status;
+    const where: Prisma.VehicleWhereInput = {};
+    const parsedStatus = vehicleStatusSchema.safeParse(status);
+    if (parsedStatus.success) {
+      where.status = parsedStatus.data;
     }
     
     // Konsinye araç filtrelemesi

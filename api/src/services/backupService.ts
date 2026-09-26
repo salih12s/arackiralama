@@ -20,13 +20,13 @@ export class BackupService {
       await fs.access(this.backupDir);
     } catch {
       await fs.mkdir(this.backupDir, { recursive: true });
-      console.log(`📁 Backup directory created: ${this.backupDir}`);
+      console.info(`📁 Backup directory created: ${this.backupDir}`);
     }
   }
 
   async createBackup(): Promise<{ filename: string; size: number; recordCounts: Record<string, number> }> {
     try {
-      console.log('🔄 Creating automated backup...');
+      console.info('🔄 Creating automated backup...');
 
       // Fetch all data from database
       const [users, vehicles, customers, rentals, payments] = await Promise.all([
@@ -104,7 +104,7 @@ export class BackupService {
       // Get file size
       const stats = await fs.stat(filepath);
 
-      console.log('✅ Automated backup created successfully:', {
+      console.info('✅ Automated backup created successfully:', {
         filename,
         size: `${(stats.size / 1024).toFixed(1)} KB`,
         records: backup.data
@@ -150,7 +150,7 @@ export class BackupService {
         for (const backup of filesToDelete) {
           await fs.unlink(backup.filepath);
           deletedCount++;
-          console.log(`🗑️ Deleted old backup: ${backup.filename}`);
+          console.info(`🗑️ Deleted old backup: ${backup.filename}`);
         }
       }
 
@@ -211,16 +211,16 @@ export class BackupService {
 
   // Schedule automatic backups
   startScheduledBackups(schedule: string = '0 2 * * *') { // Default: Daily at 2 AM
-    console.log(`📅 Scheduling automatic backups with cron: ${schedule}`);
+    console.info(`📅 Scheduling automatic backups with cron: ${schedule}`);
     
     cron.schedule(schedule, async () => {
       try {
-        console.log('🕐 Running scheduled backup...');
+        console.info('🕐 Running scheduled backup...');
         await this.createBackup();
         await this.cleanOldBackups();
         
         const stats = await this.getBackupStats();
-        console.log('📊 Backup stats after scheduled run:', stats);
+        console.info('📊 Backup stats after scheduled run:', stats);
         
       } catch (error) {
         console.error('❌ Scheduled backup failed:', error);
@@ -229,7 +229,7 @@ export class BackupService {
       timezone: "Europe/Istanbul"
     });
 
-    console.log('✅ Scheduled backups started');
+    console.info('✅ Scheduled backups started');
   }
 
   // For weekly backups
@@ -254,7 +254,7 @@ export const backupService = new BackupService(
 // Export function to start automatic backups
 export const initializeBackupScheduler = (frequency?: 'daily' | 'weekly' | 'monthly') => {
   const backupFrequency = frequency || (process.env.BACKUP_FREQUENCY as 'daily' | 'weekly' | 'monthly') || 'weekly';
-  console.log(`🚀 Initializing ${backupFrequency} backup scheduler...`);
+  console.info(`🚀 Initializing ${backupFrequency} backup scheduler...`);
   
   switch (backupFrequency) {
     case 'daily':
@@ -271,6 +271,6 @@ export const initializeBackupScheduler = (frequency?: 'daily' | 'weekly' | 'mont
   // Create initial backup stats
   setTimeout(async () => {
     const stats = await backupService.getBackupStats();
-    console.log('📊 Current backup stats:', stats);
+    console.info('📊 Current backup stats:', stats);
   }, 1000);
 };

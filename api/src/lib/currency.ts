@@ -38,6 +38,6 @@ export function formatTLAmount(kurus: number | bigint): string {
 }
 
 // Validation: kuruş değeri geçerli mi?
-export function isValidKurus(value: any): boolean {
+export function isValidKurus(value: unknown): boolean {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0;
 }

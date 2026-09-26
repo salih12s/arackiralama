@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { mkdir, unlink, writeFile } from 'fs/promises';
 import path from 'path';
 import dotenv from 'dotenv';
-import { v2 as cloudinary } from 'cloudinary';
+import { v2 as cloudinary, type UploadApiResponse } from 'cloudinary';
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 dotenv.config();
@@ -62,7 +62,7 @@ class LocalImageStorageProvider implements ImageStorageProvider {
     const root = path.resolve(imageStorageConfig.uploadDir);
     const target = path.resolve(root, ...storageKey.split('/'));
     if (target !== root && !target.startsWith(`${root}${path.sep}`)) throw new Error('Geçersiz storage anahtarı.');
-    try { await unlink(target); } catch (error: any) { if (error?.code !== 'ENOENT') throw error; }
+    try { await unlink(target); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
   }
 }
 
@@ -82,12 +82,12 @@ class CloudinaryImageStorageProvider implements ImageStorageProvider {
     return cloudinary.url(storageKey, { secure: true, resource_type: 'image' });
   }
 
-  async uploadVehicleImage({ buffer, mimeType, vehicleId }: { buffer: Buffer; mimeType: VehicleImageMimeType; vehicleId: string }) {
-    const result = await new Promise<any>((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream({ folder: `ss-filo/vehicles/${vehicleId}`, resource_type: 'image' }, (error, uploaded) => error ? reject(error) : resolve(uploaded));
+  async uploadVehicleImage({ buffer, vehicleId }: { buffer: Buffer; mimeType: VehicleImageMimeType; vehicleId: string }) {
+    const result = await new Promise<UploadApiResponse>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream({ folder: `ss-filo/vehicles/${vehicleId}`, resource_type: 'image' }, (error, uploaded) => (error || !uploaded ? reject(error ?? new Error('Cloudinary upload failed')) : resolve(uploaded)));
       stream.end(buffer);
     });
-    return { storageKey: result.public_id as string, imageUrl: result.secure_url as string };
+    return { storageKey: result.public_id, imageUrl: result.secure_url };
   }
 
   async deleteVehicleImage({ storageKey }: { storageKey?: string | null }) {

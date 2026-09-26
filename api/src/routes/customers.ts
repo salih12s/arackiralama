@@ -43,7 +43,7 @@ router.get('/', async (req, res) => {
       success: true,
       data: customers.map(customer => ({
         ...customer,
-        rentalCount: (customer as any)._count?.rentals || 0
+        rentalCount: customer._count.rentals
       }))
     });
   } catch (error) {
@@ -89,7 +89,7 @@ router.get('/:id', async (req, res) => {
       success: true,
       data: {
         ...customer,
-        rentalCount: (customer as any)._count?.rentals || 0
+        rentalCount: customer._count.rentals
       }
     });
   } catch (error) {

@@ -26,7 +26,7 @@ export function formatSpec(value?: string | null): string {
     .toLocaleLowerCase('tr-TR')
     .replace(/(^|[\s/-])\S/g, (letter) => letter.toLocaleUpperCase('tr-TR'))
     // Kısaltmalar büyük harf kalır ("Suv" → "SUV").
-    .replace(/(Suv|Lpg)/g, (word) => word.toLocaleUpperCase('tr-TR'));
+    .replace(/\b(Suv|Lpg)\b/g, (word) => word.toLocaleUpperCase('tr-TR'));
 }
 
 /** Sayfa başlığı ve description'ı günceller (SPA SEO). */

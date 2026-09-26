@@ -2,13 +2,13 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
-export function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) {
+export function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>) {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 }
 
-export function errorHandler(err: any, _req: Request, res: Response, _next: NextFunction) {
+export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
   if (err instanceof z.ZodError) {
     return res.status(400).json({ error: 'Invalid input', details: err.errors });
   }

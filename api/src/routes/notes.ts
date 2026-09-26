@@ -21,7 +21,7 @@ const updateNoteSchema = z.object({
 // GET /api/notes
 router.get('/', async (req, res) => {
   try {
-    const notes = await (prisma as any).note.findMany({
+    const notes = await prisma.note.findMany({
       orderBy: {
         rowIndex: 'asc'
       }
@@ -39,7 +39,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const note = await (prisma as any).note.findUnique({
+    const note = await prisma.note.findUnique({
       where: { id }
     });
 
@@ -59,7 +59,7 @@ router.post('/', async (req, res) => {
   try {
     const validatedData = createNoteSchema.parse(req.body);
     
-    const note = await (prisma as any).note.create({
+    const note = await prisma.note.create({
       data: validatedData
     });
 
@@ -79,7 +79,7 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const validatedData = updateNoteSchema.parse(req.body);
     
-    const note = await (prisma as any).note.update({
+    const note = await prisma.note.update({
       where: { id },
       data: validatedData
     });
@@ -99,7 +99,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    await (prisma as any).note.delete({
+    await prisma.note.delete({
       where: { id }
     });
 
