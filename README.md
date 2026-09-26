@@ -22,6 +22,7 @@
   <a href="#açık-ve-koyu-mod">Açık / koyu mod</a> ·
   <a href="#mobil">Mobil</a> ·
   <a href="#tasarım">Tasarım</a> ·
+  <a href="#teknik-kararlar">Teknik kararlar</a> ·
   <a href="#teknoloji">Teknoloji</a>
 </p>
 
@@ -137,6 +138,44 @@ Tüm ekranlar telefona göre yeniden düzenlenir: sitede araç detayında alta s
 
 ---
 
+## Teknik kararlar
+
+### Para kuruş cinsinden tamsayı olarak tutulur
+
+Veritabanındaki bütün tutarlar (günlük ücret, ek ücretler, ödemeler, bakiye) `Int` tipinde ve **kuruş** cinsindendir. TL'ye çevirme yalnızca API yanıtında ve arayüzde yapılır ([`lib/currency.ts`](api/src/lib/currency.ts)).
+
+Neden: JavaScript'te `0.1 + 0.2 === 0.30000000000000004`. Bir kiralamanın bakiyesi peşinat, taksitler ve ek ödemeler toplanıp tutardan çıkarılarak hesaplanır. Ondalıklı sayılarla bu toplamlar zamanla kuruş kayar ve borcu kapanmış bir müşteri "0,01 ₺ borçlu" görünür. Tamsayı toplama ise her zaman kesin sonuç verir.
+
+### Aynı araç iki kez kiralanamaz
+
+- **Tek kural, tek yer.** Tarih çakışması kontrolü [`availabilityService.ts`](api/src/services/availabilityService.ts) içinde yapılır; site listesi, araç detayı, rezervasyon oluşturma ve onaylama hep aynı `rangesOverlap` fonksiyonunu kullanır. Karşılaştırma gün düzeyinde ve kapsayıcıdır: bir aracın iade edildiği gün aynı araç başkasına teslim edilemez. Aynı gün devir bilinçli olarak ekibin elle onayına bırakılmıştır.
+- **Listeleme anındaki bilgiye güvenilmez.** Müşteri filo sayfasında aracı "müsait" gördükten sonra formu doldururken araç başkasına gitmiş olabilir. Bu yüzden `POST /api/public/reservations` ucu müsaitliği yeniden, **Serializable** bir transaction içinde kontrol eder. Aynı araç için iki talep aynı anda gelirse PostgreSQL biri için serileştirme hatası verir (`P2034`). Kullanıcı bunu çöken bir istek olarak değil, "tekrar deneyin" diyen bir `409` olarak görür.
+- **Bekleyen talep aracı kilitlemez, onay kilitler.** Siteden gelen talep `PENDING` durumunda başlar ve genel müsaitliği etkilemez. Aksi halde tek bir sahte form aracı günlerce kilitleyebilirdi. Kontrol, ekip talebi onaylarken aynı transaction düzeniyle tekrarlanır; aynı tarihler için ikinci onay reddedilir. Aynı telefon numarasından aynı araca çakışan ikinci talep ise en baştan kabul edilmez.
+- **Serviste olan araç tamamen kapalıdır.** Servis dönüş tarihi sistemde tutulmadığı için güvenli olan taraf seçildi: serviste olan araç hiçbir tarih için kiralanamaz.
+
+### Fiyat sunucuda hesaplanır
+
+Rezervasyon isteğinde tutar alanı yoktur; gönderilse bile doğrulama şeması onu atar. Toplam tutar sunucuda, aracın veritabanındaki günlük ücretinden hesaplanır ([`quoteService.ts`](api/src/services/quoteService.ts)).
+
+- Tarayıcıdan gelen hiçbir tutara güvenilemez; geliştirici araçlarıyla değiştirilebilir.
+- Filo listesi, araç detayı ve rezervasyon ucu aynı `buildQuote` fonksiyonunu çağırır; ekranlar arasında fiyat farkı çıkamaz.
+- Hesaplanan tutar rezervasyona `quotedAmount` olarak yazılır. Ekip daha sonra fiyatı değiştirse de müşteriye söylenen tutar kayıtta kalır.
+- Tarihler sunucunun saat diliminden bağımsız olarak İstanbul saatine (`+03:00`) sabitlenerek okunur; bulut sunucusu UTC'de çalışsa bile gün sayısı değişmez.
+
+### Herkese açık uçlar
+
+- Rezervasyon oluşturma IP başına 15 dakikada 10 istekle, okuma uçları dakikada 120 istekle sınırlıdır.
+- Sitede plakalar maskelenir (`34 ••• 07`).
+- Rezervasyon sorgulamak için kod ve telefonun birlikte doğru olması gerekir. Kod yanlış da olsa telefon yanlış da olsa aynı hata mesajı döner; böylece sorgulama ucundan hangi kodların var olduğu öğrenilemez.
+- Rezervasyon kodlarında birbirine karışan karakterler (`0/O`, `1/I/L`) kullanılmaz; kod telefonda harf harf okunabilir.
+
+### Bilinen sınırlar
+
+- Panelden elle açılan kiralamalar henüz müsaitlik servisinden geçmiyor. Çakışma kontrolü şimdilik yalnızca web talepleri ve onay akışında yapılıyor.
+- Ödeme planındaki `pay1`–`pay4` sütunları ilk sürümden kaldı. Yeni ödemeler ayrı `Payment` tablosuna yazılıyor; eski sütunların bu tabloya taşınması planlanıyor.
+
+---
+
 ## Teknoloji
 
 **Arayüz**
@@ -158,9 +197,10 @@ Tüm ekranlar telefona göre yeniden düzenlenir: sitede araç detayında alta s
 - [PostgreSQL](https://www.postgresql.org) – veritabanı
 - [Prisma](https://www.prisma.io) – ORM ve migration'lar
 
-**Dışa aktarma ve test**
+**Dışa aktarma, test ve kod kalitesi**
 - [SheetJS](https://sheetjs.com) – Excel; [jsPDF](https://github.com/parallax/jsPDF) – PDF rapor
 - [Vitest](https://vitest.dev) ve [Jest](https://jestjs.io) – arayüz ve servis testleri
+- [ESLint](https://eslint.org) + [typescript-eslint](https://typescript-eslint.io) – API'de `any` yasak, `console.log` uyarı verir
 
 ---
 
