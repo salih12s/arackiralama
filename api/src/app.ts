@@ -24,6 +24,13 @@ dotenv.config();
 
 const app = express();
 
+// Railway gibi bir proxy arkasında gerçek istemci IP'si X-Forwarded-For'dan okunur; aksi halde
+// rate limit tüm ziyaretçileri tek IP sayar. `true` yerine sekme sayısı: başlık taklit edilemez.
+const trustProxy = process.env.TRUST_PROXY ?? (process.env.NODE_ENV === 'production' ? '1' : '');
+if (trustProxy) {
+  app.set('trust proxy', /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
+}
+
 // ---- CORS (EN ÜSTE) ----
 // İzinli origin'ler yalnızca ortam değişkenlerinden gelir (ALLOWED_ORIGIN, PUBLIC_SITE_ORIGIN).
 const allowlist = new Set<string>();

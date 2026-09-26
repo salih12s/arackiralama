@@ -234,15 +234,15 @@ async function seed() {
       const { totalDue, balance } = calculateRentalAmounts(
         {
           days: seedItem.days,
-          dailyPrice: seedItem.dailyPriceTL,
-          kmDiff: seedItem.kmDiffTL ?? 0,
-          cleaning: seedItem.cleaningTL ?? 0,
-          hgs: seedItem.hgsTL ?? 0,
-          damage: seedItem.damageTL ?? 0,
-          fuel: seedItem.fuelTL ?? 0,
-          upfront: seedItem.upfrontTL ?? 0,
+          dailyPrice: TL(seedItem.dailyPriceTL),
+          kmDiff: TL(seedItem.kmDiffTL ?? 0),
+          cleaning: TL(seedItem.cleaningTL ?? 0),
+          hgs: TL(seedItem.hgsTL ?? 0),
+          damage: TL(seedItem.damageTL ?? 0),
+          fuel: TL(seedItem.fuelTL ?? 0),
+          upfront: TL(seedItem.upfrontTL ?? 0),
         },
-        paymentsKurus as any
+        paymentsKurus
       );
 
       const rental = await prisma.rental.create({
@@ -262,7 +262,7 @@ async function seed() {
           totalDue,
           upfront: TL(seedItem.upfrontTL ?? 0),
           balance,
-          status: seedItem.status as any,
+          status: seedItem.status,
           note: seedItem.note,
           deleted: seedItem.deleted ?? false,
           deletedAt: seedItem.deleted ? addDays(startDate, seedItem.days + 1) : null,
@@ -277,7 +277,7 @@ async function seed() {
             rentalId: rental.id,
             amount: TL(p.amountTL),
             paidAt: addDays(startDate, p.afterStartDays),
-            method: p.method as any,
+            method: p.method,
           }
         });
         createdPayments++;
@@ -288,7 +288,20 @@ async function seed() {
     // ---------------------------------------------------------------------
     // 5) Reservations
     // ---------------------------------------------------------------------
-    const reservationSeeds = [
+    interface ReservationSeed {
+      customer: typeof merve;
+      vehicle: typeof a3;
+      offsetDays: number;
+      time: string;
+      duration: number;
+      status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+      note: string;
+      source?: 'WEB' | 'ADMIN' | 'PHONE';
+      code?: string;
+      pickupLocation?: string;
+    }
+
+    const reservationSeeds: ReservationSeed[] = [
       { customer: merve,   vehicle: a3,      offsetDays: -5,  time: '10:00', duration: 4, status: 'PENDING' as const,
         note: 'Web sitesi rezervasyon talebi • Havalimanından teslim alınacak',
         source: 'WEB', code: 'SS-DEMO01', pickupLocation: 'İstanbul Havalimanı' },
@@ -312,11 +325,11 @@ async function seed() {
           rentalDuration: r.duration,
           note: r.note,
           status: r.status,
-          source: (r as any).source ?? 'ADMIN',
-          reservationCode: (r as any).code ?? null,
-          pickupLocation: (r as any).pickupLocation ?? null,
+          source: r.source ?? 'ADMIN',
+          reservationCode: r.code ?? null,
+          pickupLocation: r.pickupLocation ?? null,
           quotedAmount: r.vehicle.dailyRate != null ? r.vehicle.dailyRate * r.duration : null,
-          termsAcceptedAt: (r as any).source === 'WEB' ? addDays(now, -r.offsetDays - 1) : null,
+          termsAcceptedAt: r.source === 'WEB' ? addDays(now, -r.offsetDays - 1) : null,
         }
       });
     }

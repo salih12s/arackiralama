@@ -5,6 +5,12 @@ export interface RentalCalculation {
   balance: number;
 }
 
+/**
+ * Kiralama tutar hesabı. GİRDİLER ve ÇIKTILAR KURUŞ cinsindendir (veritabanıyla aynı birim).
+ * TL ↔ kuruş dönüşümü yalnızca API sınırında yapılır.
+ *
+ * Kural web tarafındaki `getRentalFinancials` ile birebir aynıdır; panel ve raporlar aynı rakamı gösterir.
+ */
 export interface RentalInput {
   days: number;
   dailyPrice: number;
@@ -18,6 +24,8 @@ export interface RentalInput {
   pay2?: number;
   pay3?: number;
   pay4?: number;
+  /** "ORIGINAL_TOTAL:<kuruş>" etiketi taşıyabilir */
+  note?: string | null;
 }
 
 export interface RentalWithPayments extends Rental {
@@ -25,52 +33,32 @@ export interface RentalWithPayments extends Rental {
 }
 
 /**
- * Calculate total due amount in KURUŞ
- * ALL fields are in TL except payments which are already in kuruş
- * Convert TL fields to kuruş for consistency
+ * Kira bedeli (kuruş). Panel günlük ücreti 10 TL'ye yuvarlayarak saklar; kullanıcının girdiği
+ * gerçek toplam note alanında ORIGINAL_TOTAL olarak durur ve varsa o esas alınır.
  */
-export function calculateTotalDue(input: RentalInput): number {
-  const {
-    days,
-    dailyPrice,
-    kmDiff = 0,
-    cleaning = 0,
-    hgs = 0,
-    damage = 0,
-    fuel = 0
-  } = input;
+export function calculateRentBase(input: Pick<RentalInput, 'days' | 'dailyPrice' | 'note'>): number {
+  const originalTotal = input.note?.match(/ORIGINAL_TOTAL:(\d+)/);
+  return originalTotal ? parseInt(originalTotal[1], 10) : input.days * input.dailyPrice;
+}
 
-  // dailyPrice, kmDiff, cleaning, hgs, damage, fuel are in TL
-  // Convert to kuruş: TL * 100
-  const totalTL = days * dailyPrice + kmDiff + cleaning + hgs + damage + fuel;
-  return Math.round(totalTL * 100); // Return in kuruş
+/** Toplam borç (kuruş) = kira bedeli + ek ücretler */
+export function calculateTotalDue(input: RentalInput): number {
+  const { kmDiff = 0, cleaning = 0, hgs = 0, damage = 0, fuel = 0 } = input;
+  return calculateRentBase(input) + kmDiff + cleaning + hgs + damage + fuel;
 }
 
 /**
- * Calculate balance amount in KURUŞ
- * balance = totalDue - (upfront + pay1 + pay2 + pay3 + pay4 + sum(payments.amount))
- * All values are in kuruş, upfront/pay1-4 need conversion from TL
+ * Bakiye (kuruş) = toplam borç - (peşinat + taksitler + ek ödemeler).
+ * Fazla ödemede negatif olur (müşteri alacağı); kırpılmaz.
  */
 export function calculateBalance(
-  totalDue: number, // Already in kuruş
+  totalDue: number,
   rental: RentalInput,
-  payments: Payment[] = []
+  payments: Pick<Payment, 'amount'>[] = []
 ): number {
-  const {
-    upfront = 0,
-    pay1 = 0,
-    pay2 = 0,
-    pay3 = 0,
-    pay4 = 0
-  } = rental;
-
-  const paymentSum = payments.reduce((sum, payment) => sum + payment.amount, 0); // Already in kuruş
-  const manualPaymentsKurus = (upfront + pay1 + pay2 + pay3 + pay4) * 100; // Convert TL to kuruş
-  const totalPaid = manualPaymentsKurus + paymentSum;
-  
-  // Balance cannot be negative - if overpaid, balance is 0
-  const calculatedBalance = totalDue - totalPaid;
-  return Math.max(0, calculatedBalance);
+  const { upfront = 0, pay1 = 0, pay2 = 0, pay3 = 0, pay4 = 0 } = rental;
+  const paymentSum = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  return totalDue - (upfront + pay1 + pay2 + pay3 + pay4 + paymentSum);
 }
 
 /**
@@ -78,7 +66,7 @@ export function calculateBalance(
  */
 export function calculateRentalAmounts(
   input: RentalInput,
-  payments: Payment[] = []
+  payments: Pick<Payment, 'amount'>[] = []
 ): RentalCalculation {
   const totalDue = calculateTotalDue(input);
   const balance = calculateBalance(totalDue, input, payments);
