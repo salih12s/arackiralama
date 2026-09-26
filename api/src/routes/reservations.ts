@@ -1,7 +1,12 @@
 import { Router } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../db/prisma';
+import { authenticateToken } from '../middleware/auth';
+import { rangesOverlap, reservationEndDate } from '../services/availabilityService';
 
 const router = Router();
+
+router.use(authenticateToken);
 
 // GET /api/reservations - Tüm rezervasyonları listele
 router.get('/', async (req, res) => {
@@ -61,8 +66,6 @@ router.post('/', async (req, res) => {
       note
     } = req.body;
 
-    console.log('Received reservation data:', req.body);
-    
     // Frontend sadece müşteri adı ve plaka gönderiyor, ID'leri bul
     let finalCustomerId = customerId;
     let finalVehicleId = vehicleId;
@@ -125,8 +128,6 @@ router.post('/', async (req, res) => {
       if (isNaN(reservationDateTime.getTime())) {
         throw new Error('Invalid date format');
       }
-      
-      console.log('🗓️ Parsed reservation date:', reservationDateTime);
       
     } catch (error) {
       console.error('Date parsing error:', error);
@@ -226,21 +227,28 @@ router.delete('/:id', async (req, res) => {
 router.post('/:id/confirm', async (req, res) => {
   try {
     const { id } = req.params;
-    
-    const reservation = await prisma.reservation.update({
-      where: { id },
-      data: {
-        status: 'CONFIRMED'
-      },
-      include: {
-        customer: true,
-        vehicle: true
+    const result = await prisma.$transaction(async (tx) => {
+      const reservation = await tx.reservation.findUnique({ where: { id }, include: { customer: true, vehicle: true } });
+      if (!reservation) return { status: 404 as const, error: 'Rezervasyon bulunamadı.' };
+      if (reservation.status !== 'PENDING') return { status: 409 as const, error: 'Yalnızca bekleyen rezervasyonlar onaylanabilir.' };
+      if (!reservation.vehicle.active || reservation.vehicle.archivedAt || reservation.vehicle.status === 'SERVICE') return { status: 409 as const, error: 'Araç şu anda rezervasyona kapalı.' };
+
+      const requestedEnd = reservationEndDate(reservation.reservationDate, reservation.rentalDuration);
+      const [rentals, confirmed] = await Promise.all([
+        tx.rental.findMany({ where: { vehicleId: reservation.vehicleId, deleted: false, status: 'ACTIVE' }, select: { startDate: true, endDate: true } }),
+        tx.reservation.findMany({ where: { vehicleId: reservation.vehicleId, status: 'CONFIRMED', id: { not: id } }, select: { reservationDate: true, rentalDuration: true } }),
+      ]);
+      if (rentals.some((rental) => rangesOverlap(rental.startDate, rental.endDate, reservation.reservationDate, requestedEnd)) || confirmed.some((item) => rangesOverlap(item.reservationDate, reservationEndDate(item.reservationDate, item.rentalDuration), reservation.reservationDate, requestedEnd))) {
+        return { status: 409 as const, error: 'Bu araç seçilen tarihlerde artık müsait değil.' };
       }
-    });
-    
-    res.json(reservation);
+
+      return { status: 200 as const, reservation: await tx.reservation.update({ where: { id }, data: { status: 'CONFIRMED' }, include: { customer: true, vehicle: true } }) };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    if (result.status !== 200) return res.status(result.status).json({ error: result.error });
+    res.json(result.reservation);
   } catch (error) {
     console.error('Error confirming reservation:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') return res.status(409).json({ error: 'Eşzamanlı başka bir işlem var. Lütfen tekrar deneyin.' });
     res.status(500).json({ error: 'Failed to confirm reservation' });
   }
 });

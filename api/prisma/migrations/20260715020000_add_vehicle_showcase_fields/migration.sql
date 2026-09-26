@@ -1,0 +1,10 @@
+-- Kiralama sitesi vitrin alanları
+ALTER TABLE "vehicles"
+  ADD COLUMN IF NOT EXISTS "year" INTEGER,
+  ADD COLUMN IF NOT EXISTS "fuel_type" TEXT,
+  ADD COLUMN IF NOT EXISTS "transmission" TEXT,
+  ADD COLUMN IF NOT EXISTS "seats" INTEGER,
+  ADD COLUMN IF NOT EXISTS "daily_rate" INTEGER,
+  ADD COLUMN IF NOT EXISTS "description" TEXT,
+  ADD COLUMN IF NOT EXISTS "image_url" TEXT,
+  ADD COLUMN IF NOT EXISTS "show_on_site" BOOLEAN NOT NULL DEFAULT true;

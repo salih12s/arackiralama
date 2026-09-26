@@ -17,7 +17,7 @@ async function startServer() {
     const server = app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🔒 CORS allowed origin: ${process.env.ALLOWED_ORIGIN || 'https://elitefilomuhasebe.com'}`);
+      console.log(`🔒 CORS allowed origin: ${process.env.ALLOWED_ORIGIN || '(tanımsız)'}`);
     });
 
     // Initialize backup scheduler (uses BACKUP_FREQUENCY from .env or defaults to weekly)
